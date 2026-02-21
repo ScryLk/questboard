@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "QuestBoard",
+    "slug": "questboard",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#1A1A2E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.questboard"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1A2E"
+      },
+      "package": "app.questboard"
+    },
+    "scheme": "questboard",
+    "plugins": ["expo-router"]
+  }
+}

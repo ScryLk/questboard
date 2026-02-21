@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───
+
+enum Plan {
+  FREE
+  ADVENTURER
+  LEGENDARY
+}
+
+enum SessionType {
+  PRIVATE
+  PUBLIC
+  ASYNC
+}
+
+enum SessionStatus {
+  IDLE
+  LIVE
+  PAUSED
+  ENDED
+}
+
+enum PlayerRole {
+  GM
+  CO_GM
+  PLAYER
+  SPECTATOR
+}
+
+enum GridType {
+  SQUARE
+  HEX
+}
+
+enum MapGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ChatChannel {
+  GENERAL
+  IN_CHARACTER
+  WHISPER
+  GM_ONLY
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  DICE_ROLL
+  SYSTEM
+  MEDIA
+  NARRATIVE
+}
+
+// ─── Models ───
+
+model User {
+  id          String   @id @default(cuid())
+  externalId  String   @unique
+  email       String   @unique
+  displayName String
+  avatarUrl   String?
+  plan        Plan     @default(FREE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownedSessions  Session[]
+  sessionPlayers SessionPlayer[]
+  characters     Character[]
+  messages       Message[]
+  diceRolls      DiceRoll[]
+}
+
+model Session {
+  id          String        @id @default(cuid())
+  name        String
+  type        SessionType   @default(PRIVATE)
+  system      String
+  status      SessionStatus @default(IDLE)
+  inviteCode  String        @unique @default(cuid())
+  maxPlayers  Int           @default(5)
+  isPublic    Boolean       @default(false)
+  tags        String[]
+  scheduledAt DateTime?
+  ownerId     String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  owner      User            @relation(fields: [ownerId], references: [id])
+  players    SessionPlayer[]
+  maps       Map[]
+  messages   Message[]
+  diceRolls  DiceRoll[]
+  timeline   TimelineEvent[]
+  audioState SessionAudio[]
+
+  @@index([ownerId])
+  @@index([inviteCode])
+  @@index([isPublic, status])
+}
+
+model SessionPlayer {
+  id          String     @id @default(cuid())
+  role        PlayerRole @default(PLAYER)
+  joinedAt    DateTime   @default(now())
+
+  userId      String
+  sessionId   String
+  characterId String?
+
+  user      User       @relation(fields: [userId], references: [id])
+  session   Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id])
+
+  @@unique([userId, sessionId])
+  @@index([sessionId])
+}
+
+model Character {
+  id         String   @id @default(cuid())
+  name       String
+  system     String
+  templateId String?
+  data       Json
+  avatarUrl  String?
+  userId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user           User               @relation(fields: [userId], references: [id])
+  template       CharacterTemplate? @relation(fields: [templateId], references: [id])
+  sessionPlayers SessionPlayer[]
+  tokens         Token[]
+
+  @@index([userId])
+}
+
+model CharacterTemplate {
+  id      String @id @default(cuid())
+  system  String
+  name    String
+  schema  Json
+  version Int    @default(1)
+
+  characters Character[]
+
+  @@unique([system, name])
+}
+
+model Map {
+  id       String   @id @default(cuid())
+  name     String
+  imageUrl String
+  gridType GridType @default(SQUARE)
+  gridSize Int      @default(50)
+  width    Int
+  height   Int
+
+  sessionId String
+  createdAt DateTime @default(now())
+
+  session  Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokens   Token[]
+  fogAreas FogArea[]
+  layers   MapLayer[]
+
+  @@index([sessionId])
+}
+
+model Token {
+  id         String   @id @default(cuid())
+  x          Int
+  y          Int
+  size       Int      @default(1)
+  imageUrl   String?
+  label      String?
+  conditions String[]
+  currentHp  Int?
+  maxHp      Int?
+  isVisible  Boolean  @default(true)
+
+  mapId       String
+  characterId String?
+
+  map       Map        @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id])
+
+  @@index([mapId])
+}
+
+model FogArea {
+  id       String  @id @default(cuid())
+  type     String  @default("polygon")
+  points   Json
+  revealed Boolean @default(false)
+  mapId    String
+
+  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@index([mapId])
+}
+
+model MapLayer {
+  id      String  @id @default(cuid())
+  type    String
+  data    Json
+  zIndex  Int     @default(0)
+  visible Boolean @default(true)
+  mapId   String
+
+  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@index([mapId])
+}
+
+model MapGeneration {
+  id        String              @id @default(cuid())
+  prompt    String
+  params    Json
+  imageUrl  String?
+  status    MapGenerationStatus @default(PENDING)
+  sessionId String
+  createdAt DateTime            @default(now())
+
+  @@index([sessionId])
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  channel   ChatChannel @default(GENERAL)
+  content   String
+  type      MessageType @default(TEXT)
+  metadata  Json?
+  sessionId String
+  userId    String
+  targetId  String?
+  createdAt DateTime    @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([sessionId, createdAt])
+}
+
+model DiceRoll {
+  id        String   @id @default(cuid())
+  formula   String
+  results   Json
+  total     Int
+  context   String?
+  isSecret  Boolean  @default(false)
+  sessionId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([sessionId, createdAt])
+}
+
+model AudioTrack {
+  id        String  @id @default(cuid())
+  category  String
+  name      String
+  url       String
+  duration  Int
+  isBuiltin Boolean @default(true)
+}
+
+model SessionAudio {
+  id        String  @id @default(cuid())
+  layer     String  @default("ambient")
+  volume    Float   @default(0.5)
+  isPlaying Boolean @default(false)
+  sessionId String
+  trackId   String
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model TimelineEvent {
+  id        String   @id @default(cuid())
+  type      String
+  data      Json
+  sessionId String
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}

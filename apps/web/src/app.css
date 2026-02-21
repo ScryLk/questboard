@@ -1,0 +1,16 @@
+@import "tailwindcss" theme(static);
+
+@theme {
+  --color-brand-primary: #1A1A2E;
+  --color-brand-accent: #E94560;
+  --color-brand-secondary: #0F3460;
+  --color-brand-surface: #16213E;
+  --color-brand-muted: #533483;
+  --color-surface: #1A1A2E;
+  --color-surface-light: #16213E;
+  --color-surface-dark: #0F0F1A;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-heading: "Cinzel", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius-card: 12px;
+}
