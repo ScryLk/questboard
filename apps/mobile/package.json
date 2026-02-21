@@ -1,0 +1,31 @@
+{
+  "name": "@questboard/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "build:android": "eas build --platform android",
+    "build:ios": "eas build --platform ios",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .expo"
+  },
+  "dependencies": {
+    "@questboard/shared": "workspace:*",
+    "@questboard/ui": "workspace:*",
+    "expo": "~52.0.0",
+    "expo-router": "~4.0.0",
+    "expo-status-bar": "~2.0.1",
+    "nativewind": "^4.1.23",
+    "react": "^18.3.1",
+    "react-native": "0.76.7",
+    "react-native-safe-area-context": "~5.0.0",
+    "react-native-screens": "~4.4.0",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

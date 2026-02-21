@@ -1,0 +1,28 @@
+{
+  "name": "questboard",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "test:unit": "turbo test:unit",
+    "test:api": "turbo test:api",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @questboard/db db:generate",
+    "db:migrate": "pnpm --filter @questboard/db db:migrate",
+    "db:seed": "pnpm --filter @questboard/db db:seed",
+    "db:studio": "pnpm --filter @questboard/db db:studio",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=20"
+  }
+}
