@@ -94,6 +94,13 @@ enum SessionStatus {
   LIVE
   PAUSED
   ENDED
+  ARCHIVED
+}
+
+enum SessionVisibility {
+  UNLISTED
+  LISTED
+  FRIENDS_ONLY
 }
 
 enum PlayerRole {
@@ -101,6 +108,46 @@ enum PlayerRole {
   CO_GM
   PLAYER
   SPECTATOR
+}
+
+enum RsvpStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  TENTATIVE
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  STARTED
+  COMPLETED
+  CANCELLED
+  SKIPPED
+}
+
+enum ReportReason {
+  HARASSMENT
+  HATE_SPEECH
+  INAPPROPRIATE
+  SPAM
+  CHEATING
+  IMPERSONATION
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
 }
 
 enum GridType {
@@ -187,6 +234,10 @@ model User {
   // Notifications
   notifications       Notification[]
   deviceTokens        DeviceToken[]
+
+  // Invites
+  sentInvites         SessionInvite[]  @relation("InvitesSent")
+  receivedInvites     SessionInvite[]  @relation("InvitesReceived")
 
   @@index([clerkId])
   @@index([plan])
@@ -303,6 +354,10 @@ model PlanLimit {
   // ── Social ──
   maxFriends            Int     @default(50)
   allowInitiativeTracker Boolean @default(false)
+
+  // ── Spectators ──
+  allowSpectators       Boolean @default(false)
+  maxSpectatorsPerSession Int   @default(0)
 
   // ── Player Plus específico ──
   maxPersonalStorageMb  Int     @default(0)
@@ -488,41 +543,77 @@ model DeviceToken {
 // ╚══════════════════════════════════════════════════════════════════╝
 
 model Session {
-  id           String        @id @default(cuid())
-  name         String
-  system       String        @default("generic")
-  type         SessionType   @default(PRIVATE)
-  status       SessionStatus @default(IDLE)
-  inviteCode   String        @unique @default(cuid())
-  maxPlayers   Int           @default(5)
-  tags         String[]
-  description  String?       @db.VarChar(1000)
-  bannerUrl    String?
-  scheduledAt  DateTime?
+  id            String        @id @default(cuid())
 
-  ownerId      String
-  owner        User          @relation(fields: [ownerId], references: [id])
+  // ── Identidade ──
+  name          String        @db.VarChar(100)
+  slug          String?       @unique
+  description   String?       @db.VarChar(2000)
+  bannerUrl     String?
+  system        String        @default("generic")
+  tags          String[]
 
-  settings     Json          @default("{}")
+  // ── Tipo e Acesso ──
+  type          SessionType   @default(PRIVATE)
+  status        SessionStatus @default(IDLE)
+  visibility    SessionVisibility @default(UNLISTED)
+  inviteCode    String        @unique @default(cuid())
+  password      String?
 
-  startedAt    DateTime?
-  endedAt      DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deletedAt    DateTime?
+  // ── Limites ──
+  maxPlayers    Int           @default(5)
+  allowSpectators Boolean     @default(false)
+  maxSpectators Int           @default(0)
 
-  players      SessionPlayer[]
-  maps         Map[]
-  messages     Message[]
-  diceRolls    DiceRoll[]
-  timeline     TimelineEvent[]
-  audioState   SessionAudio[]
+  // ── Scheduling ──
+  scheduledAt   DateTime?
+  timezone      String?
+  recurringRule Json?
+  remindBeforeMinutes Int?    @default(30)
+
+  // ── Metadata da sessão ──
+  sessionNumber Int           @default(1)
+  lastPlayedAt  DateTime?
+  totalPlaytime Int           @default(0)
+
+  // ── Configurações de jogo ──
+  settings      Json          @default("{}")
+
+  // ── Extensível ──
+  metadata      Json          @default("{}")
+
+  // ── Owner ──
+  ownerId       String
+  owner         User          @relation(fields: [ownerId], references: [id])
+
+  // ── Timestamps ──
+  startedAt     DateTime?
+  endedAt       DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  // ── Relacionamentos ──
+  players       SessionPlayer[]
+  invites       SessionInvite[]
+  schedules     SessionSchedule[]
+  maps          Map[]
+  messages      Message[]
+  diceRolls     DiceRoll[]
+  timeline      TimelineEvent[]
+  audioState    SessionAudio[]
+  combatState   CombatState?
+  sessionLog    SessionLog[]
+  reports       SessionReport[]
 
   @@index([ownerId])
   @@index([status])
+  @@index([type, visibility, status])
   @@index([inviteCode])
-  @@index([type, status])
+  @@index([scheduledAt])
+  @@index([system, type, visibility])
   @@index([deletedAt])
+  @@index([slug])
 }
 
 model SessionPlayer {
@@ -531,19 +622,194 @@ model SessionPlayer {
   sessionId     String
   characterId   String?
   role          PlayerRole  @default(PLAYER)
+
+  // ── Estado ──
+  isConnected   Boolean     @default(false)
+  lastConnectedAt DateTime?
+  isMuted       Boolean     @default(false)
+  isBanned      Boolean     @default(false)
+
+  // ── Stats desta sessão ──
+  totalMinutesPlayed Int    @default(0)
+  totalDiceRolled    Int    @default(0)
+  totalMessages      Int    @default(0)
+  sessionsAttended   Int    @default(0)
+
+  // ── Preferências por sessão ──
+  nickname      String?
+  color         String?
+
+  // ── RSVP ──
+  rsvpStatus    RsvpStatus? @default(PENDING)
+
+  // ── Extensível ──
+  metadata      Json        @default("{}")
+
+  // ── Timestamps ──
   joinedAt      DateTime    @default(now())
   leftAt        DateTime?
-
-  minutesPlayed Int         @default(0)
-  diceRolled    Int         @default(0)
-  messagesCount Int         @default(0)
+  kickedAt      DateTime?
+  kickReason    String?
 
   user          User        @relation(fields: [userId], references: [id])
   session       Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   character     Character?  @relation(fields: [characterId], references: [id])
 
   @@unique([userId, sessionId])
+  @@index([sessionId, isConnected])
+  @@index([sessionId, role])
+  @@index([userId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CONVITES PARA SESSÃO                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model SessionInvite {
+  id            String        @id @default(cuid())
+  sessionId     String
+  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // ── Quem convidou ──
+  invitedById   String
+  invitedBy     User          @relation("InvitesSent", fields: [invitedById], references: [id])
+
+  // ── Quem foi convidado ──
+  invitedUserId String?
+  invitedUser   User?         @relation("InvitesReceived", fields: [invitedUserId], references: [id])
+  invitedEmail  String?
+
+  // ── Estado ──
+  status        InviteStatus  @default(PENDING)
+  role          PlayerRole    @default(PLAYER)
+  message       String?       @db.VarChar(500)
+
+  // ── Validade ──
+  expiresAt     DateTime?
+  maxUses       Int?
+  usedCount     Int           @default(0)
+
+  // ── Token de convite ──
+  token         String        @unique @default(cuid())
+
+  metadata      Json          @default("{}")
+  createdAt     DateTime      @default(now())
+  respondedAt   DateTime?
+
+  @@index([sessionId, status])
+  @@index([invitedUserId, status])
+  @@index([invitedEmail])
+  @@index([token])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  AGENDAMENTO DE SESSÕES                                         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model SessionSchedule {
+  id            String   @id @default(cuid())
+  sessionId     String
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // ── Ocorrência ──
+  scheduledFor  DateTime
+  duration      Int?
+
+  // ── Estado ──
+  status        ScheduleStatus @default(SCHEDULED)
+  cancelReason  String?
+
+  // ── Recorrência ──
+  isRecurring   Boolean  @default(false)
+  parentRuleId  String?
+
+  // ── RSVP Summary ──
+  confirmedCount Int     @default(0)
+  declinedCount  Int     @default(0)
+  pendingCount   Int     @default(0)
+
+  // ── Notificações ──
+  reminderSent  Boolean  @default(false)
+  startingSent  Boolean  @default(false)
+
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([sessionId, scheduledFor])
+  @@index([sessionId, scheduledFor])
+  @@index([scheduledFor, status])
+  @@index([status])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ESTADO DE COMBATE                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model CombatState {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // ── Estado ──
+  isActive      Boolean  @default(false)
+  round         Int      @default(1)
+  turnIndex     Int      @default(0)
+
+  // ── Initiative Order ──
+  initiativeOrder Json   @default("[]")
+
+  // ── Histórico ──
+  combatLog     Json     @default("[]")
+
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LOG DA SESSÃO                                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model SessionLog {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  event       String
+  actorId     String?
+  targetId    String?
+  data        Json     @default("{}")
+
+  createdAt   DateTime @default(now())
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([sessionId, event])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  DENÚNCIAS DE SESSÃO                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model SessionReport {
+  id            String       @id @default(cuid())
+  sessionId     String
+  session       Session      @relation(fields: [sessionId], references: [id])
+  reporterId    String
+
+  reason        ReportReason
+  description   String?      @db.VarChar(1000)
+  evidence      Json         @default("[]")
+
+  status        ReportStatus @default(OPEN)
+  resolvedById  String?
+  resolvedAt    DateTime?
+  resolution    String?
+
+  createdAt     DateTime     @default(now())
+
   @@index([sessionId])
+  @@index([status])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗

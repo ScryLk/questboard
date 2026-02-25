@@ -43,3 +43,10 @@ export class ConflictError extends AppError {
     this.name = "ConflictError";
   }
 }
+
+export class GoneError extends AppError {
+  constructor(message: string) {
+    super(410, "GONE", message);
+    this.name = "GoneError";
+  }
+}

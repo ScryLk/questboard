@@ -1,4 +1,5 @@
 export { colors } from "./colors.js";
+export { PERMISSIONS, checkPermission, SOCKET_RATE_LIMITS } from "./permissions.js";
 
 export const MAX_PLAYERS = 20;
 export const DEFAULT_GRID_SIZE = 50;

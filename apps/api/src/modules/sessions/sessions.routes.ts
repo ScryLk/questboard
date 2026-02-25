@@ -7,12 +7,20 @@ export async function sessionsRoutes(app: FastifyInstance) {
   const service = createSessionsService(prisma);
   const controller = createSessionsController(service);
 
+  // CRUD
   app.get("/sessions", controller.list);
   app.post("/sessions", controller.create);
-  app.get("/sessions/public", controller.listPublic);
   app.get("/sessions/:id", controller.getById);
   app.patch("/sessions/:id", controller.update);
   app.delete("/sessions/:id", controller.delete);
-  app.post("/sessions/:id/join", controller.join);
-  app.post("/sessions/:id/leave", controller.leave);
+
+  // Lifecycle
+  app.post("/sessions/:id/start", controller.start);
+  app.post("/sessions/:id/pause", controller.pause);
+  app.post("/sessions/:id/resume", controller.resume);
+  app.post("/sessions/:id/end", controller.end);
+  app.post("/sessions/:id/transfer", controller.transfer);
+
+  // Log
+  app.get("/sessions/:id/log", controller.getLog);
 }

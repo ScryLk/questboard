@@ -6,3 +6,8 @@ export * from "./user.schema.js";
 export * from "./billing.schema.js";
 export * from "./friends.schema.js";
 export * from "./notifications.schema.js";
+export * from "./invite.schema.js";
+export * from "./schedule.schema.js";
+export * from "./combat.schema.js";
+export * from "./lobby.schema.js";
+export * from "./report.schema.js";

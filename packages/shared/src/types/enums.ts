@@ -80,6 +80,13 @@ export enum SessionStatus {
   LIVE = "LIVE",
   PAUSED = "PAUSED",
   ENDED = "ENDED",
+  ARCHIVED = "ARCHIVED",
+}
+
+export enum SessionVisibility {
+  UNLISTED = "UNLISTED",
+  LISTED = "LISTED",
+  FRIENDS_ONLY = "FRIENDS_ONLY",
 }
 
 export enum PlayerRole {
@@ -87,6 +94,46 @@ export enum PlayerRole {
   CO_GM = "CO_GM",
   PLAYER = "PLAYER",
   SPECTATOR = "SPECTATOR",
+}
+
+export enum RsvpStatus {
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  DECLINED = "DECLINED",
+  TENTATIVE = "TENTATIVE",
+}
+
+export enum InviteStatus {
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  DECLINED = "DECLINED",
+  EXPIRED = "EXPIRED",
+  REVOKED = "REVOKED",
+}
+
+export enum ScheduleStatus {
+  SCHEDULED = "SCHEDULED",
+  STARTED = "STARTED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+  SKIPPED = "SKIPPED",
+}
+
+export enum ReportReason {
+  HARASSMENT = "HARASSMENT",
+  HATE_SPEECH = "HATE_SPEECH",
+  INAPPROPRIATE = "INAPPROPRIATE",
+  SPAM = "SPAM",
+  CHEATING = "CHEATING",
+  IMPERSONATION = "IMPERSONATION",
+  OTHER = "OTHER",
+}
+
+export enum ReportStatus {
+  OPEN = "OPEN",
+  UNDER_REVIEW = "UNDER_REVIEW",
+  RESOLVED = "RESOLVED",
+  DISMISSED = "DISMISSED",
 }
 
 export enum GridType {

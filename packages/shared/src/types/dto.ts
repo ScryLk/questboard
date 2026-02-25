@@ -10,6 +10,14 @@ import type {
   SubscriptionStatus,
   BillingCycle,
   PaymentStatus,
+  SessionType,
+  SessionStatus,
+  SessionVisibility,
+  InviteStatus,
+  RsvpStatus,
+  ScheduleStatus,
+  ReportReason,
+  ReportStatus,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -38,15 +46,150 @@ export interface UserMeDTO extends UserProfileDTO {
 
 // ── Session DTOs ──
 
+export interface SessionDTO {
+  id: string;
+  name: string;
+  slug: string | null;
+  description: string | null;
+  bannerUrl: string | null;
+  system: string;
+  tags: string[];
+  type: SessionType;
+  status: SessionStatus;
+  visibility: SessionVisibility;
+  inviteCode: string;
+  maxPlayers: number;
+  allowSpectators: boolean;
+  maxSpectators: number;
+  scheduledAt: string | null;
+  sessionNumber: number;
+  lastPlayedAt: string | null;
+  totalPlaytime: number;
+  settings: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  ownerId: string;
+  owner: { id: string; displayName: string; avatarUrl: string | null; plan: Plan };
+  playerCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionDetailDTO extends SessionDTO {
+  players: SessionPlayerDTO[];
+  combatState: CombatStateDTO | null;
+}
+
+export interface SessionLobbyDTO {
+  id: string;
+  name: string;
+  slug: string | null;
+  description: string | null;
+  bannerUrl: string | null;
+  system: string;
+  tags: string[];
+  type: SessionType;
+  status: SessionStatus;
+  maxPlayers: number;
+  playerCount: number;
+  onlineCount: number;
+  openSlots: number;
+  isLive: boolean;
+  gmPlan: Plan;
+  owner: { id: string; displayName: string; avatarUrl: string | null };
+  scheduledAt: string | null;
+  metadata: Record<string, unknown>;
+}
+
 export interface SessionPlayerDTO {
   id: string;
   userId: string;
   displayName: string;
+  username: string | null;
   avatarUrl: string | null;
   role: PlayerRole;
   characterId: string | null;
   characterName: string | null;
+  isConnected: boolean;
+  isMuted: boolean;
+  nickname: string | null;
+  color: string | null;
+  rsvpStatus: RsvpStatus | null;
+  joinedAt: string;
 }
+
+// ── Invite DTOs ──
+
+export interface SessionInviteDTO {
+  id: string;
+  sessionId: string;
+  sessionName: string;
+  invitedById: string;
+  invitedByName: string;
+  invitedUserId: string | null;
+  invitedEmail: string | null;
+  status: InviteStatus;
+  role: PlayerRole;
+  message: string | null;
+  token: string;
+  expiresAt: string | null;
+  maxUses: number | null;
+  usedCount: number;
+  createdAt: string;
+}
+
+// ── Schedule DTOs ──
+
+export interface SessionScheduleDTO {
+  id: string;
+  sessionId: string;
+  sessionName: string;
+  scheduledFor: string;
+  duration: number | null;
+  status: ScheduleStatus;
+  isRecurring: boolean;
+  confirmedCount: number;
+  declinedCount: number;
+  pendingCount: number;
+  reminderSent: boolean;
+}
+
+// ── Combat DTOs ──
+
+export interface CombatStateDTO {
+  id: string;
+  sessionId: string;
+  isActive: boolean;
+  round: number;
+  turnIndex: number;
+  initiativeOrder: InitiativeEntry[];
+  combatLog: CombatLogEntry[];
+}
+
+export interface InitiativeEntry {
+  id: string;
+  type: "player" | "npc" | "lair";
+  name: string;
+  userId: string | null;
+  characterId: string | null;
+  initiative: number;
+  dexModifier: number;
+  hp: { current: number; max: number };
+  conditions: string[];
+  isVisible: boolean;
+  isDelayed: boolean;
+  color: string | null;
+}
+
+export interface CombatLogEntry {
+  round: number;
+  turn: number;
+  actor: string;
+  action: string;
+  result: string;
+  timestamp: string;
+}
+
+// ── Map / Token DTOs ──
 
 export interface TokenDTO {
   id: string;
@@ -68,6 +211,17 @@ export interface FogAreaDTO {
   points: unknown;
   revealed: boolean;
 }
+
+export interface LightSourceDTO {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  intensity: number;
+}
+
+// ── Chat / Dice DTOs ──
 
 export interface DiceRollDTO {
   id: string;
@@ -94,6 +248,8 @@ export interface MessageDTO {
   createdAt: string;
 }
 
+// ── Audio DTOs ──
+
 export interface SessionAudioDTO {
   layer: string;
   trackId: string;
@@ -103,12 +259,36 @@ export interface SessionAudioDTO {
   isPlaying: boolean;
 }
 
-export interface InitiativeEntry {
+// ── Timeline DTOs ──
+
+export interface TimelineEventDTO {
   id: string;
-  tokenId: string;
-  label: string;
-  initiative: number;
-  isCurrentTurn: boolean;
+  type: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+}
+
+// ── Session Log DTOs ──
+
+export interface SessionLogDTO {
+  id: string;
+  event: string;
+  actorId: string | null;
+  targetId: string | null;
+  data: Record<string, unknown>;
+  createdAt: string;
+}
+
+// ── Report DTOs ──
+
+export interface SessionReportDTO {
+  id: string;
+  sessionId: string;
+  reporterId: string;
+  reason: ReportReason;
+  description: string | null;
+  status: ReportStatus;
+  createdAt: string;
 }
 
 // ── Billing DTOs ──
