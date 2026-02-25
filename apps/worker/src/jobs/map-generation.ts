@@ -1,10 +1,9 @@
 import { Worker, type Job, type ConnectionOptions } from "bullmq";
 import { prisma } from "@questboard/db";
+import type { Prisma } from "@questboard/db";
 
 interface MapGenerationJob {
   mapGenerationId: string;
-  prompt: string;
-  params: Record<string, unknown>;
   sessionId: string;
 }
 
@@ -14,28 +13,90 @@ export function createMapGenerationWorker(connection: ConnectionOptions) {
     async (job: Job<MapGenerationJob>) => {
       const { mapGenerationId } = job.data;
 
+      const generation = await prisma.mapGeneration.findUnique({
+        where: { id: mapGenerationId },
+      });
+      if (!generation) throw new Error("Generation not found");
+
       // Update status to PROCESSING
       await prisma.mapGeneration.update({
         where: { id: mapGenerationId },
-        data: { status: "PROCESSING" },
+        data: { status: "PROCESSING", startedAt: new Date() },
       });
 
       try {
-        // TODO: Implement actual AI generation call
-        // For now, just mark as completed with a placeholder
-        console.log(`Processing map generation ${mapGenerationId}`);
+        const providerName = generation.provider ?? "openai";
+
+        // Dynamic import of provider to avoid bundling issues
+        const { getProviderByName } = await import(
+          "../../src/modules/map-generation/providers/index.js"
+        ).catch(() => ({
+          getProviderByName: () => null,
+        }));
+
+        const provider = getProviderByName(providerName);
+        if (!provider) {
+          throw new Error(`Provider ${providerName} not available`);
+        }
+
+        const sourceImageUrl = generation.sourceMapId
+          ? (await prisma.map.findUnique({ where: { id: generation.sourceMapId } }))?.imageUrl
+          : undefined;
+
+        const result = await provider.generateMap({
+          mode: generation.mode as any,
+          prompt: generation.prompt ?? undefined,
+          parameters: generation.parameters as Record<string, unknown>,
+          sourceImageUrl: sourceImageUrl ?? undefined,
+          maskData: generation.maskData ?? undefined,
+          inpaintPrompt: generation.inpaintPrompt ?? undefined,
+        });
 
         await prisma.mapGeneration.update({
           where: { id: mapGenerationId },
           data: {
             status: "COMPLETED",
-            imageUrl: "https://placeholder.com/map.png",
+            resultUrl: result.imageUrl,
+            resultWidth: result.width,
+            resultHeight: result.height,
+            provider: result.provider,
+            model: result.model,
+            costCents: result.costCents,
+            completedAt: new Date(),
           },
         });
+
+        // Update monthly usage cost
+        const now = new Date();
+        await prisma.aiUsageMonthly.upsert({
+          where: {
+            userId_year_month: {
+              userId: generation.requestedById,
+              year: now.getFullYear(),
+              month: now.getMonth() + 1,
+            },
+          },
+          create: {
+            userId: generation.requestedById,
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+            totalCostCents: result.costCents,
+          },
+          update: {
+            totalCostCents: { increment: result.costCents },
+          },
+        });
+
+        console.log(`Map generation ${mapGenerationId} completed (${result.provider}/${result.model})`);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         await prisma.mapGeneration.update({
           where: { id: mapGenerationId },
-          data: { status: "FAILED" },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            completedAt: new Date(),
+          },
         });
         throw error;
       }

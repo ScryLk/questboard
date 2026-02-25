@@ -152,14 +152,89 @@ enum ReportStatus {
 
 enum GridType {
   SQUARE
-  HEX
+  HEX_FLAT
+  HEX_POINTY
+  NONE
 }
 
 enum MapGenerationStatus {
-  PENDING
+  QUEUED
   PROCESSING
   COMPLETED
+  ACCEPTED
+  REJECTED
   FAILED
+}
+
+enum TokenType {
+  PC
+  NPC
+  ENEMY
+  ALLY
+  OBJECT
+  VEHICLE
+  EFFECT
+}
+
+enum FogShapeType {
+  RECTANGLE
+  CIRCLE
+  POLYGON
+  FREEHAND
+  CELL
+}
+
+enum WallType {
+  NORMAL
+  WINDOW
+  ETHEREAL
+  INVISIBLE
+  TERRAIN
+}
+
+enum DoorState {
+  CLOSED
+  OPEN
+  LOCKED
+  SECRET
+}
+
+enum LightType {
+  POINT
+  CONE
+  AMBIENT
+}
+
+enum LayerContentType {
+  IMAGE
+  DRAWING
+}
+
+enum AnnotationType {
+  FREEHAND
+  ARROW
+  CIRCLE
+  RECTANGLE
+  TEXT
+  RULER
+  CONE
+  SPHERE
+  LINE
+  CUBE
+}
+
+enum AnnotationVisibility {
+  ALL
+  GM_ONLY
+  SPECIFIC
+}
+
+enum MapGenMode {
+  TEXT_TO_MAP
+  VARIATION
+  INPAINT
+  ENHANCE
+  WALLS_DETECT
 }
 
 enum ChatChannel {
@@ -848,34 +923,314 @@ model CharacterTemplate {
   @@unique([system, name])
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MAPAS E TERRENO                                                ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
 model Map {
   id            String              @id @default(cuid())
   sessionId     String
   session       Session             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  name          String
+  // ── Identidade ──
+  name          String              @db.VarChar(200)
+  description   String?             @db.VarChar(1000)
+  thumbnailUrl  String?
+  sortOrder     Int                 @default(0)
+
+  // ── Imagem base ──
   imageUrl      String
-  width         Int
-  height        Int
+  imageWidth    Int
+  imageHeight   Int
+  fileSizeMb    Float               @default(0)
+
+  // ── Grid ──
   gridType      GridType            @default(SQUARE)
   gridSize      Int                 @default(32)
+  gridOffsetX   Int                 @default(0)
+  gridOffsetY   Int                 @default(0)
+  gridColor     String              @default("#FFFFFF20")
+  gridVisible   Boolean             @default(true)
+
+  // ── Dimensões lógicas (em cells) ──
+  cellsWide     Int
+  cellsHigh     Int
+
+  // ── Estado ──
   isActive      Boolean             @default(false)
+  isLocked      Boolean             @default(false)
 
+  // ── IA ──
   aiGenerated   Boolean             @default(false)
-  aiPrompt      String?
-  aiStatus      MapGenerationStatus @default(COMPLETED)
+  aiGenerationId String?
 
-  layers        Json                @default("[]")
-  tokens        Json                @default("[]")
-  fogAreas      Json                @default("[]")
-  lightSources  Json                @default("[]")
-  walls         Json                @default("[]")
+  // ── Configurações do mapa ──
+  settings      Json                @default("{}")
+  metadata      Json                @default("{}")
+
+  // ── Timestamps ──
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deletedAt     DateTime?
+
+  // ── Relacionamentos ──
+  tokens        Token[]
+  fogAreas      FogArea[]
+  walls         Wall[]
+  lightSources  LightSource[]
+  layers        MapLayer[]
+  annotations   MapAnnotation[]
+  generation    MapGeneration?      @relation("GeneratedMap")
+
+  @@index([sessionId, isActive])
+  @@index([sessionId, sortOrder])
+  @@index([deletedAt])
+}
+
+model Token {
+  id            String    @id @default(cuid())
+  mapId         String
+  map           Map       @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  // ── Identidade ──
+  name          String    @db.VarChar(100)
+  type          TokenType
+  imageUrl      String?
+  color         String?   @default("#6C5CE7")
+
+  // ── Posição (em cells) ──
+  x             Float     @default(0)
+  y             Float     @default(0)
+  rotation      Float     @default(0)
+
+  // ── Tamanho (em cells) ──
+  width         Int       @default(1)
+  height        Int       @default(1)
+
+  // ── Vinculação ──
+  ownerId       String?
+  characterId   String?
+
+  // ── Visibilidade ──
+  isVisible     Boolean   @default(true)
+  isLocked      Boolean   @default(false)
+  layer         Int       @default(0)
+
+  // ── Estado de jogo ──
+  hp            Json?
+  conditions    String[]  @default([])
+
+  // ── Visual ──
+  statusRing    String?
+  auraRadius    Float?
+  auraColor     String?
+  elevation     Float     @default(0)
+  label         String?
+
+  // ── Extensível ──
+  metadata      Json      @default("{}")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([mapId])
+  @@index([mapId, isVisible])
+  @@index([ownerId])
+}
+
+model FogArea {
+  id          String       @id @default(cuid())
+  mapId       String
+  map         Map          @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  isRevealed  Boolean      @default(false)
+  shapeType   FogShapeType
+  geometry    Json
+
+  metadata    Json         @default("{}")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([mapId])
+  @@index([mapId, isRevealed])
+}
+
+model Wall {
+  id              String    @id @default(cuid())
+  mapId           String
+  map             Map       @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  // ── Segmento ──
+  x1              Float
+  y1              Float
+  x2              Float
+  y2              Float
+
+  // ── Tipo ──
+  wallType        WallType  @default(NORMAL)
+
+  // ── Propriedades ──
+  blocksMovement  Boolean   @default(true)
+  blocksVision    Boolean   @default(true)
+  blocksLight     Boolean   @default(true)
+
+  // ── Porta ──
+  isDoor          Boolean   @default(false)
+  doorState       DoorState @default(CLOSED)
+  doorLocked      Boolean   @default(false)
+
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now())
+
+  @@index([mapId])
+}
+
+model LightSource {
+  id              String    @id @default(cuid())
+  mapId           String
+  map             Map       @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  // ── Posição ──
+  x               Float
+  y               Float
+
+  // ── Alcance ──
+  brightRadius    Float
+  dimRadius       Float
+
+  // ── Visual ──
+  color           String    @default("#FFF4E0")
+  intensity       Float     @default(1.0)
+
+  // ── Tipo ──
+  lightType       LightType @default(POINT)
+
+  // ── Cone ──
+  coneAngle       Float?
+  coneDirection   Float?
+
+  // ── Comportamento ──
+  isEnabled       Boolean   @default(true)
+  flickers        Boolean   @default(false)
+  flickerIntensity Float    @default(0.1)
+
+  // ── Vinculação a token ──
+  tokenId         String?
+  isStatic        Boolean   @default(true)
+
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([mapId])
+  @@index([tokenId])
+}
+
+model MapLayer {
+  id          String           @id @default(cuid())
+  mapId       String
+  map         Map              @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  name        String           @db.VarChar(100)
+  sortOrder   Int              @default(0)
+  isVisible   Boolean          @default(true)
+  isLocked    Boolean          @default(false)
+  opacity     Float            @default(1.0)
+
+  layerType   LayerContentType @default(IMAGE)
+  imageUrl    String?
+  objects     Json             @default("[]")
+
+  metadata    Json             @default("{}")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([mapId, sortOrder])
+}
+
+model MapAnnotation {
+  id          String               @id @default(cuid())
+  mapId       String
+  map         Map                  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  authorId    String
+
+  type        AnnotationType
+  data        Json
+
+  visibleTo   AnnotationVisibility @default(ALL)
+  isPersistent Boolean             @default(false)
+
+  createdAt   DateTime             @default(now())
+
+  @@index([mapId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  GERAÇÃO DE MAPAS POR IA                                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model MapGeneration {
+  id            String              @id @default(cuid())
+  sessionId     String
+  requestedById String
+
+  // ── Input ──
+  mode          MapGenMode
+  prompt        String?             @db.VarChar(2000)
+  parameters    Json                @default("{}")
+
+  // ── Inpainting ──
+  sourceMapId   String?
+  maskData      String?             @db.Text
+  inpaintPrompt String?             @db.VarChar(500)
+
+  // ── Variation ──
+  variationOfId String?
+
+  // ── Output ──
+  status        MapGenerationStatus @default(QUEUED)
+  resultUrl     String?
+  resultWidth   Int?
+  resultHeight  Int?
+  mapId         String?             @unique
+  map           Map?                @relation("GeneratedMap", fields: [mapId], references: [id])
+
+  // ── AI Provider ──
+  provider      String?
+  model         String?
+  providerJobId String?
+
+  // ── Custos ──
+  estimatedCostCents Int?
+  actualCostCents    Int?
+
+  // ── Timing ──
+  queuedAt      DateTime            @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  failedAt      DateTime?
+  errorMessage  String?
 
   metadata      Json                @default("{}")
   createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
 
-  @@index([sessionId, isActive])
+  @@index([sessionId])
+  @@index([requestedById])
+  @@index([status])
+}
+
+model AiUsageMonthly {
+  id             String @id @default(cuid())
+  userId         String
+  year           Int
+  month          Int
+
+  mapsGenerated  Int    @default(0)
+  inpaintsUsed   Int    @default(0)
+  totalCostCents Int    @default(0)
+
+  @@unique([userId, year, month])
+  @@index([userId])
 }
 
 model Message {

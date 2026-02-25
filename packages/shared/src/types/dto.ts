@@ -18,6 +18,17 @@ import type {
   ScheduleStatus,
   ReportReason,
   ReportStatus,
+  GridType,
+  TokenType,
+  FogShapeType,
+  WallType,
+  DoorState,
+  LightType,
+  LayerContentType,
+  AnnotationType,
+  AnnotationVisibility,
+  MapGenerationStatus,
+  MapGenMode,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -189,36 +200,189 @@ export interface CombatLogEntry {
   timestamp: string;
 }
 
-// ── Map / Token DTOs ──
+// ── Map DTOs ──
+
+export interface MapDTO {
+  id: string;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  sortOrder: number;
+  imageUrl: string;
+  imageWidth: number;
+  imageHeight: number;
+  fileSizeMb: number;
+  gridType: GridType;
+  gridSize: number;
+  gridOffsetX: number;
+  gridOffsetY: number;
+  gridColor: string;
+  gridVisible: boolean;
+  cellsWide: number;
+  cellsHigh: number;
+  isActive: boolean;
+  isLocked: boolean;
+  aiGenerated: boolean;
+  settings: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MapDetailDTO extends MapDTO {
+  tokens: TokenDTO[];
+  fogAreas: FogAreaDTO[];
+  walls: WallDTO[];
+  lightSources: LightSourceDTO[];
+  layers: MapLayerDTO[];
+  annotations: MapAnnotationDTO[];
+}
+
+export interface MapFullStateDTO {
+  map: MapDTO;
+  tokens: TokenDTO[];
+  fogAreas: FogAreaDTO[];
+  walls: WallDTO[];
+  lightSources: LightSourceDTO[];
+  layers: MapLayerDTO[];
+  annotations: MapAnnotationDTO[];
+}
+
+// ── Token DTOs ──
 
 export interface TokenDTO {
   id: string;
+  mapId: string;
+  name: string;
+  type: TokenType;
+  imageUrl: string | null;
+  color: string | null;
   x: number;
   y: number;
-  size: number;
-  imageUrl: string | null;
-  label: string | null;
-  conditions: string[];
-  currentHp: number | null;
-  maxHp: number | null;
-  isVisible: boolean;
+  rotation: number;
+  width: number;
+  height: number;
+  ownerId: string | null;
   characterId: string | null;
+  isVisible: boolean;
+  isLocked: boolean;
+  layer: number;
+  hp: { current: number; max: number; temp?: number } | null;
+  conditions: string[];
+  statusRing: string | null;
+  auraRadius: number | null;
+  auraColor: string | null;
+  elevation: number;
+  label: string | null;
+  metadata: Record<string, unknown>;
 }
+
+// ── Fog DTOs ──
 
 export interface FogAreaDTO {
   id: string;
-  type: string;
-  points: unknown;
-  revealed: boolean;
+  mapId: string;
+  isRevealed: boolean;
+  shapeType: FogShapeType;
+  geometry: Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
+
+// ── Wall DTOs ──
+
+export interface WallDTO {
+  id: string;
+  mapId: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  wallType: WallType;
+  blocksMovement: boolean;
+  blocksVision: boolean;
+  blocksLight: boolean;
+  isDoor: boolean;
+  doorState: DoorState;
+  doorLocked: boolean;
+  metadata: Record<string, unknown>;
+}
+
+// ── Light Source DTOs ──
 
 export interface LightSourceDTO {
   id: string;
+  mapId: string;
   x: number;
   y: number;
-  radius: number;
+  brightRadius: number;
+  dimRadius: number;
   color: string;
   intensity: number;
+  lightType: LightType;
+  coneAngle: number | null;
+  coneDirection: number | null;
+  isEnabled: boolean;
+  flickers: boolean;
+  flickerIntensity: number;
+  tokenId: string | null;
+  isStatic: boolean;
+}
+
+// ── Layer DTOs ──
+
+export interface MapLayerDTO {
+  id: string;
+  mapId: string;
+  name: string;
+  sortOrder: number;
+  isVisible: boolean;
+  isLocked: boolean;
+  opacity: number;
+  layerType: LayerContentType;
+  imageUrl: string | null;
+  objects: unknown[];
+}
+
+// ── Annotation DTOs ──
+
+export interface MapAnnotationDTO {
+  id: string;
+  mapId: string;
+  authorId: string;
+  type: AnnotationType;
+  data: Record<string, unknown>;
+  visibleTo: AnnotationVisibility;
+  isPersistent: boolean;
+  createdAt: string;
+}
+
+// ── Map Generation DTOs ──
+
+export interface MapGenerationDTO {
+  id: string;
+  sessionId: string;
+  requestedById: string;
+  mode: MapGenMode;
+  prompt: string | null;
+  parameters: Record<string, unknown>;
+  status: MapGenerationStatus;
+  resultUrl: string | null;
+  resultWidth: number | null;
+  resultHeight: number | null;
+  mapId: string | null;
+  provider: string | null;
+  errorMessage: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface AiUsageDTO {
+  mapsGenerated: { used: number; limit: number };
+  inpaintsUsed: number;
+  totalCostCents: number;
 }
 
 // ── Chat / Dice DTOs ──

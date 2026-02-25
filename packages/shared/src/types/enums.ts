@@ -138,14 +138,89 @@ export enum ReportStatus {
 
 export enum GridType {
   SQUARE = "SQUARE",
-  HEX = "HEX",
+  HEX_FLAT = "HEX_FLAT",
+  HEX_POINTY = "HEX_POINTY",
+  NONE = "NONE",
 }
 
 export enum MapGenerationStatus {
-  PENDING = "PENDING",
+  QUEUED = "QUEUED",
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
+  ACCEPTED = "ACCEPTED",
+  REJECTED = "REJECTED",
   FAILED = "FAILED",
+}
+
+export enum TokenType {
+  PC = "PC",
+  NPC = "NPC",
+  ENEMY = "ENEMY",
+  ALLY = "ALLY",
+  OBJECT = "OBJECT",
+  VEHICLE = "VEHICLE",
+  EFFECT = "EFFECT",
+}
+
+export enum FogShapeType {
+  RECTANGLE = "RECTANGLE",
+  CIRCLE = "CIRCLE",
+  POLYGON = "POLYGON",
+  FREEHAND = "FREEHAND",
+  CELL = "CELL",
+}
+
+export enum WallType {
+  NORMAL = "NORMAL",
+  WINDOW = "WINDOW",
+  ETHEREAL = "ETHEREAL",
+  INVISIBLE = "INVISIBLE",
+  TERRAIN = "TERRAIN",
+}
+
+export enum DoorState {
+  CLOSED = "CLOSED",
+  OPEN = "OPEN",
+  LOCKED = "LOCKED",
+  SECRET = "SECRET",
+}
+
+export enum LightType {
+  POINT = "POINT",
+  CONE = "CONE",
+  AMBIENT = "AMBIENT",
+}
+
+export enum LayerContentType {
+  IMAGE = "IMAGE",
+  DRAWING = "DRAWING",
+}
+
+export enum AnnotationType {
+  FREEHAND = "FREEHAND",
+  ARROW = "ARROW",
+  CIRCLE = "CIRCLE",
+  RECTANGLE = "RECTANGLE",
+  TEXT = "TEXT",
+  RULER = "RULER",
+  CONE = "CONE",
+  SPHERE = "SPHERE",
+  LINE = "LINE",
+  CUBE = "CUBE",
+}
+
+export enum AnnotationVisibility {
+  ALL = "ALL",
+  GM_ONLY = "GM_ONLY",
+  SPECIFIC = "SPECIFIC",
+}
+
+export enum MapGenMode {
+  TEXT_TO_MAP = "TEXT_TO_MAP",
+  VARIATION = "VARIATION",
+  INPAINT = "INPAINT",
+  ENHANCE = "ENHANCE",
+  WALLS_DETECT = "WALLS_DETECT",
 }
 
 export enum ChatChannel {

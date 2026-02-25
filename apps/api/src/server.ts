@@ -22,6 +22,16 @@ import { achievementsRoutes } from "./modules/achievements/achievements.routes.j
 import { statsRoutes } from "./modules/stats/stats.routes.js";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes.js";
 
+// Map & Terrain modules
+import { mapsRoutes } from "./modules/maps/maps.routes.js";
+import { tokensRoutes } from "./modules/tokens/tokens.routes.js";
+import { fogRoutes } from "./modules/fog/fog.routes.js";
+import { wallsRoutes } from "./modules/walls/walls.routes.js";
+import { lightingRoutes } from "./modules/lighting/lighting.routes.js";
+import { layersRoutes } from "./modules/layers/layers.routes.js";
+import { annotationsRoutes } from "./modules/annotations/annotations.routes.js";
+import { mapGenerationRoutes } from "./modules/map-generation/map-generation.routes.js";
+
 // Socket.IO
 import { createSocketGateway } from "./modules/socket/socket.gateway.js";
 
@@ -71,6 +81,16 @@ async function buildApp() {
         await authenticated.register(achievementsRoutes);
         await authenticated.register(statsRoutes);
         await authenticated.register(notificationsRoutes);
+
+        // Map & Terrain
+        await authenticated.register(mapsRoutes);
+        await authenticated.register(tokensRoutes);
+        await authenticated.register(fogRoutes);
+        await authenticated.register(wallsRoutes);
+        await authenticated.register(lightingRoutes);
+        await authenticated.register(layersRoutes);
+        await authenticated.register(annotationsRoutes);
+        await authenticated.register(mapGenerationRoutes);
       });
     },
     { prefix: "/api/v1" }

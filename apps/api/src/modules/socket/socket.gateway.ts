@@ -9,6 +9,12 @@ import { registerCombatHandlers } from "./handlers/combat.handler.js";
 import { registerDiceHandlers } from "./handlers/dice.handler.js";
 import { registerChatHandlers } from "./handlers/chat.handler.js";
 import { registerCursorHandlers } from "./handlers/cursor.handler.js";
+import { registerMapTokenHandlers } from "./handlers/map-token.handler.js";
+import { registerMapFogHandlers } from "./handlers/map-fog.handler.js";
+import { registerMapWallHandlers } from "./handlers/map-wall.handler.js";
+import { registerMapLightHandlers } from "./handlers/map-light.handler.js";
+import { registerMapAnnotationHandlers } from "./handlers/map-annotation.handler.js";
+import { registerMapStateHandlers } from "./handlers/map-state.handler.js";
 
 export type TypedIO = SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
 export type TypedSocket = Parameters<Parameters<TypedIO["on"]>[1]>[0];
@@ -51,6 +57,14 @@ export function createSocketGateway(httpServer: HttpServer, corsOrigin: string[]
     registerDiceHandlers(io, socket, prisma);
     registerChatHandlers(io, socket, prisma);
     registerCursorHandlers(io, socket);
+
+    // Map event handlers
+    registerMapTokenHandlers(io, socket, prisma);
+    registerMapFogHandlers(io, socket, prisma);
+    registerMapWallHandlers(io, socket, prisma);
+    registerMapLightHandlers(io, socket, prisma);
+    registerMapAnnotationHandlers(io, socket, prisma);
+    registerMapStateHandlers(io, socket, prisma);
 
     socket.on("disconnect", async (reason) => {
       console.log(`Socket disconnected: ${socket.id} (reason: ${reason})`);

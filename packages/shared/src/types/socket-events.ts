@@ -2,7 +2,11 @@ import type {
   SessionPlayerDTO,
   TokenDTO,
   FogAreaDTO,
+  WallDTO,
   LightSourceDTO,
+  MapLayerDTO,
+  MapAnnotationDTO,
+  MapFullStateDTO,
   DiceRollDTO,
   MessageDTO,
   SessionAudioDTO,
@@ -10,7 +14,7 @@ import type {
   CombatStateDTO,
   TimelineEventDTO,
 } from "./dto.js";
-import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus } from "./enums.js";
+import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility } from "./enums.js";
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SERVER → CLIENT (broadcast para a room da sessão)              ║
@@ -49,11 +53,35 @@ export interface ServerToClientEvents {
   // ── Mapa ──
   "map:changed": (data: { mapId: string }) => void;
   "token:moved": (data: { tokenId: string; x: number; y: number; animate: boolean }) => void;
-  "token:added": (data: { token: TokenDTO }) => void;
+  "token:added": (data: TokenDTO) => void;
   "token:removed": (data: { tokenId: string }) => void;
   "token:updated": (data: { tokenId: string; changes: Partial<TokenDTO> }) => void;
-  "fog:updated": (data: { areas: FogAreaDTO[] }) => void;
-  "light:updated": (data: { sources: LightSourceDTO[] }) => void;
+  "token:batch-moved": (data: Array<{ tokenId: string; x: number; y: number }>) => void;
+
+  "fog:area-added": (data: FogAreaDTO) => void;
+  "fog:area-removed": (data: { fogAreaId: string }) => void;
+  "fog:area-updated": (data: { fogAreaId: string; isRevealed: boolean }) => void;
+  "fog:batch-revealed": (data: { fogAreaIds: string[] }) => void;
+  "fog:all-hidden": () => void;
+  "fog:auto-reveal": (data: { revealedCells: string[] }) => void;
+
+  "wall:door-toggled": (data: { wallId: string; doorState: DoorState }) => void;
+  "wall:added": (data: WallDTO) => void;
+  "wall:removed": (data: { wallId: string }) => void;
+
+  "light:added": (data: LightSourceDTO) => void;
+  "light:removed": (data: { lightId: string }) => void;
+  "light:updated": (data: { lightId: string; changes: Partial<LightSourceDTO> }) => void;
+  "light:map-updated": (data: { lightMap: Record<string, number> }) => void;
+
+  "layer:visibility-changed": (data: { layerId: string; isVisible: boolean }) => void;
+
+  "annotation:added": (data: MapAnnotationDTO) => void;
+  "annotation:cleared": (data: { persistent: boolean }) => void;
+
+  "map:generation-progress": (data: { generationId: string; progress: number; previewUrl?: string }) => void;
+  "map:generation-complete": (data: { generationId: string; resultUrl: string }) => void;
+  "map:generation-failed": (data: { generationId: string; error: string }) => void;
 
   // ── Áudio ──
   "audio:sync": (data: SessionAudioDTO[]) => void;
@@ -105,7 +133,20 @@ export interface ClientToServerEvents {
 
   // ── Mapa ──
   "token:move": (data: { tokenId: string; x: number; y: number }) => void;
+  "token:batch-move": (data: Array<{ tokenId: string; x: number; y: number }>) => void;
   "cursor:move": (data: { x: number; y: number }) => void;
+
+  "fog:reveal": (data: { fogAreaId: string }) => void;
+  "fog:hide": (data: { fogAreaId: string }) => void;
+  "fog:batch-reveal": (data: { fogAreaIds: string[] }) => void;
+  "fog:reveal-at": (data: { shape: FogShapeType; geometry: Record<string, unknown> }) => void;
+
+  "wall:toggle-door": (data: { wallId: string }) => void;
+
+  "annotation:draw": (data: { type: AnnotationType; data: Record<string, unknown>; visibility: AnnotationVisibility }) => void;
+  "annotation:clear": (data: { persistent?: boolean }) => void;
+
+  "map:request-state": (ack: AckFn<MapFullStateDTO>) => void;
 
   // ── Áudio (GM only) ──
   "audio:play": (data: { trackId: string; layer: string; volume?: number }) => void;

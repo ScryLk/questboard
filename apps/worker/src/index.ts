@@ -5,6 +5,9 @@ import { createSchedulingCheckerWorker } from "./jobs/scheduling-checker.js";
 import { createAutoPauseWorker } from "./jobs/auto-pause.js";
 import { createRecurrenceGeneratorWorker } from "./jobs/recurrence-generator.js";
 import { createInviteExpirationWorker } from "./jobs/invite-expiration.js";
+import { createThumbnailWorker } from "./jobs/thumbnail-generation.js";
+import { createTokenPositionFlushWorker } from "./jobs/token-position-flush.js";
+import { createWallDetectionWorker } from "./jobs/wall-detection.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
 
@@ -32,6 +35,12 @@ async function setupRepeatingJobs(connection: { url: string }) {
   await inviteQueue.upsertJobScheduler("invite-expiration-repeat", {
     every: 900_000,
   });
+
+  // Token position flush — every 30 seconds
+  const tokenFlushQueue = new Queue("token-position-flush", { connection });
+  await tokenFlushQueue.upsertJobScheduler("token-position-flush-repeat", {
+    every: 30_000,
+  });
 }
 
 async function start() {
@@ -45,6 +54,9 @@ async function start() {
   const autoPauseWorker = createAutoPauseWorker(connection);
   const recurrenceGeneratorWorker = createRecurrenceGeneratorWorker(connection);
   const inviteExpirationWorker = createInviteExpirationWorker(connection);
+  const thumbnailWorker = createThumbnailWorker(connection);
+  const tokenPositionFlushWorker = createTokenPositionFlushWorker(connection);
+  const wallDetectionWorker = createWallDetectionWorker(connection);
 
   // Set up repeating jobs
   await setupRepeatingJobs(connection);
@@ -55,6 +67,9 @@ async function start() {
   console.log("  - auto-pause (every 2min)");
   console.log("  - recurrence-generator (daily at 03:00 UTC)");
   console.log("  - invite-expiration (every 15min)");
+  console.log("  - thumbnail-generation (on demand)");
+  console.log("  - token-position-flush (every 30s)");
+  console.log("  - wall-detection (on demand)");
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -65,6 +80,9 @@ async function start() {
       autoPauseWorker.close(),
       recurrenceGeneratorWorker.close(),
       inviteExpirationWorker.close(),
+      thumbnailWorker.close(),
+      tokenPositionFlushWorker.close(),
+      wallDetectionWorker.close(),
     ]);
     process.exit(0);
   };
