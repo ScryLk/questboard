@@ -2,23 +2,25 @@ import React from "react";
 
 interface ButtonProps {
   children: React.ReactNode;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
+  fullWidth?: boolean;
   className?: string;
   onPress?: () => void;
 }
 
 const variantClasses = {
-  primary: "bg-brand-accent text-white hover:bg-red-500 active:bg-red-600",
-  secondary: "bg-brand-secondary text-white hover:bg-blue-700 active:bg-blue-800",
-  ghost: "bg-transparent text-white hover:bg-white/10",
-  danger: "bg-red-700 text-white hover:bg-red-600",
+  primary: "bg-accent text-text-inverse hover:bg-accent-hover shadow-glow",
+  secondary: "bg-secondary text-text-inverse hover:bg-secondary-hover",
+  outline: "bg-transparent border border-border-default text-text-primary hover:bg-hover hover:border-border-hover",
+  ghost: "bg-transparent text-text-secondary hover:bg-hover hover:text-text-primary",
+  danger: "bg-error text-text-inverse hover:opacity-90",
 } as const;
 
 const sizeClasses = {
   sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-base",
+  md: "px-5 py-2.5 text-base",
   lg: "px-6 py-3 text-lg",
 } as const;
 
@@ -27,13 +29,20 @@ export function Button({
   variant = "primary",
   size = "md",
   disabled = false,
+  fullWidth = false,
   className = "",
   onPress,
 }: ButtonProps) {
-  const baseClasses = "rounded-lg font-medium transition-colors";
-  const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${
-    disabled ? "opacity-50" : ""
-  } ${className}`.trim();
+  const classes = [
+    "rounded-md font-semibold font-body transition-all duration-fast inline-flex items-center justify-center",
+    variantClasses[variant],
+    sizeClasses[size],
+    fullWidth ? "w-full" : "",
+    disabled ? "opacity-40 pointer-events-none" : "active:scale-[0.97]",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return React.createElement(
     "button",

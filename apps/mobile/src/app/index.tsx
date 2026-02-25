@@ -1,26 +1,25 @@
-import { View, Text, ScrollView } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, ActivityIndicator } from "react-native";
+import { Redirect } from "expo-router";
 
-export default function HomeScreen() {
+export default function SplashScreen() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (ready) {
+    // TODO: check auth state — redirect to /(auth) or /(tabs)
+    return <Redirect href="/(tabs)" />;
+  }
+
   return (
-    <ScrollView className="flex-1 bg-[#1A1A2E]">
-      <View className="px-6 py-12">
-        <Text className="text-center text-3xl font-bold text-[#E94560]">
-          QuestBoard
-        </Text>
-        <Text className="mt-4 text-center text-lg text-gray-400">
-          Sua mesa de RPG, online
-        </Text>
-
-        <View className="mt-8 rounded-xl bg-[#16213E] p-6">
-          <Text className="text-lg font-semibold text-white">
-            Bem-vindo ao QuestBoard
-          </Text>
-          <Text className="mt-2 text-gray-400">
-            Crie sessões, gerencie personagens e role dados — tudo em um só
-            lugar.
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+    <View className="flex-1 bg-base items-center justify-center">
+      <Text className="text-5xl font-bold text-accent tracking-tight">QB</Text>
+      <Text className="text-text-muted text-sm mt-4">Sua mesa de RPG, online</Text>
+      <ActivityIndicator color="#6C5CE7" size="large" style={{ marginTop: 32 }} />
+    </View>
   );
 }

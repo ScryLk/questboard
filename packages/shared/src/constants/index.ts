@@ -1,3 +1,5 @@
+export { colors } from "./colors.js";
+
 export const MAX_PLAYERS = 20;
 export const DEFAULT_GRID_SIZE = 50;
 export const DEFAULT_MAX_PLAYERS = 5;
