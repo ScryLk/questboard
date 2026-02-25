@@ -19,3 +19,6 @@ export * from "./light.schema.js";
 export * from "./layer.schema.js";
 export * from "./annotation.schema.js";
 export * from "./map-generation.schema.js";
+export * from "./interactive-object.schema.js";
+export * from "./zone.schema.js";
+export * from "./exploration.schema.js";

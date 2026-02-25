@@ -229,6 +229,52 @@ enum AnnotationVisibility {
   SPECIFIC
 }
 
+enum InteractionType {
+  DOOR
+  CHEST
+  LEVER
+  NPC_TALK
+  EXAMINE
+  TELEPORT
+  TRAP
+  PICKUP
+  CUSTOM
+}
+
+enum ZoneType {
+  DIFFICULT_TERRAIN
+  HAZARD
+  DARKNESS
+  AMBIENT_SOUND
+  NARRATIVE
+  ANTI_MAGIC
+  CONCEALMENT
+  TRIGGER
+  SAFE_ZONE
+  CUSTOM
+}
+
+enum ExplorationEvent {
+  DOOR_OPENED
+  DOOR_CLOSED
+  DOOR_LOCKED
+  DOOR_UNLOCKED
+  OBJECT_USED
+  ZONE_ENTERED
+  ZONE_EXITED
+  TRAP_TRIGGERED
+  TRAP_DISARMED
+  NPC_TALKED
+  AREA_DISCOVERED
+  ITEM_PICKED_UP
+  TELEPORTED
+  MAP_CHANGED
+  NARRATIVE_SHOWN
+  SECRET_FOUND
+  SKILL_CHECK_MADE
+  TOKEN_MOVED
+}
+
 enum MapGenMode {
   TEXT_TO_MAP
   VARIATION
@@ -439,6 +485,21 @@ model PlanLimit {
   allowPersonalVault    Boolean @default(false)
   allowProfileBadge     Boolean @default(false)
   badgeName             String?
+
+  // ── Exploração ──
+  allowExplorationMode     Boolean  @default(true)
+  allowAutoRevealFog       Boolean  @default(false)
+  allowInteractiveObjects  Boolean  @default(false)
+  maxInteractiveObjects    Int      @default(0)
+  allowMapZones            Boolean  @default(false)
+  allowedZoneTypes         Json     @default("[]")
+  allowedInteractionTypes  Json     @default("[]")
+  allowIndividualVision    Boolean  @default(false)
+  allowPathTrail           Boolean  @default(false)
+  allowAmbientSounds       Boolean  @default(false)
+  allowMapTransitions      Boolean  @default(true)
+  allowNpcDialogue         Boolean  @default(false)
+  allowTriggerChains       Boolean  @default(false)
 
   // ── Extensível ──
   extras                Json    @default("{}")
@@ -981,6 +1042,10 @@ model Map {
   layers        MapLayer[]
   annotations   MapAnnotation[]
   generation    MapGeneration?      @relation("GeneratedMap")
+  interactiveObjects InteractiveObject[]
+  zones         MapZone[]
+  explorationLogs ExplorationLog[]
+  playerViewStates PlayerViewState[]
 
   @@index([sessionId, isActive])
   @@index([sessionId, sortOrder])
@@ -1299,6 +1364,130 @@ model SessionAudio {
   volume      Float    @default(0.5)
   isPlaying   Boolean  @default(false)
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  EXPLORAÇÃO INTERATIVA                                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model InteractiveObject {
+  id                String          @id @default(cuid())
+  mapId             String
+  map               Map             @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  tokenId           String          @unique
+
+  // ── Tipo de interação ──
+  interactionType   InteractionType
+
+  // ── Alcance ──
+  interactionRange  Float           @default(1)
+  requiresLineOfSight Boolean      @default(true)
+
+  // ── Requisitos ──
+  requiredRole      String[]        @default(["GM", "CO_GM", "PLAYER"])
+  requiredCheck     Json?
+
+  // ── Comportamento ──
+  onInteract        Json            @default("{}")
+
+  // ── Estado ──
+  isActive          Boolean         @default(true)
+  isHidden          Boolean         @default(false)
+  hasBeenUsed       Boolean         @default(false)
+  usedById          String?
+  usedAt            DateTime?
+
+  // ── Visual ──
+  highlightOnHover  Boolean         @default(true)
+  highlightColor    String          @default("#6C5CE760")
+  interactionIcon   String?
+
+  metadata          Json            @default("{}")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([mapId])
+  @@index([tokenId])
+}
+
+model MapZone {
+  id            String    @id @default(cuid())
+  mapId         String
+  map           Map       @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  name          String    @db.VarChar(100)
+  zoneType      ZoneType
+
+  // ── Geometria ──
+  shapeType     String
+  geometry      Json
+
+  // ── Propriedades por tipo ──
+  properties    Json      @default("{}")
+
+  // ── Visibilidade ──
+  isVisible       Boolean @default(true)
+  visibleToGmOnly Boolean @default(false)
+  overlayColor    String?
+
+  // ── Estado ──
+  isActive      Boolean   @default(true)
+  sortOrder     Int       @default(0)
+
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([mapId])
+}
+
+model ExplorationLog {
+  id          String           @id @default(cuid())
+  sessionId   String
+  mapId       String
+  map         Map              @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  // ── Evento ──
+  event       ExplorationEvent
+  actorId     String?
+  tokenId     String?
+
+  // ── Dados ──
+  data        Json             @default("{}")
+
+  // ── Visibilidade ──
+  visibleTo   String[]         @default([])
+  channel     String           @default("exploration")
+
+  createdAt   DateTime         @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, mapId])
+}
+
+model PlayerViewState {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  mapId       String
+  map         Map      @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  // ── Cells exploradas ──
+  exploredCells Json   @default("[]")
+
+  // ── Última posição ──
+  lastTokenX  Float    @default(0)
+  lastTokenY  Float    @default(0)
+
+  // ── Câmera ──
+  cameraX     Float    @default(0)
+  cameraY     Float    @default(0)
+  cameraZoom  Float    @default(1.0)
+
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, userId, mapId])
+  @@index([sessionId, mapId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗

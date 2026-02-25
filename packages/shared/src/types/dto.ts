@@ -29,6 +29,9 @@ import type {
   AnnotationVisibility,
   MapGenerationStatus,
   MapGenMode,
+  InteractionType,
+  ZoneType,
+  ExplorationEvent,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -484,6 +487,18 @@ export interface PlanLimitsDTO {
   maxCharactersPerPlayer: number;
   allowPdfExport: boolean;
   maxFriends: number;
+  // Exploration
+  allowExplorationMode: boolean;
+  allowAutoRevealFog: boolean;
+  allowInteractiveObjects: boolean;
+  maxInteractiveObjects: number;
+  allowMapZones: boolean;
+  allowIndividualVision: boolean;
+  allowPathTrail: boolean;
+  allowAmbientSounds: boolean;
+  allowMapTransitions: boolean;
+  allowNpcDialogue: boolean;
+  allowTriggerChains: boolean;
 }
 
 export interface SubscriptionDTO {
@@ -612,6 +627,106 @@ export interface SessionFeaturesDTO {
   progressiveReveal: boolean;
   maxMapLayers: number;
   maxFileUploadMb: number;
+  // Exploration
+  explorationMode: boolean;
+  autoRevealFog: boolean;
+  interactiveObjects: boolean;
+  mapZones: boolean;
+  individualVision: boolean;
+  pathTrail: boolean;
+  ambientSounds: boolean;
+  npcDialogue: boolean;
+  triggerChains: boolean;
+}
+
+// ── Exploration DTOs ──
+
+export interface InteractiveObjectDTO {
+  id: string;
+  mapId: string;
+  tokenId: string;
+  interactionType: InteractionType;
+  interactionRange: number;
+  requiresLineOfSight: boolean;
+  requiredRole: string[];
+  requiredCheck: Record<string, unknown> | null;
+  onInteract: Record<string, unknown>;
+  isActive: boolean;
+  isHidden: boolean;
+  hasBeenUsed: boolean;
+  usedById: string | null;
+  usedAt: string | null;
+  highlightOnHover: boolean;
+  highlightColor: string;
+  interactionIcon: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface MapZoneDTO {
+  id: string;
+  mapId: string;
+  name: string;
+  zoneType: ZoneType;
+  shapeType: string;
+  geometry: Record<string, unknown>;
+  properties: Record<string, unknown>;
+  isVisible: boolean;
+  visibleToGmOnly: boolean;
+  overlayColor: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface ExplorationLogDTO {
+  id: string;
+  sessionId: string;
+  mapId: string;
+  event: ExplorationEvent;
+  actorId: string | null;
+  tokenId: string | null;
+  data: Record<string, unknown>;
+  visibleTo: string[];
+  channel: string;
+  createdAt: string;
+}
+
+export interface PlayerViewStateDTO {
+  sessionId: string;
+  userId: string;
+  mapId: string;
+  exploredCells: string[] | Record<string, unknown>;
+  lastTokenX: number;
+  lastTokenY: number;
+  cameraX: number;
+  cameraY: number;
+  cameraZoom: number;
+}
+
+export interface ExplorationSettingsDTO {
+  enabled: boolean;
+  playerTokenControl: "free" | "request";
+  showPathTrail: boolean;
+  pathTrailDuration: number;
+  pathTrailColor: string;
+  autoRevealFog: boolean;
+  revealMode: "token_vision" | "gm_manual";
+  exploredFogOpacity: number;
+  hiddenFogOpacity: number;
+  defaultVisionRadius: number;
+  visionRadiusUnit: "cells" | "ft" | "m";
+  sharedVision: boolean;
+  allowDoorInteraction: boolean;
+  doorInteractionRange: number;
+  allowObjectInteraction: boolean;
+  objectInteractionRange: number;
+  cameraFollowToken: boolean;
+  cameraFollowSmoothing: number;
+  allowFreeCamera: boolean;
+  cameraBoundsRestrict: boolean;
+  ambientSoundEnabled: boolean;
+  footstepSoundEnabled: boolean;
+  interactionSoundEnabled: boolean;
 }
 
 // ── Generic Response Types ──

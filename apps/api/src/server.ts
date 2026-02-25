@@ -32,6 +32,13 @@ import { layersRoutes } from "./modules/layers/layers.routes.js";
 import { annotationsRoutes } from "./modules/annotations/annotations.routes.js";
 import { mapGenerationRoutes } from "./modules/map-generation/map-generation.routes.js";
 
+// Exploration modules
+import { interactiveObjectsRoutes } from "./modules/interactive-objects/interactive-objects.routes.js";
+import { zonesRoutes } from "./modules/zones/zones.routes.js";
+import { explorationLogRoutes } from "./modules/exploration-log/exploration-log.routes.js";
+import { playerViewRoutes } from "./modules/player-view/player-view.routes.js";
+import { explorationRoutes } from "./modules/exploration/exploration.routes.js";
+
 // Socket.IO
 import { createSocketGateway } from "./modules/socket/socket.gateway.js";
 
@@ -91,6 +98,13 @@ async function buildApp() {
         await authenticated.register(layersRoutes);
         await authenticated.register(annotationsRoutes);
         await authenticated.register(mapGenerationRoutes);
+
+        // Exploration
+        await authenticated.register(interactiveObjectsRoutes);
+        await authenticated.register(zonesRoutes);
+        await authenticated.register(explorationLogRoutes);
+        await authenticated.register(playerViewRoutes);
+        await authenticated.register(explorationRoutes);
       });
     },
     { prefix: "/api/v1" }

@@ -15,6 +15,8 @@ import { registerMapWallHandlers } from "./handlers/map-wall.handler.js";
 import { registerMapLightHandlers } from "./handlers/map-light.handler.js";
 import { registerMapAnnotationHandlers } from "./handlers/map-annotation.handler.js";
 import { registerMapStateHandlers } from "./handlers/map-state.handler.js";
+import { registerExplorationInteractionHandlers } from "./handlers/exploration-interaction.handler.js";
+import { registerExplorationMovementHandlers } from "./handlers/exploration-movement.handler.js";
 
 export type TypedIO = SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
 export type TypedSocket = Parameters<Parameters<TypedIO["on"]>[1]>[0];
@@ -65,6 +67,10 @@ export function createSocketGateway(httpServer: HttpServer, corsOrigin: string[]
     registerMapLightHandlers(io, socket, prisma);
     registerMapAnnotationHandlers(io, socket, prisma);
     registerMapStateHandlers(io, socket, prisma);
+
+    // Exploration event handlers
+    registerExplorationInteractionHandlers(io, socket, prisma);
+    registerExplorationMovementHandlers(io, socket, prisma);
 
     socket.on("disconnect", async (reason) => {
       console.log(`Socket disconnected: ${socket.id} (reason: ${reason})`);

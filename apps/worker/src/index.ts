@@ -8,6 +8,7 @@ import { createInviteExpirationWorker } from "./jobs/invite-expiration.js";
 import { createThumbnailWorker } from "./jobs/thumbnail-generation.js";
 import { createTokenPositionFlushWorker } from "./jobs/token-position-flush.js";
 import { createWallDetectionWorker } from "./jobs/wall-detection.js";
+import { createVisionFlushWorker } from "./jobs/vision-flush.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
 
@@ -41,6 +42,12 @@ async function setupRepeatingJobs(connection: { url: string }) {
   await tokenFlushQueue.upsertJobScheduler("token-position-flush-repeat", {
     every: 30_000,
   });
+
+  // Vision flush — every 60 seconds
+  const visionFlushQueue = new Queue("vision-flush", { connection });
+  await visionFlushQueue.upsertJobScheduler("vision-flush-repeat", {
+    every: 60_000,
+  });
 }
 
 async function start() {
@@ -57,6 +64,7 @@ async function start() {
   const thumbnailWorker = createThumbnailWorker(connection);
   const tokenPositionFlushWorker = createTokenPositionFlushWorker(connection);
   const wallDetectionWorker = createWallDetectionWorker(connection);
+  const visionFlushWorker = createVisionFlushWorker(connection);
 
   // Set up repeating jobs
   await setupRepeatingJobs(connection);
@@ -70,6 +78,7 @@ async function start() {
   console.log("  - thumbnail-generation (on demand)");
   console.log("  - token-position-flush (every 30s)");
   console.log("  - wall-detection (on demand)");
+  console.log("  - vision-flush (every 60s)");
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -83,6 +92,7 @@ async function start() {
       thumbnailWorker.close(),
       tokenPositionFlushWorker.close(),
       wallDetectionWorker.close(),
+      visionFlushWorker.close(),
     ]);
     process.exit(0);
   };

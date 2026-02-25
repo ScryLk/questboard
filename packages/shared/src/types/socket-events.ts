@@ -14,7 +14,7 @@ import type {
   CombatStateDTO,
   TimelineEventDTO,
 } from "./dto.js";
-import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility } from "./enums.js";
+import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType } from "./enums.js";
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SERVER → CLIENT (broadcast para a room da sessão)              ║
@@ -92,6 +92,113 @@ export interface ServerToClientEvents {
   // ── Cursores (high frequency) ──
   "cursor:positions": (data: Record<string, { x: number; y: number }>) => void;
 
+  // ── Exploração: Visão ──
+  "exploration:vision-updated": (data: {
+    visibleCells: string[];
+    brightCells: string[];
+    dimCells: string[];
+    darkCells: string[];
+  }) => void;
+  "exploration:shared-vision-updated": (data: { visibleCells: string[] }) => void;
+
+  // ── Exploração: Trail ──
+  "exploration:trail-updated": (data: { userId: string; point: { x: number; y: number } }) => void;
+  "exploration:trail-cleared": (data: { userId: string }) => void;
+
+  // ── Exploração: Interação ──
+  "exploration:interaction-available": (data: {
+    objects: Array<{
+      objectId: string;
+      tokenId: string;
+      interactionType: InteractionType;
+      icon: string;
+      position: { x: number; y: number };
+      distance: number;
+    }>;
+  }) => void;
+  "exploration:interaction-result": (data: {
+    objectId: string;
+    userId: string;
+    success: boolean;
+    message?: string;
+    sound?: string;
+    effects: Array<{ type: string }>;
+  }) => void;
+  "exploration:interaction-failed": (data: { objectId: string; reason: string }) => void;
+  "exploration:check-required": (data: {
+    objectId: string;
+    check: {
+      type: string;
+      ability?: string;
+      skill?: string;
+      dc?: number;
+      itemName?: string;
+    };
+  }) => void;
+
+  // ── Exploração: Diálogo ──
+  "exploration:dialogue-started": (data: {
+    npcName: string;
+    portrait?: string;
+    dialogue: Array<{ speaker: string; text: string }>;
+  }) => void;
+
+  // ── Exploração: Narrativa ──
+  "exploration:narrative": (data: {
+    message: string;
+    channel: string;
+    causedBy?: string;
+  }) => void;
+
+  // ── Exploração: Transição de mapa ──
+  "exploration:map-transition-start": (data: {
+    effect: string;
+    targetMapId: string;
+    targetMapName: string;
+  }) => void;
+  "exploration:map-transition-complete": (data: { mapId: string }) => void;
+
+  // ── Exploração: Zonas ──
+  "exploration:zone-entered": (data: {
+    zoneId: string;
+    zoneName: string;
+    zoneType: ZoneType;
+    description?: string;
+    overlayColor?: string;
+  }) => void;
+  "exploration:zone-effect": (data: {
+    zoneId: string;
+    effect: string;
+    details: Record<string, unknown>;
+  }) => void;
+
+  // ── Exploração: Modo ──
+  "exploration:mode-changed": (data: { mode: "exploration" | "combat"; transition: string }) => void;
+
+  // ── Exploração: Move request ──
+  "exploration:move-requested": (data: {
+    requestId: string;
+    userId: string;
+    tokenId: string;
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    path: Array<{ x: number; y: number }>;
+  }) => void;
+  "exploration:move-approved": (data: {
+    requestId: string;
+    tokenId: string;
+    path: Array<{ x: number; y: number }>;
+  }) => void;
+  "exploration:move-denied": (data: { requestId: string; reason?: string }) => void;
+
+  // ── Áudio ──
+  "audio:play-effect": (data: { soundId: string; volume: number }) => void;
+  "audio:ambient-zone-entered": (data: { soundId: string; volume: number; fadeIn: number }) => void;
+  "audio:ambient-zone-exited": (data: { soundId: string; fadeOut: number }) => void;
+
+  // ── Token move rejected ──
+  "token:move-rejected": (data: { tokenId: string; reason: string }) => void;
+
   // ── Sistema ──
   "error": (data: { code: string; message: string }) => void;
 }
@@ -155,6 +262,21 @@ export interface ClientToServerEvents {
 
   // ── RSVP ──
   "schedule:rsvp": (data: { scheduleId: string; status: RsvpStatus }, ack: AckFn<void>) => void;
+
+  // ── Exploração ──
+  "exploration:interact": (data: {
+    objectId: string;
+    context?: { diceResult?: number; hasItem?: string };
+  }) => void;
+  "exploration:request-move": (data: { tokenId: string; x: number; y: number }) => void;
+  "exploration:approve-move": (data: { requestId: string }) => void;
+  "exploration:deny-move": (data: { requestId: string; reason?: string }) => void;
+  "exploration:examine-area": (data: { x: number; y: number }) => void;
+  "exploration:ping-location": (data: {
+    x: number;
+    y: number;
+    type: "attention" | "danger" | "question" | "go_here";
+  }) => void;
 }
 
 // ── Types auxiliares ──
