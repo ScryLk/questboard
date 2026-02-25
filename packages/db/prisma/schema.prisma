@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
 }
 
 datasource db {
@@ -7,12 +8,79 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ENUMS                                                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
 enum Plan {
   FREE
   ADVENTURER
   LEGENDARY
+  PLAYER_PLUS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  PAUSED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
+  CHARGED_BACK
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum AchievementCategory {
+  SESSIONS
+  COMBAT
+  SOCIAL
+  CREATION
+  EXPLORATION
+  DEDICATION
+  SPECIAL
+}
+
+enum AchievementRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum NotificationType {
+  SESSION_INVITE
+  SESSION_STARTING
+  SESSION_LIVE
+  SESSION_ENDED
+  SESSION_KICK
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  FRIEND_ONLINE
+  ACHIEVEMENT_UNLOCKED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  TRIAL_ENDING
+  PLAN_CHANGED
+  SYSTEM_ANNOUNCEMENT
+  SYSTEM_UPDATE
 }
 
 enum SessionType {
@@ -63,85 +131,443 @@ enum MessageType {
   NARRATIVE
 }
 
-// ─── Models ───
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CORE: USUÁRIO E AUTENTICAÇÃO                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
 model User {
-  id          String   @id @default(cuid())
-  externalId  String   @unique
-  email       String   @unique
-  displayName String
-  avatarUrl   String?
-  plan        Plan     @default(FREE)
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String    @unique
+  displayName   String
+  username      String?   @unique
+  avatarUrl     String?
+  bannerUrl     String?
+  bio           String?   @db.VarChar(500)
+  locale        String    @default("pt-BR")
+  timezone      String    @default("America/Sao_Paulo")
+
+  // ── Plano ──
+  plan          Plan      @default(FREE)
+  planExpiresAt DateTime?
+  trialUsed     Boolean   @default(false)
+
+  // ── Status ──
+  isOnline      Boolean   @default(false)
+  lastSeenAt    DateTime  @default(now())
+  onboardingCompleted Boolean @default(false)
+
+  // ── Extensível ──
+  preferences   Json      @default("{}")
+  metadata      Json      @default("{}")
+
+  // ── Timestamps ──
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  // ── Relacionamentos ──
+  subscription        Subscription?
+  ownedSessions       Session[]
+  sessionPlayers      SessionPlayer[]
+  characters          Character[]
+  messages            Message[]
+  diceRolls           DiceRoll[]
+
+  // Social
+  sentFriendRequests     Friendship[]     @relation("FriendshipSender")
+  receivedFriendRequests Friendship[]     @relation("FriendshipReceiver")
+  blockedUsers           UserBlock[]      @relation("BlockSender")
+  blockedByUsers         UserBlock[]      @relation("BlockReceiver")
+
+  // Achievements & Stats
+  userAchievements    UserAchievement[]
+  userStats           UserStats?
+
+  // Notifications
+  notifications       Notification[]
+  deviceTokens        DeviceToken[]
+
+  @@index([clerkId])
+  @@index([plan])
+  @@index([isOnline])
+  @@index([deletedAt])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ASSINATURAS E BILLING (Mercado Pago)                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  userId              String             @unique
+  user                User               @relation(fields: [userId], references: [id])
+
+  mpPreapprovalId     String?            @unique
+  mpPayerId           String?
+  mpPlanId            String?
+
+  plan                Plan               @default(FREE)
+  status              SubscriptionStatus @default(ACTIVE)
+  billingCycle        BillingCycle       @default(MONTHLY)
+  priceAmountCents    Int                @default(0)
+  currency            String             @default("BRL")
+
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  trialStart          DateTime?
+  trialEnd            DateTime?
+  cancelledAt         DateTime?
+  cancelReason        String?
+
+  previousPlan        Plan?
+  planChangedAt       DateTime?
+
+  metadata            Json               @default("{}")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  payments            Payment[]
+
+  @@index([status])
+  @@index([mpPreapprovalId])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  subscriptionId    String
+  subscription      Subscription  @relation(fields: [subscriptionId], references: [id])
+
+  mpPaymentId       String?       @unique
+  amountCents       Int
+  currency          String        @default("BRL")
+  status            PaymentStatus @default(PENDING)
+  paidAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  receiptUrl        String?
+
+  metadata          Json          @default("{}")
+  createdAt         DateTime      @default(now())
+
+  @@index([subscriptionId])
+  @@index([status])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LIMITES DE PLANO (Configuração — não hardcoded)                ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model PlanLimit {
+  id              String   @id @default(cuid())
+  plan            Plan     @unique
+
+  // ── Sessões ──
+  maxActiveSessions     Int     @default(2)
+  maxPlayersPerSession  Int     @default(5)
+  allowPublicSessions   Boolean @default(false)
+  allowAsyncSessions    Boolean @default(false)
+
+  // ── Mapas ──
+  maxMapUploadMb        Int     @default(5)
+  maxAiMapsPerMonth     Int     @default(0)
+  allowFogOfWar         Boolean @default(false)
+  maxMapLayers          Int     @default(0)
+  allowDynamicLighting  Boolean @default(false)
+  allowLineOfSight      Boolean @default(false)
+  allowInpainting       Boolean @default(false)
+
+  // ── Personagens e Fichas ──
+  maxCharactersPerPlayer Int    @default(3)
+  allowContextualRolls   Boolean @default(false)
+  allowPdfExport         Boolean @default(false)
+  availableSheetTemplates Json  @default("[\"generic\"]")
+
+  // ── Comunicação ──
+  allowWhisper           Boolean @default(false)
+  allowSecretNotes       Boolean @default(false)
+  maxFileUploadMb        Int     @default(2)
+  allowPlayerFileSharing Boolean @default(false)
+  allowProgressiveReveal Boolean @default(false)
+
+  // ── Mídia ──
+  maxStorageMb          Int     @default(50)
+  allowSoundtrack       Boolean @default(false)
+  soundtrackTier        String  @default("none")
+  allowCustomAudioUpload Boolean @default(false)
+
+  // ── IA ──
+  allowNpcAssistant     Boolean @default(false)
+  allowAiTimeline       Boolean @default(false)
+
+  // ── Social ──
+  maxFriends            Int     @default(50)
+  allowInitiativeTracker Boolean @default(false)
+
+  // ── Player Plus específico ──
+  maxPersonalStorageMb  Int     @default(0)
+  allowPersonalVault    Boolean @default(false)
+  allowProfileBadge     Boolean @default(false)
+  badgeName             String?
+
+  // ── Extensível ──
+  extras                Json    @default("{}")
+
+  updatedAt             DateTime @updatedAt
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SISTEMA DE AMIZADE                                             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Friendship {
+  id          String           @id @default(cuid())
+  senderId    String
+  receiverId  String
+  status      FriendshipStatus @default(PENDING)
+
+  sender      User @relation("FriendshipSender", fields: [senderId], references: [id])
+  receiver    User @relation("FriendshipReceiver", fields: [receiverId], references: [id])
+
+  metadata    Json @default("{}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  ownedSessions  Session[]
-  sessionPlayers SessionPlayer[]
-  characters     Character[]
-  messages       Message[]
-  diceRolls      DiceRoll[]
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
 }
 
-model Session {
-  id          String        @id @default(cuid())
-  name        String
-  type        SessionType   @default(PRIVATE)
-  system      String
-  status      SessionStatus @default(IDLE)
-  inviteCode  String        @unique @default(cuid())
-  maxPlayers  Int           @default(5)
-  isPublic    Boolean       @default(false)
-  tags        String[]
-  scheduledAt DateTime?
-  ownerId     String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+model UserBlock {
+  id          String   @id @default(cuid())
+  blockerId   String
+  blockedId   String
 
-  owner      User            @relation(fields: [ownerId], references: [id])
-  players    SessionPlayer[]
-  maps       Map[]
-  messages   Message[]
-  diceRolls  DiceRoll[]
-  timeline   TimelineEvent[]
-  audioState SessionAudio[]
+  blocker     User     @relation("BlockSender", fields: [blockerId], references: [id])
+  blocked     User     @relation("BlockReceiver", fields: [blockedId], references: [id])
+
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CONQUISTAS (ACHIEVEMENTS)                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Achievement {
+  id            String              @id @default(cuid())
+  key           String              @unique
+  name          String
+  description   String
+  iconUrl       String?
+  category      AchievementCategory
+  rarity        AchievementRarity   @default(COMMON)
+
+  triggerType   String
+  triggerConfig Json
+
+  reward        Json                @default("{}")
+  sortOrder     Int                 @default(0)
+  isHidden      Boolean             @default(false)
+  isActive      Boolean             @default(true)
+
+  metadata      Json                @default("{}")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id              String      @id @default(cuid())
+  userId          String
+  achievementId   String
+
+  user            User        @relation(fields: [userId], references: [id])
+  achievement     Achievement @relation(fields: [achievementId], references: [id])
+
+  unlockedAt      DateTime    @default(now())
+  progress        Json        @default("{}")
+  notified        Boolean     @default(false)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ESTATÍSTICAS DO JOGADOR                                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model UserStats {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+
+  totalSessions         Int @default(0)
+  totalSessionsAsGm     Int @default(0)
+  totalSessionsAsPlayer Int @default(0)
+  totalSessionMinutes   Int @default(0)
+  longestSessionMinutes Int @default(0)
+
+  totalDiceRolled       Int @default(0)
+  totalNat20s           Int @default(0)
+  totalNat1s            Int @default(0)
+  totalCriticalHits     Int @default(0)
+
+  totalCharactersCreated Int @default(0)
+  totalCharacterDeaths   Int @default(0)
+
+  totalMessagesInChat   Int @default(0)
+  totalFriendsAdded     Int @default(0)
+
+  totalMapsGenerated    Int @default(0)
+  totalCombatsParticipated Int @default(0)
+
+  currentWeeklyStreak   Int @default(0)
+  longestWeeklyStreak   Int @default(0)
+  lastSessionAt         DateTime?
+
+  extras                Json @default("{}")
+  updatedAt             DateTime @updatedAt
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  NOTIFICAÇÕES                                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Notification {
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+
+  type        NotificationType
+  title       String
+  body        String
+
+  sourceType  String?
+  sourceId    String?
+
+  actionUrl   String?
+  imageUrl    String?
+
+  isRead      Boolean            @default(false)
+  readAt      DateTime?
+
+  channels    Json               @default("[\"in_app\"]")
+  groupKey    String?
+
+  data        Json               @default("{}")
+  expiresAt   DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, type])
+  @@index([groupKey])
+}
+
+model DeviceToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  token       String   @unique
+  platform    String
+  deviceName  String?
+
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([userId, isActive])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SESSÃO DE JOGO                                                 ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Session {
+  id           String        @id @default(cuid())
+  name         String
+  system       String        @default("generic")
+  type         SessionType   @default(PRIVATE)
+  status       SessionStatus @default(IDLE)
+  inviteCode   String        @unique @default(cuid())
+  maxPlayers   Int           @default(5)
+  tags         String[]
+  description  String?       @db.VarChar(1000)
+  bannerUrl    String?
+  scheduledAt  DateTime?
+
+  ownerId      String
+  owner        User          @relation(fields: [ownerId], references: [id])
+
+  settings     Json          @default("{}")
+
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  players      SessionPlayer[]
+  maps         Map[]
+  messages     Message[]
+  diceRolls    DiceRoll[]
+  timeline     TimelineEvent[]
+  audioState   SessionAudio[]
 
   @@index([ownerId])
+  @@index([status])
   @@index([inviteCode])
-  @@index([isPublic, status])
+  @@index([type, status])
+  @@index([deletedAt])
 }
 
 model SessionPlayer {
-  id          String     @id @default(cuid())
-  role        PlayerRole @default(PLAYER)
-  joinedAt    DateTime   @default(now())
+  id            String      @id @default(cuid())
+  userId        String
+  sessionId     String
+  characterId   String?
+  role          PlayerRole  @default(PLAYER)
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
 
-  userId      String
-  sessionId   String
-  characterId String?
+  minutesPlayed Int         @default(0)
+  diceRolled    Int         @default(0)
+  messagesCount Int         @default(0)
 
-  user      User       @relation(fields: [userId], references: [id])
-  session   Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  character Character? @relation(fields: [characterId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+  session       Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  character     Character?  @relation(fields: [characterId], references: [id])
 
   @@unique([userId, sessionId])
   @@index([sessionId])
 }
 
-model Character {
-  id         String   @id @default(cuid())
-  name       String
-  system     String
-  templateId String?
-  data       Json
-  avatarUrl  String?
-  userId     String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ENTIDADES DE JOGO                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
-  user           User               @relation(fields: [userId], references: [id])
-  template       CharacterTemplate? @relation(fields: [templateId], references: [id])
+model Character {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+
+  name          String
+  system        String    @default("generic")
+  avatarUrl     String?
+  isPublic      Boolean   @default(false)
+
+  sheetData     Json      @default("{}")
+  metadata      Json      @default("{}")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
   sessionPlayers SessionPlayer[]
-  tokens         Token[]
 
   @@index([userId])
 }
@@ -153,153 +579,123 @@ model CharacterTemplate {
   schema  Json
   version Int    @default(1)
 
-  characters Character[]
-
   @@unique([system, name])
 }
 
 model Map {
-  id       String   @id @default(cuid())
-  name     String
-  imageUrl String
-  gridType GridType @default(SQUARE)
-  gridSize Int      @default(50)
-  width    Int
-  height   Int
+  id            String              @id @default(cuid())
+  sessionId     String
+  session       Session             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  sessionId String
-  createdAt DateTime @default(now())
+  name          String
+  imageUrl      String
+  width         Int
+  height        Int
+  gridType      GridType            @default(SQUARE)
+  gridSize      Int                 @default(32)
+  isActive      Boolean             @default(false)
 
-  session  Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  tokens   Token[]
-  fogAreas FogArea[]
-  layers   MapLayer[]
+  aiGenerated   Boolean             @default(false)
+  aiPrompt      String?
+  aiStatus      MapGenerationStatus @default(COMPLETED)
 
-  @@index([sessionId])
-}
+  layers        Json                @default("[]")
+  tokens        Json                @default("[]")
+  fogAreas      Json                @default("[]")
+  lightSources  Json                @default("[]")
+  walls         Json                @default("[]")
 
-model Token {
-  id         String   @id @default(cuid())
-  x          Int
-  y          Int
-  size       Int      @default(1)
-  imageUrl   String?
-  label      String?
-  conditions String[]
-  currentHp  Int?
-  maxHp      Int?
-  isVisible  Boolean  @default(true)
+  metadata      Json                @default("{}")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
-  mapId       String
-  characterId String?
-
-  map       Map        @relation(fields: [mapId], references: [id], onDelete: Cascade)
-  character Character? @relation(fields: [characterId], references: [id])
-
-  @@index([mapId])
-}
-
-model FogArea {
-  id       String  @id @default(cuid())
-  type     String  @default("polygon")
-  points   Json
-  revealed Boolean @default(false)
-  mapId    String
-
-  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
-
-  @@index([mapId])
-}
-
-model MapLayer {
-  id      String  @id @default(cuid())
-  type    String
-  data    Json
-  zIndex  Int     @default(0)
-  visible Boolean @default(true)
-  mapId   String
-
-  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
-
-  @@index([mapId])
-}
-
-model MapGeneration {
-  id        String              @id @default(cuid())
-  prompt    String
-  params    Json
-  imageUrl  String?
-  status    MapGenerationStatus @default(PENDING)
-  sessionId String
-  createdAt DateTime            @default(now())
-
-  @@index([sessionId])
+  @@index([sessionId, isActive])
 }
 
 model Message {
-  id        String      @id @default(cuid())
-  channel   ChatChannel @default(GENERAL)
-  content   String
-  type      MessageType @default(TEXT)
-  metadata  Json?
-  sessionId String
-  userId    String
-  targetId  String?
-  createdAt DateTime    @default(now())
+  id          String      @id @default(cuid())
+  sessionId   String
+  userId      String
+  channel     ChatChannel @default(GENERAL)
+  content     String
+  type        MessageType @default(TEXT)
+  targetId    String?
+  metadata    Json?
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
+  session     Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime    @default(now())
 
   @@index([sessionId, createdAt])
+  @@index([sessionId, channel])
 }
 
 model DiceRoll {
-  id        String   @id @default(cuid())
-  formula   String
-  results   Json
-  total     Int
-  context   String?
-  isSecret  Boolean  @default(false)
-  sessionId String
-  userId    String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  formula     String
+  results     Json
+  total       Int
+  context     String?
+  isSecret    Boolean  @default(false)
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([userId])
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  sessionId   String
+  type        String
+  data        Json
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
 
   @@index([sessionId, createdAt])
 }
 
 model AudioTrack {
-  id        String  @id @default(cuid())
-  category  String
-  name      String
-  url       String
-  duration  Int
-  isBuiltin Boolean @default(true)
+  id          String   @id @default(cuid())
+  category    String
+  name        String
+  url         String
+  duration    Int
+  isBuiltin   Boolean  @default(true)
 }
 
 model SessionAudio {
-  id        String  @id @default(cuid())
-  layer     String  @default("ambient")
-  volume    Float   @default(0.5)
-  isPlaying Boolean @default(false)
-  sessionId String
-  trackId   String
-
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
+  id          String   @id @default(cuid())
+  sessionId   String
+  layer       String   @default("ambient")
+  trackId     String
+  volume      Float    @default(0.5)
+  isPlaying   Boolean  @default(false)
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
-model TimelineEvent {
-  id        String   @id @default(cuid())
-  type      String
-  data      Json
-  sessionId String
-  createdAt DateTime @default(now())
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  AUDIT LOG                                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  targetType  String?
+  targetId    String?
+  changes     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
 
-  @@index([sessionId, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
 }

@@ -6,9 +6,7 @@ import { createSuccessResponse } from "@questboard/shared";
 export function createSessionsController(sessionsService: SessionsService) {
   return {
     async list(request: FastifyRequest, reply: FastifyReply) {
-      // TODO: Get userId from Clerk auth
-      const userId = (request.headers["x-user-id"] as string) ?? "";
-      const sessions = await sessionsService.list(userId);
+      const sessions = await sessionsService.list(request.user.id);
       return reply.send(createSuccessResponse(sessions));
     },
 
@@ -21,9 +19,8 @@ export function createSessionsController(sessionsService: SessionsService) {
     },
 
     async create(request: FastifyRequest, reply: FastifyReply) {
-      const userId = (request.headers["x-user-id"] as string) ?? "";
       const input = createSessionSchema.parse(request.body);
-      const session = await sessionsService.create(userId, input);
+      const session = await sessionsService.create(request.user.id, input);
       return reply.status(201).send(createSuccessResponse(session));
     },
 
@@ -31,11 +28,10 @@ export function createSessionsController(sessionsService: SessionsService) {
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply
     ) {
-      const userId = (request.headers["x-user-id"] as string) ?? "";
       const input = updateSessionSchema.parse(request.body);
       const session = await sessionsService.update(
         request.params.id,
-        userId,
+        request.user.id,
         input
       );
       return reply.send(createSuccessResponse(session));
@@ -45,8 +41,7 @@ export function createSessionsController(sessionsService: SessionsService) {
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply
     ) {
-      const userId = (request.headers["x-user-id"] as string) ?? "";
-      await sessionsService.delete(request.params.id, userId);
+      await sessionsService.delete(request.params.id, request.user.id);
       return reply.status(204).send();
     },
 
@@ -54,9 +49,8 @@ export function createSessionsController(sessionsService: SessionsService) {
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply
     ) {
-      const userId = (request.headers["x-user-id"] as string) ?? "";
       const input = joinSessionSchema.parse(request.body);
-      const player = await sessionsService.join(input.inviteCode, userId);
+      const player = await sessionsService.join(input.inviteCode, request.user.id);
       return reply.status(201).send(createSuccessResponse(player));
     },
 
@@ -64,8 +58,7 @@ export function createSessionsController(sessionsService: SessionsService) {
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply
     ) {
-      const userId = (request.headers["x-user-id"] as string) ?? "";
-      await sessionsService.leave(request.params.id, userId);
+      await sessionsService.leave(request.params.id, request.user.id);
       return reply.status(204).send();
     },
 

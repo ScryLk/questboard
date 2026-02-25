@@ -6,9 +6,11 @@ export const createSessionSchema = z.object({
   type: z.nativeEnum(SessionType).default(SessionType.PRIVATE),
   system: z.string().min(1).max(50),
   maxPlayers: z.number().int().min(1).max(20).default(5),
-  isPublic: z.boolean().default(false),
   tags: z.array(z.string().max(30)).max(10).default([]),
+  description: z.string().max(1000).optional().nullable(),
+  bannerUrl: z.string().url().optional().nullable(),
   scheduledAt: z.coerce.date().nullable().optional(),
+  settings: z.record(z.unknown()).optional(),
 });
 
 export const updateSessionSchema = createSessionSchema.partial();

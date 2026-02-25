@@ -7,6 +7,7 @@ export function createSessionsService(prisma: PrismaClient) {
     async list(userId: string) {
       const sessions = await prisma.session.findMany({
         where: {
+          deletedAt: null,
           OR: [
             { ownerId: userId },
             { players: { some: { userId } } },
@@ -23,7 +24,7 @@ export function createSessionsService(prisma: PrismaClient) {
 
     async getById(sessionId: string) {
       const session = await prisma.session.findUnique({
-        where: { id: sessionId },
+        where: { id: sessionId, deletedAt: null },
         include: {
           owner: { select: { id: true, displayName: true, avatarUrl: true } },
           players: {
@@ -34,7 +35,7 @@ export function createSessionsService(prisma: PrismaClient) {
           },
         },
       });
-      if (!session) throw new NotFoundError("Session");
+      if (!session) throw new NotFoundError("Sessão");
       return session;
     },
 
@@ -55,10 +56,10 @@ export function createSessionsService(prisma: PrismaClient) {
 
     async update(sessionId: string, userId: string, input: UpdateSessionInput) {
       const session = await prisma.session.findUnique({
-        where: { id: sessionId },
+        where: { id: sessionId, deletedAt: null },
         select: { ownerId: true },
       });
-      if (!session) throw new NotFoundError("Session");
+      if (!session) throw new NotFoundError("Sessão");
       if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode editar a sessão");
 
       return prisma.session.update({
@@ -69,21 +70,25 @@ export function createSessionsService(prisma: PrismaClient) {
 
     async delete(sessionId: string, userId: string) {
       const session = await prisma.session.findUnique({
-        where: { id: sessionId },
+        where: { id: sessionId, deletedAt: null },
         select: { ownerId: true },
       });
-      if (!session) throw new NotFoundError("Session");
+      if (!session) throw new NotFoundError("Sessão");
       if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode deletar a sessão");
 
-      return prisma.session.delete({ where: { id: sessionId } });
+      // Soft delete
+      return prisma.session.update({
+        where: { id: sessionId },
+        data: { deletedAt: new Date() },
+      });
     },
 
     async join(inviteCode: string, userId: string) {
       const session = await prisma.session.findUnique({
-        where: { inviteCode },
+        where: { inviteCode, deletedAt: null },
         select: { id: true, maxPlayers: true, _count: { select: { players: true } } },
       });
-      if (!session) throw new NotFoundError("Session");
+      if (!session) throw new NotFoundError("Sessão");
 
       if (session._count.players >= session.maxPlayers) {
         throw new BadRequestError("Sessão cheia");
@@ -105,10 +110,10 @@ export function createSessionsService(prisma: PrismaClient) {
 
     async leave(sessionId: string, userId: string) {
       const session = await prisma.session.findUnique({
-        where: { id: sessionId },
+        where: { id: sessionId, deletedAt: null },
         select: { ownerId: true },
       });
-      if (!session) throw new NotFoundError("Session");
+      if (!session) throw new NotFoundError("Sessão");
       if (session.ownerId === userId) {
         throw new BadRequestError("O GM não pode sair da própria sessão");
       }
@@ -121,7 +126,7 @@ export function createSessionsService(prisma: PrismaClient) {
     async listPublic(page: number, pageSize: number) {
       const [sessions, total] = await Promise.all([
         prisma.session.findMany({
-          where: { isPublic: true, status: { in: ["IDLE", "LIVE"] } },
+          where: { type: "PUBLIC", status: { in: ["IDLE", "LIVE"] }, deletedAt: null },
           include: {
             owner: { select: { id: true, displayName: true, avatarUrl: true } },
             _count: { select: { players: true } },
@@ -131,7 +136,7 @@ export function createSessionsService(prisma: PrismaClient) {
           take: pageSize,
         }),
         prisma.session.count({
-          where: { isPublic: true, status: { in: ["IDLE", "LIVE"] } },
+          where: { type: "PUBLIC", status: { in: ["IDLE", "LIVE"] }, deletedAt: null },
         }),
       ]);
 
