@@ -290,3 +290,54 @@ export enum DiceRollMode {
   GM_ONLY = "GM_ONLY",
   SELF = "SELF",
 }
+
+// ── Character & Template Enums ──
+
+export enum TemplateTier {
+  FREE = "FREE",
+  ADVENTURER = "ADVENTURER",
+  LEGENDARY = "LEGENDARY",
+}
+
+export enum CharacterStatus {
+  ACTIVE = "ACTIVE",
+  RETIRED = "RETIRED",
+  DEAD = "DEAD",
+  ARCHIVED = "ARCHIVED",
+}
+
+export enum VaultFileType {
+  IMAGE = "IMAGE",
+  DOCUMENT = "DOCUMENT",
+  AUDIO = "AUDIO",
+  SHEET_EXPORT = "SHEET_EXPORT",
+  OTHER = "OTHER",
+}
+
+export enum DiceRollType {
+  MANUAL = "MANUAL",
+  ABILITY_CHECK = "ABILITY_CHECK",
+  SAVING_THROW = "SAVING_THROW",
+  ATTACK = "ATTACK",
+  DAMAGE = "DAMAGE",
+  SPELL_ATTACK = "SPELL_ATTACK",
+  SPELL_DAMAGE = "SPELL_DAMAGE",
+  INITIATIVE = "INITIATIVE",
+  HIT_DICE = "HIT_DICE",
+  DEATH_SAVE = "DEATH_SAVE",
+  CUSTOM = "CUSTOM",
+}
+
+export enum DiceVisibility {
+  PUBLIC = "PUBLIC",
+  GM_ONLY = "GM_ONLY",
+  WHISPER = "WHISPER",
+  SELF = "SELF",
+}
+
+export enum ShareTargetType {
+  GM = "GM",
+  CO_GM = "CO_GM",
+  ALL_PLAYERS = "ALL_PLAYERS",
+  SPECIFIC_USER = "SPECIFIC_USER",
+}

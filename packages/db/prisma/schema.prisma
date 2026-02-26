@@ -283,6 +283,55 @@ enum MapGenMode {
   WALLS_DETECT
 }
 
+enum TemplateTier {
+  FREE
+  ADVENTURER
+  LEGENDARY
+}
+
+enum CharacterStatus {
+  ACTIVE
+  RETIRED
+  DEAD
+  ARCHIVED
+}
+
+enum VaultFileType {
+  IMAGE
+  DOCUMENT
+  AUDIO
+  SHEET_EXPORT
+  OTHER
+}
+
+enum DiceRollType {
+  MANUAL
+  ABILITY_CHECK
+  SAVING_THROW
+  ATTACK
+  DAMAGE
+  SPELL_ATTACK
+  SPELL_DAMAGE
+  INITIATIVE
+  HIT_DICE
+  DEATH_SAVE
+  CUSTOM
+}
+
+enum DiceVisibility {
+  PUBLIC
+  GM_ONLY
+  WHISPER
+  SELF
+}
+
+enum ShareTargetType {
+  GM
+  CO_GM
+  ALL_PLAYERS
+  SPECIFIC_USER
+}
+
 enum ChatChannel {
   GENERAL
   IN_CHARACTER
@@ -450,10 +499,11 @@ model PlanLimit {
   allowInpainting       Boolean @default(false)
 
   // ── Personagens e Fichas ──
-  maxCharactersPerPlayer Int    @default(3)
-  allowContextualRolls   Boolean @default(false)
-  allowPdfExport         Boolean @default(false)
-  availableSheetTemplates Json  @default("[\"generic\"]")
+  maxCharactersPerPlayer  Int     @default(3)
+  allowContextualRolls    Boolean @default(false)
+  allowPdfExport          Boolean @default(false)
+  allowCustomTemplates    Boolean @default(false)
+  availableSheetTemplates Json    @default("[\"generic\"]")
 
   // ── Comunicação ──
   allowWhisper           Boolean @default(false)
@@ -952,36 +1002,156 @@ model SessionReport {
 // ║  ENTIDADES DE JOGO                                              ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
-model Character {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
+model CharacterTemplate {
+  id            String       @id @default(cuid())
 
-  name          String
-  system        String    @default("generic")
-  avatarUrl     String?
-  isPublic      Boolean   @default(false)
+  // ── Identidade ──
+  name          String       @db.VarChar(100)
+  slug          String       @unique
+  description   String?      @db.VarChar(500)
+  systemName    String       @db.VarChar(100)
+  iconUrl       String?
+  coverUrl      String?
 
-  sheetData     Json      @default("{}")
-  metadata      Json      @default("{}")
+  // ── Versão ──
+  version       Int          @default(1)
+  changelog     String?      @db.Text
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  // ── Schema ──
+  schema        Json
+  layout        Json
+  formulas      Json         @default("{}")
+  diceActions   Json         @default("[]")
+  defaults      Json         @default("{}")
 
-  sessionPlayers SessionPlayer[]
+  // ── Configurações ──
+  settings      Json         @default("{}")
 
-  @@index([userId])
+  // ── Acesso ──
+  tier          TemplateTier @default(FREE)
+  isOfficial    Boolean      @default(true)
+  isActive      Boolean      @default(true)
+  createdById   String?
+
+  // ── Extensível ──
+  metadata      Json         @default("{}")
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // ── Relacionamentos ──
+  characters    Character[]
+
+  @@index([slug])
+  @@index([tier])
 }
 
-model CharacterTemplate {
-  id      String @id @default(cuid())
-  system  String
-  name    String
-  schema  Json
-  version Int    @default(1)
+model Character {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id])
+  templateId      String
+  template        CharacterTemplate @relation(fields: [templateId], references: [id])
+  templateVersion Int             @default(1)
 
-  @@unique([system, name])
+  // ── Identidade ──
+  name            String          @db.VarChar(100)
+  avatarUrl       String?
+  bannerUrl       String?
+  pronouns        String?         @db.VarChar(50)
+
+  // ── Status ──
+  status          CharacterStatus @default(ACTIVE)
+  isPublic        Boolean         @default(false)
+
+  // ── Dados da ficha ──
+  data            Json            @default("{}")
+
+  // ── Inventário ──
+  inventory       Json            @default("[]")
+
+  // ── Spellbook ──
+  spells          Json            @default("{}")
+
+  // ── Moeda ──
+  currency        Json            @default("{}")
+
+  // ── Backstory e Notas ──
+  backstory       String?         @db.Text
+  notes           Json            @default("[]")
+
+  // ── Progressão ──
+  experience      Int             @default(0)
+  level           Int             @default(1)
+  levelHistory    Json            @default("[]")
+
+  // ── Session link ──
+  activeSessionId String?
+
+  // ── Vault ──
+  vaultUsageMb    Float           @default(0)
+
+  // ── Extensível ──
+  metadata        Json            @default("{}")
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  // ── Relacionamentos ──
+  sessionPlayers  SessionPlayer[]
+  vaultFiles      CharacterVaultFile[]
+  diceRolls       CharacterDiceRoll[]
+  sharePermissions CharacterSharePermission[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([activeSessionId])
+  @@index([templateId])
+  @@index([deletedAt])
+}
+
+model CharacterVaultFile {
+  id            String        @id @default(cuid())
+  characterId   String
+  character     Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // ── Arquivo ──
+  fileName      String        @db.VarChar(255)
+  fileUrl       String
+  fileSizeMb    Float
+  mimeType      String        @db.VarChar(100)
+  fileType      VaultFileType
+
+  // ── Organização ──
+  folder        String        @default("/")
+  description   String?       @db.VarChar(500)
+  sortOrder     Int           @default(0)
+
+  metadata      Json          @default("{}")
+  createdAt     DateTime      @default(now())
+
+  @@index([characterId])
+  @@index([characterId, folder])
+}
+
+model CharacterSharePermission {
+  id            String          @id @default(cuid())
+  characterId   String
+  character     Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  sessionId     String
+
+  // ── Quem pode ver ──
+  targetType    ShareTargetType
+  targetUserId  String?
+
+  // ── O que pode ver ──
+  visibleSections Json         @default("[\"basic\"]")
+
+  canEdit       Boolean        @default(false)
+
+  @@unique([characterId, sessionId, targetType, targetUserId])
+  @@index([characterId, sessionId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -1334,6 +1504,39 @@ model DiceRoll {
 
   @@index([sessionId, createdAt])
   @@index([userId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ROLAGENS DE DADOS CONTEXTUAIS (vinculadas a personagem/ficha) ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model CharacterDiceRoll {
+  id            String         @id @default(cuid())
+  sessionId     String
+  userId        String
+  characterId   String?
+  character     Character?     @relation(fields: [characterId], references: [id])
+
+  // ── Notação ──
+  notation      String         @db.VarChar(200)
+  label         String?        @db.VarChar(200)
+
+  // ── Resultado ──
+  results       Json
+
+  // ── Contexto ──
+  rollType      DiceRollType   @default(MANUAL)
+  rollContext    Json?
+
+  // ── Visibilidade ──
+  visibility    DiceVisibility @default(PUBLIC)
+  whisperTo     String[]       @default([])
+
+  createdAt     DateTime       @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([userId])
+  @@index([characterId])
 }
 
 model TimelineEvent {

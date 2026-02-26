@@ -32,6 +32,12 @@ import type {
   InteractionType,
   ZoneType,
   ExplorationEvent,
+  TemplateTier,
+  CharacterStatus,
+  VaultFileType,
+  DiceRollType,
+  DiceVisibility,
+  ShareTargetType,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -484,8 +490,13 @@ export interface PlanLimitsDTO {
   allowNpcAssistant: boolean;
   allowInitiativeTracker: boolean;
   maxStorageMb: number;
+  // Characters
   maxCharactersPerPlayer: number;
+  allowContextualRolls: boolean;
   allowPdfExport: boolean;
+  allowCustomTemplates: boolean;
+  allowPersonalVault: boolean;
+  maxPersonalStorageMb: number;
   maxFriends: number;
   // Exploration
   allowExplorationMode: boolean;
@@ -727,6 +738,283 @@ export interface ExplorationSettingsDTO {
   ambientSoundEnabled: boolean;
   footstepSoundEnabled: boolean;
   interactionSoundEnabled: boolean;
+}
+
+// ── Character Template DTOs ──
+
+export interface CharacterTemplateDTO {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  systemName: string;
+  iconUrl: string | null;
+  coverUrl: string | null;
+  version: number;
+  changelog: string | null;
+  schema: TemplateSchemaDTO;
+  layout: Record<string, unknown>;
+  formulas: Record<string, string>;
+  diceActions: DiceActionDTO[];
+  defaults: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  tier: TemplateTier;
+  isOfficial: boolean;
+  isActive: boolean;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharacterTemplateListDTO {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  systemName: string;
+  iconUrl: string | null;
+  coverUrl: string | null;
+  version: number;
+  tier: TemplateTier;
+  isOfficial: boolean;
+}
+
+export interface TemplateSchemaDTO {
+  sections: TemplateSectionDTO[];
+}
+
+export interface TemplateSectionDTO {
+  id: string;
+  label: string;
+  icon?: string;
+  columns?: number;
+  fields: TemplateFieldDTO[];
+}
+
+export interface TemplateFieldDTO {
+  key: string;
+  label: string;
+  type: FieldType;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ value: string; label: string }>;
+  defaultValue?: unknown;
+  formula?: string;
+  computed?: boolean;
+  readOnly?: boolean;
+  visibility?: "always" | "edit" | "view";
+  width?: "full" | "half" | "third" | "quarter";
+  condition?: string;
+  group?: string;
+  // HP-specific
+  maxFormula?: string;
+  tempHp?: boolean;
+  // Spell slot specific
+  slotLevels?: number[];
+  // Currency specific
+  denominations?: Array<{ key: string; label: string; rate: number }>;
+  // Repeatable specific
+  itemFields?: TemplateFieldDTO[];
+  // Death save specific
+  successCount?: number;
+  failCount?: number;
+}
+
+export type FieldType =
+  | "text"
+  | "number"
+  | "textarea"
+  | "select"
+  | "boolean"
+  | "hp"
+  | "proficiency"
+  | "ability_score"
+  | "skill"
+  | "spell_slot"
+  | "death_saves"
+  | "currency"
+  | "condition_tracker"
+  | "repeatable"
+  | "computed"
+  | "markdown"
+  | "image"
+  | "divider"
+  | "stat_block"
+  | "resource_counter"
+  | "hit_dice"
+  | "speed"
+  | "armor_class"
+  | "initiative"
+  | "spell_list"
+  | "feature_list"
+  | "equipment_slot";
+
+export interface DiceActionDTO {
+  id: string;
+  label: string;
+  notation: string;
+  rollType: DiceRollType;
+  followUp?: {
+    condition: string;
+    label: string;
+    notation: string;
+    rollType: DiceRollType;
+  };
+}
+
+// ── Character DTOs ──
+
+export interface CharacterDTO {
+  id: string;
+  userId: string;
+  templateId: string;
+  templateVersion: number;
+  templateName: string;
+  systemName: string;
+  name: string;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  pronouns: string | null;
+  status: CharacterStatus;
+  isPublic: boolean;
+  data: Record<string, unknown>;
+  inventory: InventoryItemDTO[];
+  spells: Record<string, unknown>;
+  currency: Record<string, number>;
+  backstory: string | null;
+  notes: CharacterNoteDTO[];
+  experience: number;
+  level: number;
+  activeSessionId: string | null;
+  vaultUsageMb: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharacterListDTO {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  status: CharacterStatus;
+  level: number;
+  systemName: string;
+  templateName: string;
+  activeSessionId: string | null;
+  createdAt: string;
+}
+
+export interface CharacterNoteDTO {
+  id: string;
+  title: string;
+  content: string;
+  isPrivate: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryItemDTO {
+  id: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  weight: number;
+  equipped: boolean;
+  attunement: boolean;
+  rarity?: string;
+  category?: string;
+  properties?: Record<string, unknown>;
+}
+
+// ── Character Dice Roll DTOs ──
+
+export interface CharacterDiceRollDTO {
+  id: string;
+  sessionId: string;
+  userId: string;
+  characterId: string | null;
+  characterName: string | null;
+  displayName: string;
+  notation: string;
+  label: string | null;
+  results: {
+    terms: Array<{
+      count: number;
+      sides: number;
+      rolls: number[];
+      kept: number[];
+      subtotal: number;
+    }>;
+    flatBonus: number;
+    total: number;
+  };
+  rollType: DiceRollType;
+  rollContext: Record<string, unknown> | null;
+  visibility: DiceVisibility;
+  whisperTo: string[];
+  createdAt: string;
+}
+
+// ── Character Vault DTOs ──
+
+export interface CharacterVaultFileDTO {
+  id: string;
+  characterId: string;
+  fileName: string;
+  fileUrl: string;
+  fileSizeMb: number;
+  mimeType: string;
+  fileType: VaultFileType;
+  folder: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+// ── Character Share DTOs ──
+
+export interface CharacterSharePermissionDTO {
+  id: string;
+  characterId: string;
+  sessionId: string;
+  targetType: ShareTargetType;
+  targetUserId: string | null;
+  visibleSections: string[];
+  canEdit: boolean;
+}
+
+// ── Level Up DTOs ──
+
+export interface LevelUpChoicesDTO {
+  hpMethod: "roll" | "average" | "manual";
+  hpRoll?: number;
+  hpManual?: number;
+  abilityScoreImprovements?: Record<string, number>;
+  featChoice?: string;
+  classFeatureChoices?: Record<string, string>;
+  newSpells?: string[];
+  skillProficiencies?: string[];
+}
+
+export interface LevelUpResultDTO {
+  previousLevel: number;
+  newLevel: number;
+  hpGained: number;
+  newFeatures: string[];
+  spellSlotsGained: Record<string, number>;
+  changes: Record<string, unknown>;
+}
+
+// ── Rest DTOs ──
+
+export interface RestResultDTO {
+  type: "short" | "long";
+  hpRestored: number;
+  hitDiceUsed: number;
+  resourcesReset: string[];
+  spellSlotsRecovered: Record<string, number>;
 }
 
 // ── Generic Response Types ──

@@ -39,6 +39,11 @@ import { explorationLogRoutes } from "./modules/exploration-log/exploration-log.
 import { playerViewRoutes } from "./modules/player-view/player-view.routes.js";
 import { explorationRoutes } from "./modules/exploration/exploration.routes.js";
 
+// Character modules
+import { characterTemplatesRoutes } from "./modules/character-templates/character-templates.routes.js";
+import { charactersRoutes } from "./modules/characters/characters.routes.js";
+import { characterDiceRoutes } from "./modules/character-dice/character-dice.routes.js";
+
 // Socket.IO
 import { createSocketGateway } from "./modules/socket/socket.gateway.js";
 
@@ -105,6 +110,11 @@ async function buildApp() {
         await authenticated.register(explorationLogRoutes);
         await authenticated.register(playerViewRoutes);
         await authenticated.register(explorationRoutes);
+
+        // Characters
+        await authenticated.register(characterTemplatesRoutes);
+        await authenticated.register(charactersRoutes);
+        await authenticated.register(characterDiceRoutes);
       });
     },
     { prefix: "/api/v1" }

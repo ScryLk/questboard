@@ -13,8 +13,10 @@ import type {
   InitiativeEntry,
   CombatStateDTO,
   TimelineEventDTO,
+  CharacterDiceRollDTO,
+  RestResultDTO,
 } from "./dto.js";
-import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType } from "./enums.js";
+import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType, DiceRollType, DiceVisibility } from "./enums.js";
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SERVER → CLIENT (broadcast para a room da sessão)              ║
@@ -199,6 +201,39 @@ export interface ServerToClientEvents {
   // ── Token move rejected ──
   "token:move-rejected": (data: { tokenId: string; reason: string }) => void;
 
+  // ── Personagem (Character) ──
+  "character:updated": (data: {
+    characterId: string;
+    userId: string;
+    changes: Record<string, unknown>;
+    computedChanges?: Record<string, unknown>;
+  }) => void;
+  "character:hp-synced": (data: {
+    characterId: string;
+    tokenId: string;
+    hp: { current: number; max: number; temp?: number };
+  }) => void;
+  "character:condition-changed": (data: {
+    characterId: string;
+    tokenId: string;
+    conditions: string[];
+  }) => void;
+  "character:rest-completed": (data: {
+    characterId: string;
+    userId: string;
+    result: RestResultDTO;
+  }) => void;
+
+  // ── Dados contextuais (Contextual Dice) ──
+  "dice:character-result": (data: CharacterDiceRollDTO) => void;
+  "dice:follow-up-prompt": (data: {
+    originalRollId: string;
+    label: string;
+    notation: string;
+    rollType: DiceRollType;
+    characterId: string;
+  }) => void;
+
   // ── Sistema ──
   "error": (data: { code: string; message: string }) => void;
 }
@@ -277,6 +312,34 @@ export interface ClientToServerEvents {
     y: number;
     type: "attention" | "danger" | "question" | "go_here";
   }) => void;
+
+  // ── Personagem (Character) ──
+  "character:update-field": (data: {
+    characterId: string;
+    fieldPath: string;
+    value: unknown;
+  }, ack: AckFn<{ computedChanges?: Record<string, unknown> }>) => void;
+  "character:roll-dice": (data: {
+    characterId: string;
+    actionId: string;
+    notation: string;
+    label?: string;
+    rollType: DiceRollType;
+    visibility: DiceVisibility;
+    whisperTo?: string[];
+  }, ack: AckFn<CharacterDiceRollDTO>) => void;
+  "character:use-resource": (data: {
+    characterId: string;
+    resourcePath: string;
+    amount: number;
+  }, ack: AckFn<void>) => void;
+  "character:short-rest": (data: {
+    characterId: string;
+    hitDiceToSpend: number;
+  }, ack: AckFn<RestResultDTO>) => void;
+  "character:long-rest": (data: {
+    characterId: string;
+  }, ack: AckFn<RestResultDTO>) => void;
 }
 
 // ── Types auxiliares ──

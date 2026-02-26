@@ -9,6 +9,8 @@ import { createThumbnailWorker } from "./jobs/thumbnail-generation.js";
 import { createTokenPositionFlushWorker } from "./jobs/token-position-flush.js";
 import { createWallDetectionWorker } from "./jobs/wall-detection.js";
 import { createVisionFlushWorker } from "./jobs/vision-flush.js";
+import { createPdfGenerationWorker } from "./jobs/pdf-generation.js";
+import { createTemplateMigrationWorker } from "./jobs/template-migration.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
 
@@ -65,6 +67,8 @@ async function start() {
   const tokenPositionFlushWorker = createTokenPositionFlushWorker(connection);
   const wallDetectionWorker = createWallDetectionWorker(connection);
   const visionFlushWorker = createVisionFlushWorker(connection);
+  const pdfGenerationWorker = createPdfGenerationWorker(connection);
+  const templateMigrationWorker = createTemplateMigrationWorker(connection);
 
   // Set up repeating jobs
   await setupRepeatingJobs(connection);
@@ -79,6 +83,8 @@ async function start() {
   console.log("  - token-position-flush (every 30s)");
   console.log("  - wall-detection (on demand)");
   console.log("  - vision-flush (every 60s)");
+  console.log("  - pdf-generation (on demand)");
+  console.log("  - template-migration (on demand)");
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -93,6 +99,8 @@ async function start() {
       tokenPositionFlushWorker.close(),
       wallDetectionWorker.close(),
       visionFlushWorker.close(),
+      pdfGenerationWorker.close(),
+      templateMigrationWorker.close(),
     ]);
     process.exit(0);
   };
