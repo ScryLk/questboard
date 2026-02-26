@@ -415,3 +415,65 @@ export enum ShareTargetType {
   ALL_PLAYERS = "ALL_PLAYERS",
   SPECIFIC_USER = "SPECIFIC_USER",
 }
+
+// ── In-Game Experience Enums ──
+
+export enum SceneCardStyle {
+  CINEMATIC = "CINEMATIC",
+  TITLE_CARD = "TITLE_CARD",
+  NARRATOR_BOX = "NARRATOR_BOX",
+  LOCATION = "LOCATION",
+  TIME_SKIP = "TIME_SKIP",
+  FLASHBACK = "FLASHBACK",
+  DRAMATIC = "DRAMATIC",
+}
+
+export enum TimeOfDay {
+  DAWN = "DAWN",
+  DAY = "DAY",
+  DUSK = "DUSK",
+  NIGHT = "NIGHT",
+}
+
+export enum WeatherType {
+  CLEAR = "CLEAR",
+  CLOUDY = "CLOUDY",
+  RAIN = "RAIN",
+  HEAVY_RAIN = "HEAVY_RAIN",
+  STORM = "STORM",
+  SNOW = "SNOW",
+  BLIZZARD = "BLIZZARD",
+  FOG = "FOG",
+  SANDSTORM = "SANDSTORM",
+  WIND = "WIND",
+}
+
+export enum QuestType {
+  MAIN = "MAIN",
+  SIDE = "SIDE",
+  PERSONAL = "PERSONAL",
+  BOUNTY = "BOUNTY",
+  EXPLORATION = "EXPLORATION",
+}
+
+export enum QuestStatus {
+  ACTIVE = "ACTIVE",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+  ABANDONED = "ABANDONED",
+}
+
+export enum LootStatus {
+  UNCLAIMED = "UNCLAIMED",
+  CLAIMED = "CLAIMED",
+  DISTRIBUTED = "DISTRIBUTED",
+  SOLD = "SOLD",
+  DISCARDED = "DISCARDED",
+}
+
+export enum NoteVisibility {
+  PERSONAL = "PERSONAL",
+  GM_ONLY = "GM_ONLY",
+  PARTY = "PARTY",
+  SPECIFIC = "SPECIFIC",
+}

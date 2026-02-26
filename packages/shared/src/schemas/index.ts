@@ -25,3 +25,4 @@ export * from "./exploration.schema.js";
 export * from "./handout.schema.js";
 export * from "./soundtrack.schema.js";
 export * from "./moderation.schema.js";
+export * from "./in-game.schema.js";

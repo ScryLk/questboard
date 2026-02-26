@@ -45,6 +45,13 @@ import type {
   TrackType,
   ModerationAction,
   ModerationStatus,
+  SceneCardStyle,
+  TimeOfDay,
+  WeatherType,
+  QuestType,
+  QuestStatus,
+  LootStatus,
+  NoteVisibility,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -664,6 +671,31 @@ export interface PlanLimitsDTO {
   allowMapTransitions: boolean;
   allowNpcDialogue: boolean;
   allowTriggerChains: boolean;
+  // In-Game Experience
+  allowSceneCards: boolean;
+  allowedSceneCardStyles: string[];
+  allowWeatherSystem: boolean;
+  allowWeatherMechanics: boolean;
+  allowAutoSoundtrackSync: boolean;
+  maxActiveQuests: number;
+  allowPartyLoot: boolean;
+  allowMarchingOrder: boolean;
+  allowThoughtBubbles: boolean;
+  maxMapNotes: number;
+  allowPartyMapNotes: boolean;
+  maxNpcProfiles: number;
+  allowNpcDisposition: boolean;
+  allowNpcAiAssistant: boolean;
+  allowAiRecap: boolean;
+  allowItemTrading: boolean;
+  allowProximityWhisper: boolean;
+  allowProximityFileShare: boolean;
+  allowEmotes: boolean;
+  allowPlayerViewToggle: boolean;
+  allowTorchTimer: boolean;
+  allowEncounterBalancing: boolean;
+  allowSmartInitiative: boolean;
+  allowAutoTimeline: boolean;
 }
 
 export interface SubscriptionDTO {
@@ -1169,6 +1201,240 @@ export interface RestResultDTO {
   hitDiceUsed: number;
   resourcesReset: string[];
   spellSlotsRecovered: Record<string, number>;
+}
+
+// ── Scene Card DTOs ──
+
+export interface SceneCardDTO {
+  id: string;
+  sessionId: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  style: SceneCardStyle;
+  duration: number;
+  animation: string;
+  soundEffect: string | null;
+  dimBackground: boolean;
+  shownAt: string | null;
+  shownById: string | null;
+  createdAt: string;
+}
+
+// ── Environment DTOs ──
+
+export interface VisualOverlayDTO {
+  tint: string;
+  brightness: number;
+  saturation: number;
+  particleEffect: string | null;
+  particleIntensity: number;
+  vignette: boolean;
+}
+
+export interface MechanicalEffectsDTO {
+  visionMultiplier: number;
+  outdoorTorchesExtinguished: boolean;
+  rangedDisadvantage: boolean;
+  stealthAdvantage: boolean;
+  perceptionDisadvantage: boolean;
+}
+
+export interface EnvironmentStateDTO {
+  timeOfDay: TimeOfDay;
+  hourInGame: number;
+  timeFlowRate: number;
+  weather: WeatherType;
+  weatherIntensity: number;
+  visualOverlay: VisualOverlayDTO;
+  mechanicalEffects: MechanicalEffectsDTO;
+  autoSoundtrackEnabled: boolean;
+}
+
+// ── Quest DTOs ──
+
+export interface QuestObjectiveDTO {
+  id: string;
+  text: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  isSecret: boolean;
+  visibleTo: string[];
+  linkedMapId: string | null;
+  linkedPosition: { x: number; y: number } | null;
+  completedAt: string | null;
+}
+
+export interface QuestRewardsDTO {
+  xp: number;
+  currency: Record<string, number>;
+  items: Array<{ name: string; description?: string }>;
+  description: string | null;
+}
+
+export interface QuestDTO {
+  id: string;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  questType: QuestType;
+  status: QuestStatus;
+  objectives: QuestObjectiveDTO[];
+  rewards: QuestRewardsDTO;
+  visibleTo: string[];
+  isSecret: boolean;
+  sortOrder: number;
+  isPinned: boolean;
+  createdById: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuestListDTO {
+  id: string;
+  name: string;
+  questType: QuestType;
+  status: QuestStatus;
+  objectiveCount: number;
+  completedObjectiveCount: number;
+  isPinned: boolean;
+  createdAt: string;
+}
+
+// ── Party Loot DTOs ──
+
+export interface PartyLootDTO {
+  id: string;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  quantity: number;
+  itemType: string | null;
+  value: { amount: number; currency: string } | null;
+  status: LootStatus;
+  claimedById: string | null;
+  claimedAt: string | null;
+  approvedByGm: boolean;
+  source: string | null;
+  addedById: string;
+  foundOnMapId: string | null;
+  createdAt: string;
+}
+
+// ── Marching Order DTOs ──
+
+export interface MarchingFormationEntry {
+  position: "front" | "middle" | "rear";
+  tokenIds: string[];
+}
+
+export interface MarchingOrderDTO {
+  formation: MarchingFormationEntry[];
+  isActive: boolean;
+  rules: Record<string, unknown>;
+}
+
+// ── Thought Bubble DTOs ──
+
+export interface ThoughtBubbleDTO {
+  id: string;
+  userId: string;
+  characterId: string;
+  characterName?: string;
+  content: string;
+  position: { x: number; y: number } | null;
+  isLocationBound: boolean;
+  createdAt: string;
+}
+
+// ── Map Note DTOs ──
+
+export interface MapNoteDTO {
+  id: string;
+  mapId: string;
+  authorId: string;
+  x: number;
+  y: number;
+  content: string;
+  icon: string;
+  color: string;
+  visibility: NoteVisibility;
+  createdAt: string;
+}
+
+// ── NPC Profile DTOs ──
+
+export interface NpcAttackDTO {
+  name: string;
+  bonus: string;
+  damage: string;
+  type: string;
+}
+
+export interface NpcQuickStatsDTO {
+  hp: { current: number; max: number };
+  ac: number;
+  speed: number;
+  abilities: Record<string, number>;
+  attacks: NpcAttackDTO[];
+  cr: string;
+  xp: number;
+}
+
+export interface NpcDispositionDTO {
+  attitude: "friendly" | "helpful" | "neutral" | "unfriendly" | "hostile" | "unknown";
+  notes: string | null;
+}
+
+export interface NpcProfileDTO {
+  id: string;
+  sessionId: string;
+  name: string;
+  title: string | null;
+  portraitUrl: string | null;
+  description: string | null;
+  quickStats: NpcQuickStatsDTO;
+  dispositions: Record<string, NpcDispositionDTO>;
+  personality: Record<string, unknown>;
+  notes: string | null;
+  tags: string[];
+  isRecurring: boolean;
+  tokenId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NpcProfileListDTO {
+  id: string;
+  name: string;
+  title: string | null;
+  portraitUrl: string | null;
+  tags: string[];
+  isRecurring: boolean;
+  tokenId: string | null;
+}
+
+// ── Session Recap DTOs ──
+
+export interface SessionRecapDTO {
+  id: string;
+  sessionId: string;
+  sessionNumber: number;
+  content: string;
+  aiGenerated: boolean;
+  sourceData: Record<string, unknown> | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Proximity DTOs ──
+
+export interface ProximityStateDTO {
+  room: string[];
+  adjacent: string[];
+  canWhisper: string[];
+  canTrade: string[];
 }
 
 // ── Generic Response Types ──

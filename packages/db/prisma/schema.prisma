@@ -422,6 +422,130 @@ enum ModerationStatus {
   REVIEWED
 }
 
+// ── In-Game Experience Enums ──
+
+enum SceneCardStyle {
+  CINEMATIC
+  TITLE_CARD
+  NARRATOR_BOX
+  LOCATION
+  TIME_SKIP
+  FLASHBACK
+  DRAMATIC
+}
+
+enum TimeOfDay {
+  DAWN
+  DAY
+  DUSK
+  NIGHT
+}
+
+enum WeatherType {
+  CLEAR
+  CLOUDY
+  RAIN
+  HEAVY_RAIN
+  STORM
+  SNOW
+  BLIZZARD
+  FOG
+  SANDSTORM
+  WIND
+}
+
+enum QuestType {
+  MAIN
+  SIDE
+  PERSONAL
+  BOUNTY
+  EXPLORATION
+}
+
+enum QuestStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  ABANDONED
+}
+
+enum LootStatus {
+  UNCLAIMED
+  CLAIMED
+  DISTRIBUTED
+  SOLD
+  DISCARDED
+}
+
+enum NoteVisibility {
+  PERSONAL
+  GM_ONLY
+  PARTY
+  SPECIFIC
+}
+
+// ── In-Game Experience Enums ──
+
+enum SceneCardStyle {
+  CINEMATIC
+  TITLE_CARD
+  NARRATOR_BOX
+  LOCATION
+  TIME_SKIP
+  FLASHBACK
+  DRAMATIC
+}
+
+enum TimeOfDay {
+  DAWN
+  DAY
+  DUSK
+  NIGHT
+}
+
+enum WeatherType {
+  CLEAR
+  CLOUDY
+  RAIN
+  HEAVY_RAIN
+  STORM
+  SNOW
+  BLIZZARD
+  FOG
+  SANDSTORM
+  WIND
+}
+
+enum QuestType {
+  MAIN
+  SIDE
+  PERSONAL
+  BOUNTY
+  EXPLORATION
+}
+
+enum QuestStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  ABANDONED
+}
+
+enum LootStatus {
+  UNCLAIMED
+  CLAIMED
+  DISTRIBUTED
+  SOLD
+  DISCARDED
+}
+
+enum NoteVisibility {
+  PERSONAL
+  GM_ONLY
+  PARTY
+  SPECIFIC
+}
+
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  CORE: USUÁRIO E AUTENTICAÇÃO                                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
@@ -630,6 +754,32 @@ model PlanLimit {
   allowMapTransitions      Boolean  @default(true)
   allowNpcDialogue         Boolean  @default(false)
   allowTriggerChains       Boolean  @default(false)
+
+  // ── In-Game Experience ──
+  allowSceneCards           Boolean  @default(false)
+  allowedSceneCardStyles    Json     @default("[]")
+  allowWeatherSystem        Boolean  @default(false)
+  allowWeatherMechanics     Boolean  @default(false)
+  allowAutoSoundtrackSync   Boolean  @default(false)
+  maxActiveQuests           Int      @default(0)
+  allowPartyLoot            Boolean  @default(false)
+  allowMarchingOrder        Boolean  @default(false)
+  allowThoughtBubbles       Boolean  @default(false)
+  maxMapNotes               Int      @default(10)
+  allowPartyMapNotes        Boolean  @default(false)
+  maxNpcProfiles            Int      @default(5)
+  allowNpcDisposition       Boolean  @default(false)
+  allowNpcAiAssistant       Boolean  @default(false)
+  allowAiRecap              Boolean  @default(false)
+  allowItemTrading          Boolean  @default(false)
+  allowProximityWhisper     Boolean  @default(false)
+  allowProximityFileShare   Boolean  @default(false)
+  allowEmotes               Boolean  @default(false)
+  allowPlayerViewToggle     Boolean  @default(false)
+  allowTorchTimer           Boolean  @default(false)
+  allowEncounterBalancing   Boolean  @default(false)
+  allowSmartInitiative      Boolean  @default(false)
+  allowAutoTimeline         Boolean  @default(false)
 
   // ── Extensível ──
   extras                Json    @default("{}")
@@ -1955,4 +2105,227 @@ model AuditLog {
   @@index([userId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
   @@index([targetType, targetId])
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  EXPERIÊNCIA IN-GAME                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model SceneCard {
+  id            String         @id @default(cuid())
+  sessionId     String
+
+  // ── Conteúdo ──
+  title         String         @db.VarChar(200)
+  subtitle      String?        @db.VarChar(500)
+  imageUrl      String?
+  style         SceneCardStyle @default(CINEMATIC)
+
+  // ── Apresentação ──
+  duration      Int            @default(5)
+  animation     String         @default("fade")
+  soundEffect   String?
+  dimBackground Boolean        @default(true)
+
+  // ── Quando foi mostrado ──
+  shownAt       DateTime?
+  shownById     String?
+
+  metadata      Json           @default("{}")
+  createdAt     DateTime       @default(now())
+
+  @@index([sessionId])
+}
+
+model EnvironmentState {
+  id            String      @id @default(cuid())
+  sessionId     String      @unique
+
+  // ── Hora do dia ──
+  timeOfDay     TimeOfDay   @default(DAY)
+  hourInGame    Int         @default(12)
+  timeFlowRate  Float       @default(0)
+
+  // ── Clima ──
+  weather       WeatherType @default(CLEAR)
+  weatherIntensity Float    @default(0.5)
+
+  // ── Efeitos visuais ──
+  visualOverlay Json        @default("{}")
+
+  // ── Efeitos mecânicos ──
+  mechanicalEffects Json    @default("{}")
+
+  // ── Auto-sync com trilha sonora ──
+  autoSoundtrackEnabled Boolean @default(false)
+  soundtrackMapping     Json    @default("{}")
+
+  updatedAt     DateTime    @updatedAt
+}
+
+model Quest {
+  id            String      @id @default(cuid())
+  sessionId     String
+  name          String      @db.VarChar(200)
+  description   String?     @db.VarChar(2000)
+  questType     QuestType   @default(MAIN)
+  status        QuestStatus @default(ACTIVE)
+
+  // ── Objetivos ──
+  objectives    Json        @default("[]")
+
+  // ── Recompensas ──
+  rewards       Json        @default("{}")
+
+  // ── Visibilidade ──
+  visibleTo     String[]    @default([])
+  isSecret      Boolean     @default(false)
+  sortOrder     Int         @default(0)
+  isPinned      Boolean     @default(false)
+
+  createdById   String
+  completedAt   DateTime?
+  metadata      Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([sessionId, status])
+}
+
+model PartyLoot {
+  id            String      @id @default(cuid())
+  sessionId     String
+
+  // ── Item ──
+  name          String      @db.VarChar(200)
+  description   String?     @db.VarChar(1000)
+  quantity      Int         @default(1)
+  itemType      String?
+
+  // ── Valor ──
+  value         Json?
+
+  // ── Status de distribuição ──
+  status        LootStatus  @default(UNCLAIMED)
+  claimedById   String?
+  claimedAt     DateTime?
+  approvedByGm  Boolean     @default(false)
+
+  // ── Origem ──
+  source        String?     @db.VarChar(200)
+  addedById     String
+  foundOnMapId  String?
+
+  metadata      Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([sessionId, status])
+}
+
+model MarchingOrder {
+  id            String    @id @default(cuid())
+  sessionId     String    @unique
+
+  // ── Formação ──
+  formation     Json      @default("[]")
+  isActive      Boolean   @default(false)
+
+  // ── Regras mecânicas ──
+  rules         Json      @default("{}")
+
+  updatedAt     DateTime  @updatedAt
+}
+
+model ThoughtBubble {
+  id            String    @id @default(cuid())
+  sessionId     String
+  userId        String
+  characterId   String
+
+  content       String    @db.VarChar(500)
+  position      Json?
+  isLocationBound Boolean @default(false)
+
+  createdAt     DateTime  @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model MapNote {
+  id            String         @id @default(cuid())
+  mapId         String
+  authorId      String
+
+  // ── Posição ──
+  x             Float
+  y             Float
+
+  // ── Conteúdo ──
+  content       String         @db.VarChar(500)
+  icon          String         @default("📌")
+  color         String         @default("#6C5CE7")
+
+  // ── Visibilidade ──
+  visibility    NoteVisibility @default(PERSONAL)
+
+  createdAt     DateTime       @default(now())
+
+  @@index([mapId])
+  @@index([mapId, authorId])
+}
+
+model NpcProfile {
+  id            String    @id @default(cuid())
+  sessionId     String
+  createdById   String
+
+  // ── Identidade ──
+  name          String    @db.VarChar(100)
+  title         String?   @db.VarChar(200)
+  portraitUrl   String?
+  description   String?   @db.VarChar(2000)
+
+  // ── Stats rápidos ──
+  quickStats    Json      @default("{}")
+
+  // ── Disposição por PC ──
+  dispositions  Json      @default("{}")
+
+  // ── Personalidade (para IA) ──
+  personality   Json      @default("{}")
+
+  // ── Notas do GM ──
+  notes         String?   @db.Text
+  tags          String[]  @default([])
+  isRecurring   Boolean   @default(false)
+
+  // ── Link ──
+  tokenId       String?
+
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, tags])
+}
+
+model SessionRecap {
+  id            String    @id @default(cuid())
+  sessionId     String
+  sessionNumber Int
+
+  // ── Conteúdo ──
+  content       String    @db.Text
+  aiGenerated   Boolean   @default(false)
+
+  // ── Fonte (se AI) ──
+  sourceData    Json?
+
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([sessionId, sessionNumber])
 }

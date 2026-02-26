@@ -18,6 +18,14 @@ import type {
   RestResultDTO,
   HandoutDTO,
   SoundtrackTrackDTO,
+  QuestDTO,
+  QuestRewardsDTO,
+  PartyLootDTO,
+  MarchingOrderDTO,
+  MapNoteDTO,
+  InventoryItemDTO,
+  VisualOverlayDTO,
+  MechanicalEffectsDTO,
 } from "./dto.js";
 import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType, DiceRollType, DiceVisibility, ModerationAction } from "./enums.js";
 
@@ -258,6 +266,61 @@ export interface ServerToClientEvents {
     characterId: string;
   }) => void;
 
+  // ── Proximity ──
+  "proximity:updated": (data: { room: string[]; adjacent: string[]; canWhisper: string[]; canTrade: string[] }) => void;
+  "proximity:whisper-available": (data: { userId: string; characterName: string }) => void;
+
+  // ── Scene Cards ──
+  "scene:card-shown": (data: { id: string; title: string; subtitle?: string; imageUrl?: string; style: string; animation: string; duration: number; soundEffect?: string; dimBackground: boolean }) => void;
+  "scene:card-dismissed": () => void;
+
+  // ── Environment ──
+  "environment:changed": (data: { timeOfDay: string; weather: string; weatherIntensity: number; visualOverlay: VisualOverlayDTO; mechanicalEffects: MechanicalEffectsDTO }) => void;
+  "environment:time-tick": (data: { hourInGame: number; timeOfDay: string }) => void;
+
+  // ── Quests ──
+  "quest:created": (data: QuestDTO) => void;
+  "quest:updated": (data: { questId: string; changes: Partial<QuestDTO> }) => void;
+  "quest:objective-completed": (data: { questId: string; objectiveId: string }) => void;
+  "quest:completed": (data: { questId: string; rewards: QuestRewardsDTO }) => void;
+
+  // ── Party Loot ──
+  "loot:added": (data: PartyLootDTO) => void;
+  "loot:claimed": (data: { lootId: string; claimedById: string; characterName: string }) => void;
+  "loot:distributed": (data: { lootId: string }) => void;
+
+  // ── Marching Order ──
+  "marching:updated": (data: MarchingOrderDTO) => void;
+  "marching:trigger": (data: { triggerType: string; primaryTarget: string; description: string }) => void;
+
+  // ── Thought Bubbles ──
+  "thought:shown": (data: { userId: string; characterName: string; content: string; position?: { x: number; y: number } }) => void;
+
+  // ── Map Notes ──
+  "mapnote:added": (data: MapNoteDTO) => void;
+  "mapnote:removed": (data: { noteId: string }) => void;
+
+  // ── NPC ──
+  "npc:disposition-shown": (data: { npcId: string; attitude: string; notes?: string }) => void;
+
+  // ── Session Recap ──
+  "recap:generated": (data: { recapId: string; preview: string }) => void;
+
+  // ── Player View ──
+  "gm:player-view-enabled": (data: { viewingAsUserId: string }) => void;
+  "gm:player-view-disabled": () => void;
+
+  // ── Session Timer ──
+  "session:timer-tick": (data: { elapsed: number }) => void;
+
+  // ── Item Trading ──
+  "trade:offer-received": (data: { tradeId: string; fromUserId: string; fromCharacterName: string; item: InventoryItemDTO }) => void;
+  "trade:offer-accepted": (data: { tradeId: string }) => void;
+  "trade:offer-declined": (data: { tradeId: string }) => void;
+
+  // ── Emotes ──
+  "character:emote": (data: { userId: string; characterName: string; emote: string; characterAvatar?: string }) => void;
+
   // ── Sistema ──
   "error": (data: { code: string; message: string }) => void;
 }
@@ -394,6 +457,55 @@ export interface ClientToServerEvents {
   "character:long-rest": (data: {
     characterId: string;
   }, ack: AckFn<RestResultDTO>) => void;
+
+  // ── Scene Cards (GM only) ──
+  "scene:show-card": (data: { title: string; subtitle?: string; imageUrl?: string; style: string; animation?: string; duration?: number; soundEffect?: string }, ack: AckFn<void>) => void;
+  "scene:dismiss-card": (ack: AckFn<void>) => void;
+
+  // ── Environment (GM only) ──
+  "environment:set": (data: { timeOfDay?: string; weather?: string; weatherIntensity?: number; visualOverlay?: Partial<VisualOverlayDTO>; mechanicalEffects?: Partial<MechanicalEffectsDTO> }, ack: AckFn<void>) => void;
+  "environment:set-time-flow": (data: { rate: number }, ack: AckFn<void>) => void;
+
+  // ── Quests (GM only) ──
+  "quest:create": (data: { name: string; description?: string; questType?: string; objectives?: Array<{ text: string; isSecret?: boolean; visibleTo?: string[] }>; visibleTo?: string[]; isSecret?: boolean }, ack: AckFn<QuestDTO>) => void;
+  "quest:update-objective": (data: { questId: string; objectiveId: string; status: string }, ack: AckFn<void>) => void;
+  "quest:complete": (data: { questId: string }, ack: AckFn<void>) => void;
+
+  // ── Party Loot (GM add, player claim) ──
+  "loot:add": (data: { name: string; description?: string; quantity?: number; itemType?: string; value?: { amount: number; currency: string }; source?: string }, ack: AckFn<PartyLootDTO>) => void;
+  "loot:claim": (data: { lootId: string }, ack: AckFn<void>) => void;
+  "loot:approve": (data: { lootId: string }, ack: AckFn<void>) => void;
+  "loot:reject": (data: { lootId: string }, ack: AckFn<void>) => void;
+
+  // ── Marching Order (GM only) ──
+  "marching:set": (data: { formation: Array<{ position: string; tokenIds: string[] }>; rules?: Record<string, unknown> }, ack: AckFn<void>) => void;
+  "marching:toggle": (data: { isActive: boolean }, ack: AckFn<void>) => void;
+
+  // ── Thought Bubbles (Player only) ──
+  "thought:send": (data: { content: string; isLocationBound?: boolean }, ack: AckFn<void>) => void;
+
+  // ── Map Notes ──
+  "mapnote:add": (data: { mapId: string; x: number; y: number; content: string; icon?: string; color?: string; visibility?: string }, ack: AckFn<MapNoteDTO>) => void;
+  "mapnote:remove": (data: { noteId: string }, ack: AckFn<void>) => void;
+
+  // ── Item Trading ──
+  "trade:offer": (data: { targetUserId: string; itemId: string; fromCharacterId: string }, ack: AckFn<{ tradeId: string }>) => void;
+  "trade:accept": (data: { tradeId: string }, ack: AckFn<void>) => void;
+  "trade:decline": (data: { tradeId: string }, ack: AckFn<void>) => void;
+
+  // ── Emotes ──
+  "character:emote": (data: { emote: string }, ack: AckFn<void>) => void;
+
+  // ── GM Player View ──
+  "gm:enable-player-view": (data: { userId: string }, ack: AckFn<void>) => void;
+  "gm:disable-player-view": (ack: AckFn<void>) => void;
+
+  // ── Session Recap (GM only) ──
+  "recap:generate": (ack: AckFn<{ recapId: string }>) => void;
+
+  // ── NPC (GM only) ──
+  "npc:set-disposition": (data: { npcId: string; userId: string; attitude: string; notes?: string }, ack: AckFn<void>) => void;
+  "npc:speak": (data: { npcId: string; content: string }, ack: AckFn<void>) => void;
 }
 
 // ── Types auxiliares ──

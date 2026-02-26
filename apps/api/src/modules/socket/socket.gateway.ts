@@ -21,6 +21,16 @@ import { registerCharacterHandlers } from "./handlers/character.handler.js";
 import { registerHandoutHandlers } from "./handlers/handout.handler.js";
 import { registerSoundtrackHandlers } from "./handlers/soundtrack.handler.js";
 import { registerModerationHandlers } from "./handlers/moderation.handler.js";
+import { registerSceneCardHandlers } from "./handlers/scene-card.handler.js";
+import { registerEnvironmentHandlers } from "./handlers/environment.handler.js";
+import { registerQuestHandlers } from "./handlers/quest.handler.js";
+import { registerLootHandlers } from "./handlers/loot.handler.js";
+import { registerMarchingHandlers } from "./handlers/marching.handler.js";
+import { registerThoughtHandlers } from "./handlers/thought.handler.js";
+import { registerMapNoteHandlers } from "./handlers/mapnote.handler.js";
+import { registerTradeHandlers } from "./handlers/trade.handler.js";
+import { registerEmoteHandlers } from "./handlers/emote.handler.js";
+import { registerGmToolsHandlers } from "./handlers/gm-tools.handler.js";
 
 export type TypedIO = SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
 export type TypedSocket = Parameters<Parameters<TypedIO["on"]>[1]>[0];
@@ -83,6 +93,18 @@ export function createSocketGateway(httpServer: HttpServer, corsOrigin: string[]
     registerHandoutHandlers(io, socket, prisma);
     registerSoundtrackHandlers(io, socket, prisma);
     registerModerationHandlers(io, socket, prisma);
+
+    // In-game experience handlers
+    registerSceneCardHandlers(io, socket, prisma);
+    registerEnvironmentHandlers(io, socket, prisma);
+    registerQuestHandlers(io, socket, prisma);
+    registerLootHandlers(io, socket, prisma);
+    registerMarchingHandlers(io, socket, prisma);
+    registerThoughtHandlers(io, socket, prisma);
+    registerMapNoteHandlers(io, socket, prisma);
+    registerTradeHandlers(io, socket, prisma);
+    registerEmoteHandlers(io, socket, prisma);
+    registerGmToolsHandlers(io, socket, prisma);
 
     socket.on("disconnect", async (reason) => {
       console.log(`Socket disconnected: ${socket.id} (reason: ${reason})`);

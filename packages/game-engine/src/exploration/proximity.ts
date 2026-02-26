@@ -160,3 +160,231 @@ function segmentsIntersect(
   }
   return false;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Room-based proximity system for in-game experience
+// ═══════════════════════════════════════════════════════════════════════
+
+export type AwarenessLevel = "visible" | "audible" | "unaware";
+
+export interface TokenPosition {
+  id: string;
+  userId?: string;
+  x: number;
+  y: number;
+  visionRadius: number;
+  isVisible: boolean;
+}
+
+/**
+ * Flood-fill from a starting cell to find all reachable cells (a "room")
+ * bounded by movement-blocking walls.
+ */
+export function floodFillRoom(
+  startX: number,
+  startY: number,
+  walls: WallSegment[],
+  maxCells: number = 2000
+): Set<string> {
+  const room = new Set<string>();
+  const queue: Array<{ x: number; y: number }> = [{ x: Math.floor(startX), y: Math.floor(startY) }];
+  const startKey = `${Math.floor(startX)},${Math.floor(startY)}`;
+  room.add(startKey);
+
+  const movementWalls = walls.filter(
+    (w) => w.blocksMovement && !(w.isDoor && w.doorState === "OPEN")
+  );
+
+  while (queue.length > 0 && room.size < maxCells) {
+    const { x, y } = queue.shift()!;
+
+    const neighbors = [
+      { nx: x + 1, ny: y },
+      { nx: x - 1, ny: y },
+      { nx: x, ny: y + 1 },
+      { nx: x, ny: y - 1 },
+    ];
+
+    for (const { nx, ny } of neighbors) {
+      const key = `${nx},${ny}`;
+      if (room.has(key)) continue;
+
+      // Check if a wall blocks crossing from (x,y) to (nx,ny)
+      const cx = x + 0.5;
+      const cy = y + 0.5;
+      const ncx = nx + 0.5;
+      const ncy = ny + 0.5;
+
+      let blocked = false;
+      for (const wall of movementWalls) {
+        if (segmentsIntersect(cx, cy, ncx, ncy, wall.x1, wall.y1, wall.x2, wall.y2)) {
+          blocked = true;
+          break;
+        }
+      }
+
+      if (!blocked) {
+        room.add(key);
+        queue.push({ x: nx, y: ny });
+      }
+    }
+  }
+
+  return room;
+}
+
+/**
+ * Get all tokens occupying the same room as a given token.
+ */
+export function getRoomOccupants(
+  token: TokenPosition,
+  allTokens: TokenPosition[],
+  walls: WallSegment[]
+): TokenPosition[] {
+  const room = floodFillRoom(token.x, token.y, walls);
+  return allTokens.filter((t) => {
+    if (t.id === token.id) return false;
+    const key = `${Math.floor(t.x)},${Math.floor(t.y)}`;
+    return room.has(key);
+  });
+}
+
+/**
+ * Check if two tokens are in the same room (reachable without crossing walls).
+ */
+export function areInSameRoom(
+  tokenA: TokenPosition,
+  tokenB: TokenPosition,
+  walls: WallSegment[]
+): boolean {
+  const room = floodFillRoom(tokenA.x, tokenA.y, walls);
+  const key = `${Math.floor(tokenB.x)},${Math.floor(tokenB.y)}`;
+  return room.has(key);
+}
+
+/**
+ * Get all tokens within a given grid radius of a target token.
+ */
+export function getAdjacentTokens(
+  token: TokenPosition,
+  allTokens: TokenPosition[],
+  radius: number
+): TokenPosition[] {
+  return allTokens.filter((t) => {
+    if (t.id === token.id) return false;
+    const dist = Math.sqrt((t.x - token.x) ** 2 + (t.y - token.y) ** 2);
+    return dist <= radius;
+  });
+}
+
+/**
+ * Determine the awareness level between two tokens.
+ * - "visible": observer can see the target (LoS + in vision range)
+ * - "audible": same room but no LoS (e.g. around a corner)
+ * - "unaware": different room or too far
+ */
+export function getAwareness(
+  observer: TokenPosition,
+  target: TokenPosition,
+  walls: WallSegment[],
+  audibleRadius: number = 30
+): AwarenessLevel {
+  if (!target.isVisible) return "unaware";
+
+  const dist = Math.sqrt((observer.x - target.x) ** 2 + (observer.y - target.y) ** 2);
+
+  // Check line of sight
+  const visionWalls = walls.filter(
+    (w) => w.blocksVision && !(w.isDoor && w.doorState === "OPEN")
+  );
+  let hasLoS = true;
+  if (dist > 0) {
+    for (const wall of visionWalls) {
+      if (segmentsIntersect(observer.x, observer.y, target.x, target.y, wall.x1, wall.y1, wall.x2, wall.y2)) {
+        hasLoS = false;
+        break;
+      }
+    }
+  }
+
+  if (hasLoS && dist <= observer.visionRadius) {
+    return "visible";
+  }
+
+  // Check if same room (audible range)
+  if (dist <= audibleRadius && areInSameRoom(observer, target, walls)) {
+    return "audible";
+  }
+
+  return "unaware";
+}
+
+/**
+ * Compute full proximity state for all tokens from a given observer's perspective.
+ */
+export function computeProximityState(
+  observer: TokenPosition,
+  allTokens: TokenPosition[],
+  walls: WallSegment[]
+): Array<{ tokenId: string; userId?: string; awareness: AwarenessLevel; distance: number }> {
+  return allTokens
+    .filter((t) => t.id !== observer.id)
+    .map((t) => ({
+      tokenId: t.id,
+      userId: t.userId,
+      awareness: getAwareness(observer, t, walls),
+      distance: Math.sqrt((observer.x - t.x) ** 2 + (observer.y - t.y) ** 2),
+    }));
+}
+
+/**
+ * Resolve marching order triggers (traps, ambushes) based on formation positions.
+ */
+export function resolveFormationTrigger(
+  formation: Array<{ userId: string; position: "front" | "middle" | "rear"; slot: number }>,
+  triggerType: "trap" | "ambush" | "encounter",
+  options?: { affectsPosition?: "front" | "middle" | "rear" }
+): { affectedUserIds: string[]; firstContact: string | null } {
+  const sorted = [...formation].sort((a, b) => {
+    const posOrder = { front: 0, middle: 1, rear: 2 };
+    if (posOrder[a.position] !== posOrder[b.position]) {
+      return posOrder[a.position] - posOrder[b.position];
+    }
+    return a.slot - b.slot;
+  });
+
+  if (sorted.length === 0) return { affectedUserIds: [], firstContact: null };
+
+  const targetPosition = options?.affectsPosition;
+
+  if (targetPosition) {
+    const affected = sorted.filter((m) => m.position === targetPosition);
+    return {
+      affectedUserIds: affected.map((m) => m.userId),
+      firstContact: affected[0]?.userId ?? null,
+    };
+  }
+
+  switch (triggerType) {
+    case "trap":
+      // Traps hit the front row
+      const frontMembers = sorted.filter((m) => m.position === "front");
+      return {
+        affectedUserIds: frontMembers.map((m) => m.userId),
+        firstContact: frontMembers[0]?.userId ?? sorted[0]?.userId ?? null,
+      };
+    case "ambush":
+      // Ambushes hit the rear
+      const rearMembers = sorted.filter((m) => m.position === "rear");
+      return {
+        affectedUserIds: rearMembers.map((m) => m.userId),
+        firstContact: rearMembers[rearMembers.length - 1]?.userId ?? sorted[sorted.length - 1]?.userId ?? null,
+      };
+    case "encounter":
+      // Encounters hit front first
+      return {
+        affectedUserIds: sorted.map((m) => m.userId),
+        firstContact: sorted[0]?.userId ?? null,
+      };
+  }
+}

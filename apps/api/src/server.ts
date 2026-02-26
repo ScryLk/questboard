@@ -51,6 +51,16 @@ import { soundtrackRoutes } from "./modules/soundtrack/soundtrack.routes.js";
 import { moderationRoutes } from "./modules/moderation/moderation.routes.js";
 import { mediaUploadRoutes } from "./modules/media-upload/media-upload.routes.js";
 
+// In-Game Experience modules
+import { sceneCardsRoutes } from "./modules/scene-cards/scene-cards.routes.js";
+import { environmentRoutes } from "./modules/environment/environment.routes.js";
+import { questsRoutes } from "./modules/quests/quests.routes.js";
+import { partyLootRoutes } from "./modules/party-loot/party-loot.routes.js";
+import { marchingOrderRoutes } from "./modules/marching-order/marching-order.routes.js";
+import { mapNotesRoutes } from "./modules/map-notes/map-notes.routes.js";
+import { npcProfilesRoutes } from "./modules/npc-profiles/npc-profiles.routes.js";
+import { sessionRecapsRoutes } from "./modules/session-recaps/session-recaps.routes.js";
+
 // Socket.IO
 import { createSocketGateway } from "./modules/socket/socket.gateway.js";
 
@@ -129,6 +139,16 @@ async function buildApp() {
         await authenticated.register(soundtrackRoutes);
         await authenticated.register(moderationRoutes);
         await authenticated.register(mediaUploadRoutes);
+
+        // In-Game Experience
+        await authenticated.register(sceneCardsRoutes);
+        await authenticated.register(environmentRoutes);
+        await authenticated.register(questsRoutes);
+        await authenticated.register(partyLootRoutes);
+        await authenticated.register(marchingOrderRoutes);
+        await authenticated.register(mapNotesRoutes);
+        await authenticated.register(npcProfilesRoutes);
+        await authenticated.register(sessionRecapsRoutes);
       });
     },
     { prefix: "/api/v1" }

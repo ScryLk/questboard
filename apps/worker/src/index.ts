@@ -14,6 +14,7 @@ import { createTemplateMigrationWorker } from "./jobs/template-migration.js";
 import { createMediaProcessingWorker } from "./jobs/media-processing.js";
 import { createContentModerationWorker } from "./jobs/content-moderation.js";
 import { createAsyncTurnReminderWorker } from "./jobs/async-turn-reminder.js";
+import { createRecapGenerationWorker } from "./jobs/recap-generation.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
 
@@ -81,6 +82,7 @@ async function start() {
   const mediaProcessingWorker = createMediaProcessingWorker(connection);
   const contentModerationWorker = createContentModerationWorker(connection);
   const asyncTurnReminderWorker = createAsyncTurnReminderWorker(connection);
+  const recapGenerationWorker = createRecapGenerationWorker(connection);
 
   // Set up repeating jobs
   await setupRepeatingJobs(connection);
@@ -100,6 +102,7 @@ async function start() {
   console.log("  - media-processing (on demand)");
   console.log("  - content-moderation (on demand)");
   console.log("  - async-turn-reminder (every 1h)");
+  console.log("  - recap-generation (on demand)");
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -119,6 +122,7 @@ async function start() {
       mediaProcessingWorker.close(),
       contentModerationWorker.close(),
       asyncTurnReminderWorker.close(),
+      recapGenerationWorker.close(),
     ]);
     process.exit(0);
   };
