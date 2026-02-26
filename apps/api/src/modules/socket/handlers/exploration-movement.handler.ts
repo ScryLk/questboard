@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from "@questboard/db";
 import type { TypedIO, TypedSocket } from "../socket.gateway.js";
-import { processExplorationMove, processCombatMove } from "@questboard/game-engine";
+import { processExplorationMove, processCombatMove, computeTokenVision, computeFogReveal } from "@questboard/game-engine";
 import { randomUUID } from "node:crypto";
 
 // In-memory store for pending move requests (GM approval flow)
@@ -313,7 +313,7 @@ export function registerExplorationMovementHandlers(
         data: {
           sessionId,
           mapId: activeMap.id,
-          userId: socket.ctx.userId,
+          actorId: socket.ctx.userId,
           event: "OBJECT_INTERACTION",
           data: {
             action: "examine_area",
@@ -377,6 +377,9 @@ async function applyMove(
     userId,
     point: moveResult.finalPosition,
   });
+
+  // Recalculate vision and broadcast
+  await recalculateAndBroadcastVision(prisma, io, sessionId, mapId, userId, moveResult.finalPosition);
 
   // Handle zone entries
   for (const zone of moveResult.zonesEntered) {
@@ -472,7 +475,7 @@ async function applyMove(
     data: {
       sessionId,
       mapId,
-      userId,
+      actorId: userId,
       event: "TOKEN_MOVE",
       data: {
         tokenId: token.id,
@@ -484,6 +487,140 @@ async function applyMove(
       } as Prisma.InputJsonValue,
     },
   });
+}
+
+async function recalculateAndBroadcastVision(
+  prisma: PrismaClient,
+  io: TypedIO,
+  sessionId: string,
+  mapId: string,
+  userId: string,
+  tokenPos: { x: number; y: number }
+) {
+  try {
+    // Get exploration settings
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { settings: true },
+    });
+    const settings = (session?.settings as Record<string, unknown>) ?? {};
+    const exploration = (settings.exploration as Record<string, unknown>) ?? {};
+
+    if (exploration.autoRevealFog === false && exploration.revealMode === "gm_manual") return;
+
+    const map = await prisma.map.findUnique({ where: { id: mapId } });
+    if (!map) return;
+
+    // Load walls for vision calculation
+    const walls = await prisma.wall.findMany({ where: { mapId } });
+    const wallSegments = walls.map((w) => ({
+      x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2,
+      blocksMovement: w.blocksMovement,
+      blocksVision: w.blocksVision,
+      blocksLight: w.blocksLight,
+      isDoor: w.isDoor,
+      doorState: w.doorState ?? "CLOSED",
+    }));
+
+    const visionRadius = (exploration.defaultVisionRadius as number) ?? 12;
+
+    // Build door state list for vision computation
+    const doorStates = walls
+      .filter((w) => w.isDoor)
+      .map((w) => ({ wallId: w.id, state: w.doorState ?? "CLOSED" }));
+
+    // Compute token vision using raycasting
+    const vision = computeTokenVision(
+      tokenPos,
+      visionRadius,
+      wallSegments,
+      doorStates,
+      (map.gridType as string) ?? "SQUARE"
+    );
+
+    // Auto-reveal fog if enabled
+    if (exploration.autoRevealFog !== false) {
+      const fogAreas = await prisma.fogArea.findMany({
+        where: { mapId, isRevealed: false },
+      });
+
+      if (fogAreas.length > 0) {
+        const fogData = fogAreas.map((f) => ({
+          id: f.id,
+          isRevealed: f.isRevealed,
+          geometry: {
+            shapeType: f.shapeType,
+            ...(f.geometry as Record<string, unknown>),
+          },
+        }));
+
+        const fogResult = computeFogReveal(vision.currentlyVisible, fogData, 0.3);
+
+        if (fogResult.toReveal.length > 0) {
+          await prisma.fogArea.updateMany({
+            where: { id: { in: fogResult.toReveal } },
+            data: { isRevealed: true },
+          });
+          io.to(sessionId).emit("fog:batch-revealed", {
+            fogAreaIds: fogResult.toReveal,
+          });
+        }
+      }
+    }
+
+    // Send vision update to the specific player
+    const sockets = await io.in(sessionId).fetchSockets();
+    const playerSocket = sockets.find((s) => s.ctx?.userId === userId);
+    if (playerSocket) {
+      playerSocket.emit("exploration:vision-updated", {
+        visibleCells: Array.from(vision.currentlyVisible),
+        brightCells: Array.from(vision.brightCells),
+        dimCells: Array.from(vision.dimCells),
+        darkCells: Array.from(vision.darkCells),
+      });
+    }
+
+    // If shared vision, broadcast to all
+    const sharedVision = exploration.sharedVision as boolean ?? true;
+    if (sharedVision) {
+      io.to(sessionId).emit("exploration:shared-vision-updated", {
+        visibleCells: Array.from(vision.currentlyVisible),
+      });
+    }
+
+    // Update explored cells in PlayerViewState
+    const visibleArray = Array.from(vision.currentlyVisible);
+    if (visibleArray.length > 0) {
+      const existing = await prisma.playerViewState.findUnique({
+        where: { sessionId_userId_mapId: { sessionId, userId, mapId } },
+      });
+
+      const existingCells = existing?.exploredCells
+        ? (Array.isArray(existing.exploredCells) ? existing.exploredCells as string[] : [])
+        : [];
+
+      const merged = [...new Set([...existingCells, ...visibleArray])];
+
+      await prisma.playerViewState.upsert({
+        where: { sessionId_userId_mapId: { sessionId, userId, mapId } },
+        create: {
+          sessionId,
+          userId,
+          mapId,
+          exploredCells: merged as unknown as Prisma.InputJsonValue,
+          lastTokenX: tokenPos.x,
+          lastTokenY: tokenPos.y,
+        },
+        update: {
+          exploredCells: merged as unknown as Prisma.InputJsonValue,
+          lastTokenX: tokenPos.x,
+          lastTokenY: tokenPos.y,
+        },
+      });
+    }
+  } catch {
+    // Vision recalculation is non-critical — don't break the move
+  }
 }
 
 function isPointInGeometry(

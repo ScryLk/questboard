@@ -172,7 +172,7 @@ export function registerExplorationInteractionHandlers(
         data: {
           sessionId,
           mapId: ctx.mapId,
-          userId: socket.ctx.userId,
+          actorId: socket.ctx.userId,
           event: "OBJECT_INTERACTION",
           data: {
             objectId: obj.id,
