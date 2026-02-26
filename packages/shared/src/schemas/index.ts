@@ -22,3 +22,6 @@ export * from "./map-generation.schema.js";
 export * from "./interactive-object.schema.js";
 export * from "./zone.schema.js";
 export * from "./exploration.schema.js";
+export * from "./handout.schema.js";
+export * from "./soundtrack.schema.js";
+export * from "./moderation.schema.js";

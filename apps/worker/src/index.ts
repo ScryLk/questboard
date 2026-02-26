@@ -11,6 +11,9 @@ import { createWallDetectionWorker } from "./jobs/wall-detection.js";
 import { createVisionFlushWorker } from "./jobs/vision-flush.js";
 import { createPdfGenerationWorker } from "./jobs/pdf-generation.js";
 import { createTemplateMigrationWorker } from "./jobs/template-migration.js";
+import { createMediaProcessingWorker } from "./jobs/media-processing.js";
+import { createContentModerationWorker } from "./jobs/content-moderation.js";
+import { createAsyncTurnReminderWorker } from "./jobs/async-turn-reminder.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
 
@@ -50,6 +53,12 @@ async function setupRepeatingJobs(connection: { url: string }) {
   await visionFlushQueue.upsertJobScheduler("vision-flush-repeat", {
     every: 60_000,
   });
+
+  // Async turn reminder — every 1 hour
+  const asyncReminderQueue = new Queue("async-turn-reminder", { connection });
+  await asyncReminderQueue.upsertJobScheduler("async-turn-reminder-hourly", {
+    every: 3_600_000,
+  });
 }
 
 async function start() {
@@ -69,6 +78,9 @@ async function start() {
   const visionFlushWorker = createVisionFlushWorker(connection);
   const pdfGenerationWorker = createPdfGenerationWorker(connection);
   const templateMigrationWorker = createTemplateMigrationWorker(connection);
+  const mediaProcessingWorker = createMediaProcessingWorker(connection);
+  const contentModerationWorker = createContentModerationWorker(connection);
+  const asyncTurnReminderWorker = createAsyncTurnReminderWorker(connection);
 
   // Set up repeating jobs
   await setupRepeatingJobs(connection);
@@ -85,6 +97,9 @@ async function start() {
   console.log("  - vision-flush (every 60s)");
   console.log("  - pdf-generation (on demand)");
   console.log("  - template-migration (on demand)");
+  console.log("  - media-processing (on demand)");
+  console.log("  - content-moderation (on demand)");
+  console.log("  - async-turn-reminder (every 1h)");
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -101,6 +116,9 @@ async function start() {
       visionFlushWorker.close(),
       pdfGenerationWorker.close(),
       templateMigrationWorker.close(),
+      mediaProcessingWorker.close(),
+      contentModerationWorker.close(),
+      asyncTurnReminderWorker.close(),
     ]);
     process.exit(0);
   };

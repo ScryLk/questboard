@@ -9,14 +9,17 @@ import type {
   MapFullStateDTO,
   DiceRollDTO,
   MessageDTO,
+  ChatMessageDTO,
   SessionAudioDTO,
   InitiativeEntry,
   CombatStateDTO,
   TimelineEventDTO,
   CharacterDiceRollDTO,
   RestResultDTO,
+  HandoutDTO,
+  SoundtrackTrackDTO,
 } from "./dto.js";
-import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType, DiceRollType, DiceVisibility } from "./enums.js";
+import type { SessionStatus, PlayerRole, ChatChannel, RsvpStatus, DoorState, FogShapeType, AnnotationType, AnnotationVisibility, InteractionType, ZoneType, DiceRollType, DiceVisibility, ModerationAction } from "./enums.js";
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SERVER → CLIENT (broadcast para a room da sessão)              ║
@@ -49,8 +52,25 @@ export interface ServerToClientEvents {
   "dice:secret-result": (data: DiceRollDTO) => void;
 
   // ── Chat ──
-  "chat:message": (data: MessageDTO) => void;
-  "chat:typing": (data: { userId: string; channel: ChatChannel }) => void;
+  "chat:message": (data: ChatMessageDTO) => void;
+  "chat:message-edited": (data: { messageId: string; content: string; editedAt: string }) => void;
+  "chat:message-deleted": (data: { messageId: string }) => void;
+  "chat:message-pinned": (data: { messageId: string; isPinned: boolean }) => void;
+  "chat:reaction-added": (data: { messageId: string; emoji: string; userId: string }) => void;
+  "chat:reaction-removed": (data: { messageId: string; emoji: string; userId: string }) => void;
+  "chat:typing": (data: { userId: string; channel: ChatChannel; characterName?: string }) => void;
+  "chat:typing-stopped": (data: { userId: string; channel: ChatChannel }) => void;
+  "chat:unread-updated": (data: { channel: ChatChannel; count: number }) => void;
+
+  // ── Handouts ──
+  "handout:created": (data: { handoutId: string; name: string; coverUrl?: string }) => void;
+  "handout:section-revealed": (data: { handoutId: string; sectionId: string; title: string; content: string; imageUrl?: string }) => void;
+  "handout:updated": (data: { handoutId: string; changes: Partial<HandoutDTO> }) => void;
+
+  // ── Moderação ──
+  "moderation:flagged": (data: { moderationId: string; userId: string; content: string; categories: string[]; confidence: number }) => void;
+  "moderation:muted": (data: { duration?: number; reason?: string }) => void;
+  "moderation:unmuted": () => void;
 
   // ── Mapa ──
   "map:changed": (data: { mapId: string }) => void;
@@ -85,8 +105,12 @@ export interface ServerToClientEvents {
   "map:generation-complete": (data: { generationId: string; resultUrl: string }) => void;
   "map:generation-failed": (data: { generationId: string; error: string }) => void;
 
-  // ── Áudio ──
+  // ── Áudio / Trilha Sonora ──
   "audio:sync": (data: SessionAudioDTO[]) => void;
+  "audio:soundtrack-play": (data: { trackId: string; audioUrl: string; name: string; category: string; coverUrl?: string; volume: number; fadeIn: number; isLooping: boolean; duration: number }) => void;
+  "audio:soundtrack-stop": (data: { fadeOut: number }) => void;
+  "audio:soundtrack-volume": (data: { volume: number }) => void;
+  "audio:soundtrack-sync": (data: { trackId: string; audioUrl: string; name: string; volume: number; position: number; isLooping: boolean; isPlaying: boolean }) => void;
 
   // ── Timeline ──
   "timeline:event": (data: TimelineEventDTO) => void;
@@ -270,8 +294,38 @@ export interface ClientToServerEvents {
   "dice:roll": (data: { formula: string; context?: string; isSecret?: boolean }, ack: AckFn<DiceRollDTO>) => void;
 
   // ── Chat ──
-  "chat:send": (data: { channel: ChatChannel; content: string; targetId?: string }, ack: AckFn<MessageDTO>) => void;
+  "chat:send": (data: {
+    channel: ChatChannel;
+    content: string;
+    recipientIds?: string[];
+    groupName?: string;
+    attachments?: Array<{ id: string; type: string; url: string; fileName: string; fileSizeMb: number; mimeType: string }>;
+    authorAsNpc?: { name: string; portrait?: string };
+  }, ack: AckFn<ChatMessageDTO>) => void;
+  "chat:edit": (data: { messageId: string; content: string }, ack: AckFn<void>) => void;
+  "chat:delete": (data: { messageId: string }, ack: AckFn<void>) => void;
+  "chat:pin": (data: { messageId: string; isPinned: boolean }, ack: AckFn<void>) => void;
+  "chat:react": (data: { messageId: string; emoji: string }) => void;
+  "chat:unreact": (data: { messageId: string; emoji: string }) => void;
   "chat:typing": (data: { channel: ChatChannel }) => void;
+  "chat:mark-read": (data: { channel: ChatChannel }) => void;
+
+  // ── Handouts ──
+  "handout:reveal-section": (data: { handoutId: string; sectionId: string; revealTo?: string[] }, ack: AckFn<void>) => void;
+
+  // ── Trilha Sonora ──
+  "soundtrack:play": (data: { trackId: string; volume?: number; fadeIn?: number }, ack: AckFn<void>) => void;
+  "soundtrack:stop": (data: { fadeOut?: number }, ack: AckFn<void>) => void;
+  "soundtrack:volume": (data: { volume: number }) => void;
+  "soundtrack:seek": (data: { position: number }) => void;
+  "soundtrack:next-track": (ack: AckFn<void>) => void;
+  "soundtrack:prev-track": (ack: AckFn<void>) => void;
+
+  // ── Moderação ──
+  "moderation:mute": (data: { userId: string; duration?: number; reason?: string }, ack: AckFn<void>) => void;
+  "moderation:unmute": (data: { userId: string }, ack: AckFn<void>) => void;
+  "moderation:review": (data: { moderationId: string; approved: boolean }, ack: AckFn<void>) => void;
+  "moderation:slow-mode": (data: { channel: ChatChannel; seconds: number }, ack: AckFn<void>) => void;
 
   // ── Mapa ──
   "token:move": (data: { tokenId: string; x: number; y: number }) => void;

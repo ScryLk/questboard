@@ -38,6 +38,13 @@ import type {
   DiceRollType,
   DiceVisibility,
   ShareTargetType,
+  MessageAuthorType,
+  MessageContentType,
+  HandoutType,
+  SoundCategory,
+  TrackType,
+  ModerationAction,
+  ModerationStatus,
 } from "./enums.js";
 
 // ── User DTOs ──
@@ -421,6 +428,121 @@ export interface MessageDTO {
   createdAt: string;
 }
 
+export interface ChatMessageDTO {
+  id: string;
+  sessionId: string;
+  authorId: string | null;
+  authorType: MessageAuthorType;
+  channel: ChatChannel;
+  content: string;
+  contentType: MessageContentType;
+  characterId: string | null;
+  characterName: string | null;
+  characterAvatar: string | null;
+  recipientIds: string[];
+  groupName: string | null;
+  attachments: ChatAttachmentDTO[];
+  embed: Record<string, unknown> | null;
+  reactions: Record<string, string[]>;
+  isEdited: boolean;
+  editedAt: string | null;
+  isDeleted: boolean;
+  isPinned: boolean;
+  isAsyncPost: boolean;
+  asyncTurnNumber: number | null;
+  displayName: string;
+  avatarUrl: string | null;
+  createdAt: string;
+}
+
+export interface ChatAttachmentDTO {
+  id: string;
+  type: "image" | "file" | "audio" | "handout";
+  url: string;
+  fileName: string;
+  fileSizeMb: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  thumbnailUrl?: string;
+  caption?: string;
+}
+
+// ── Handout DTOs ──
+
+export interface HandoutDTO {
+  id: string;
+  sessionId: string;
+  name: string;
+  description: string | null;
+  handoutType: HandoutType;
+  sections: HandoutSectionDTO[];
+  coverImageUrl: string | null;
+  style: string;
+  visibleTo: string[];
+  isPinned: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HandoutSectionDTO {
+  id: string;
+  title: string;
+  content?: string;
+  imageUrl?: string;
+  isRevealed: boolean;
+  revealedAt?: string;
+  revealedTo: string[];
+  revealCondition?: string;
+  sortOrder: number;
+}
+
+export interface HandoutListDTO {
+  id: string;
+  name: string;
+  handoutType: HandoutType;
+  coverImageUrl: string | null;
+  style: string;
+  isPinned: boolean;
+  revealedSectionCount: number;
+  totalSectionCount: number;
+  createdAt: string;
+}
+
+// ── Soundtrack DTOs ──
+
+export interface SoundtrackTrackDTO {
+  id: string;
+  name: string;
+  category: SoundCategory;
+  tags: string[];
+  audioUrl: string;
+  duration: number;
+  fileSize: number;
+  format: string;
+  trackType: TrackType;
+  isBuiltIn: boolean;
+  uploadedById: string | null;
+  coverUrl: string | null;
+  artist: string | null;
+  license: string | null;
+}
+
+export interface SessionSoundtrackStateDTO {
+  activeTrackId: string | null;
+  activeTrack: SoundtrackTrackDTO | null;
+  isPlaying: boolean;
+  volume: number;
+  position: number;
+  isLooping: boolean;
+  playlist: Array<{ trackId: string; order: number }>;
+  playlistMode: string;
+  fadeInSeconds: number;
+  fadeOutSeconds: number;
+  crossfade: boolean;
+}
+
 // ── Audio DTOs ──
 
 export interface SessionAudioDTO {
@@ -430,6 +552,26 @@ export interface SessionAudioDTO {
   trackUrl: string;
   volume: number;
   isPlaying: boolean;
+}
+
+// ── Moderation DTOs ──
+
+export interface ChatModerationDTO {
+  id: string;
+  sessionId: string;
+  messageId: string | null;
+  userId: string | null;
+  action: ModerationAction;
+  reason: string | null;
+  isAutomatic: boolean;
+  confidence: number | null;
+  categories: string[];
+  status: ModerationStatus;
+  expiresAt: string | null;
+  performedById: string;
+  resolvedById: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
 }
 
 // ── Timeline DTOs ──
@@ -484,9 +626,6 @@ export interface PlanLimitsDTO {
   allowFogOfWar: boolean;
   allowDynamicLighting: boolean;
   allowLineOfSight: boolean;
-  allowWhisper: boolean;
-  allowSecretNotes: boolean;
-  allowSoundtrack: boolean;
   allowNpcAssistant: boolean;
   allowInitiativeTracker: boolean;
   maxStorageMb: number;
@@ -498,6 +637,21 @@ export interface PlanLimitsDTO {
   allowPersonalVault: boolean;
   maxPersonalStorageMb: number;
   maxFriends: number;
+  // Communication
+  enabledChatChannels: string[];
+  allowWhisper: boolean;
+  allowSecretNotes: boolean;
+  allowHandouts: boolean;
+  maxFileUploadMb: number;
+  allowPlayerFileSharing: boolean;
+  allowProgressiveReveal: boolean;
+  allowAsyncMode: boolean;
+  allowGroupChannels: boolean;
+  allowAutoModeration: boolean;
+  chatSlowModeMin: number;
+  allowSoundtrack: boolean;
+  soundtrackTier: string;
+  allowCustomAudioUpload: boolean;
   // Exploration
   allowExplorationMode: boolean;
   allowAutoRevealFog: boolean;

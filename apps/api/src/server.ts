@@ -44,6 +44,13 @@ import { characterTemplatesRoutes } from "./modules/character-templates/characte
 import { charactersRoutes } from "./modules/characters/characters.routes.js";
 import { characterDiceRoutes } from "./modules/character-dice/character-dice.routes.js";
 
+// Communication modules
+import { chatRoutes } from "./modules/chat/chat.routes.js";
+import { handoutsRoutes } from "./modules/handouts/handouts.routes.js";
+import { soundtrackRoutes } from "./modules/soundtrack/soundtrack.routes.js";
+import { moderationRoutes } from "./modules/moderation/moderation.routes.js";
+import { mediaUploadRoutes } from "./modules/media-upload/media-upload.routes.js";
+
 // Socket.IO
 import { createSocketGateway } from "./modules/socket/socket.gateway.js";
 
@@ -115,6 +122,13 @@ async function buildApp() {
         await authenticated.register(characterTemplatesRoutes);
         await authenticated.register(charactersRoutes);
         await authenticated.register(characterDiceRoutes);
+
+        // Communication
+        await authenticated.register(chatRoutes);
+        await authenticated.register(handoutsRoutes);
+        await authenticated.register(soundtrackRoutes);
+        await authenticated.register(moderationRoutes);
+        await authenticated.register(mediaUploadRoutes);
       });
     },
     { prefix: "/api/v1" }

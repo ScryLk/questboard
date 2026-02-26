@@ -272,9 +272,13 @@ export enum MapGenMode {
 export enum ChatChannel {
   GENERAL = "GENERAL",
   IN_CHARACTER = "IN_CHARACTER",
+  NARRATOR = "NARRATOR",
   WHISPER = "WHISPER",
-  GM_ONLY = "GM_ONLY",
+  SECRET_NOTE = "SECRET_NOTE",
   GROUP = "GROUP",
+  GM_ONLY = "GM_ONLY",
+  ASYNC = "ASYNC",
+  SYSTEM = "SYSTEM",
 }
 
 export enum MessageType {
@@ -283,6 +287,76 @@ export enum MessageType {
   SYSTEM = "SYSTEM",
   MEDIA = "MEDIA",
   NARRATIVE = "NARRATIVE",
+}
+
+export enum MessageAuthorType {
+  USER = "USER",
+  CHARACTER = "CHARACTER",
+  NARRATOR = "NARRATOR",
+  SYSTEM = "SYSTEM",
+  NPC = "NPC",
+  BOT = "BOT",
+}
+
+export enum MessageContentType {
+  TEXT = "TEXT",
+  IMAGE = "IMAGE",
+  FILE = "FILE",
+  DICE_ROLL = "DICE_ROLL",
+  COMBAT_EVENT = "COMBAT_EVENT",
+  EXPLORATION_EVENT = "EXPLORATION_EVENT",
+  HANDOUT = "HANDOUT",
+  AUDIO_CLIP = "AUDIO_CLIP",
+  MAP_MARKER = "MAP_MARKER",
+  SYSTEM_EVENT = "SYSTEM_EVENT",
+}
+
+export enum HandoutType {
+  DOCUMENT = "DOCUMENT",
+  IMAGE = "IMAGE",
+  MAP_FRAGMENT = "MAP_FRAGMENT",
+  ITEM_CARD = "ITEM_CARD",
+  NPC_PROFILE = "NPC_PROFILE",
+  CLUE = "CLUE",
+}
+
+export enum SoundCategory {
+  TAVERN = "TAVERN",
+  FOREST = "FOREST",
+  DUNGEON = "DUNGEON",
+  COMBAT = "COMBAT",
+  CITY = "CITY",
+  SEA = "SEA",
+  HORROR = "HORROR",
+  PEACEFUL = "PEACEFUL",
+  EPIC = "EPIC",
+  MYSTERY = "MYSTERY",
+  AMBIENT = "AMBIENT",
+  CUSTOM = "CUSTOM",
+}
+
+export enum TrackType {
+  AMBIENT = "AMBIENT",
+  MUSIC = "MUSIC",
+  EFFECT = "EFFECT",
+  VOICE = "VOICE",
+}
+
+export enum ModerationAction {
+  MUTE = "MUTE",
+  TEMP_MUTE = "TEMP_MUTE",
+  DELETE_MESSAGE = "DELETE_MESSAGE",
+  WARN = "WARN",
+  SLOW_MODE = "SLOW_MODE",
+  BAN_FROM_CHAT = "BAN_FROM_CHAT",
+  AUTO_FLAGGED = "AUTO_FLAGGED",
+}
+
+export enum ModerationStatus {
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED",
+  REVOKED = "REVOKED",
+  REVIEWED = "REVIEWED",
 }
 
 export enum DiceRollMode {

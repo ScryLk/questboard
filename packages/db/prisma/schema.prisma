@@ -335,9 +335,13 @@ enum ShareTargetType {
 enum ChatChannel {
   GENERAL
   IN_CHARACTER
+  NARRATOR
   WHISPER
-  GM_ONLY
+  SECRET_NOTE
   GROUP
+  GM_ONLY
+  ASYNC
+  SYSTEM
 }
 
 enum MessageType {
@@ -346,6 +350,76 @@ enum MessageType {
   SYSTEM
   MEDIA
   NARRATIVE
+}
+
+enum MessageAuthorType {
+  USER
+  CHARACTER
+  NARRATOR
+  SYSTEM
+  NPC
+  BOT
+}
+
+enum MessageContentType {
+  TEXT
+  IMAGE
+  FILE
+  DICE_ROLL
+  COMBAT_EVENT
+  EXPLORATION_EVENT
+  HANDOUT
+  AUDIO_CLIP
+  MAP_MARKER
+  SYSTEM_EVENT
+}
+
+enum HandoutType {
+  DOCUMENT
+  IMAGE
+  MAP_FRAGMENT
+  ITEM_CARD
+  NPC_PROFILE
+  CLUE
+}
+
+enum SoundCategory {
+  TAVERN
+  FOREST
+  DUNGEON
+  COMBAT
+  CITY
+  SEA
+  HORROR
+  PEACEFUL
+  EPIC
+  MYSTERY
+  AMBIENT
+  CUSTOM
+}
+
+enum TrackType {
+  AMBIENT
+  MUSIC
+  EFFECT
+  VOICE
+}
+
+enum ModerationAction {
+  MUTE
+  TEMP_MUTE
+  DELETE_MESSAGE
+  WARN
+  SLOW_MODE
+  BAN_FROM_CHAT
+  AUTO_FLAGGED
+}
+
+enum ModerationStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  REVIEWED
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -388,7 +462,7 @@ model User {
   ownedSessions       Session[]
   sessionPlayers      SessionPlayer[]
   characters          Character[]
-  messages            Message[]
+  chatMessages        ChatMessage[]
   diceRolls           DiceRoll[]
 
   // Social
@@ -506,11 +580,17 @@ model PlanLimit {
   availableSheetTemplates Json    @default("[\"generic\"]")
 
   // ── Comunicação ──
+  enabledChatChannels    Json    @default("[\"GENERAL\",\"IN_CHARACTER\",\"NARRATOR\",\"GM_ONLY\",\"SYSTEM\"]")
   allowWhisper           Boolean @default(false)
   allowSecretNotes       Boolean @default(false)
+  allowHandouts          Boolean @default(false)
   maxFileUploadMb        Int     @default(2)
   allowPlayerFileSharing Boolean @default(false)
   allowProgressiveReveal Boolean @default(false)
+  allowAsyncMode         Boolean @default(false)
+  allowGroupChannels     Boolean @default(false)
+  allowAutoModeration    Boolean @default(false)
+  chatSlowModeMin        Int     @default(0)
 
   // ── Mídia ──
   maxStorageMb          Int     @default(50)
@@ -784,7 +864,7 @@ model Session {
   invites       SessionInvite[]
   schedules     SessionSchedule[]
   maps          Map[]
-  messages      Message[]
+  chatMessages  ChatMessage[]
   diceRolls     DiceRoll[]
   timeline      TimelineEvent[]
   audioState    SessionAudio[]
@@ -1468,23 +1548,61 @@ model AiUsageMonthly {
   @@index([userId])
 }
 
-model Message {
-  id          String      @id @default(cuid())
-  sessionId   String
-  userId      String
-  channel     ChatChannel @default(GENERAL)
-  content     String
-  type        MessageType @default(TEXT)
-  targetId    String?
-  metadata    Json?
+model ChatMessage {
+  id              String             @id @default(cuid())
+  sessionId       String
+  session         Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  session     Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id])
+  // ── Autor ──
+  authorId        String?
+  author          User?              @relation(fields: [authorId], references: [id])
+  authorType      MessageAuthorType  @default(USER)
 
-  createdAt   DateTime    @default(now())
+  // ── Canal ──
+  channel         ChatChannel
 
+  // ── Conteúdo ──
+  content         String             @db.Text
+  contentType     MessageContentType @default(TEXT)
+
+  // ── Referências IC ──
+  characterId     String?
+  characterName   String?            @db.VarChar(100)
+  characterAvatar String?
+
+  // ── Whisper / Grupo ──
+  recipientIds    String[]           @default([])
+  groupName       String?            @db.VarChar(100)
+
+  // ── Mídia ──
+  attachments     Json               @default("[]")
+
+  // ── Inline embeds ──
+  embed           Json?
+
+  // ── Reações ──
+  reactions       Json               @default("{}")
+
+  // ── Estado ──
+  isEdited        Boolean            @default(false)
+  editedAt        DateTime?
+  isDeleted       Boolean            @default(false)
+  isPinned        Boolean            @default(false)
+
+  // ── Async ──
+  isAsyncPost     Boolean            @default(false)
+  asyncTurnNumber Int?
+
+  // ── Extensível ──
+  metadata        Json               @default("{}")
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([sessionId, channel, createdAt])
   @@index([sessionId, createdAt])
-  @@index([sessionId, channel])
+  @@index([authorId])
+  @@index([sessionId, isPinned])
 }
 
 model DiceRoll {
@@ -1567,6 +1685,132 @@ model SessionAudio {
   volume      Float    @default(0.5)
   isPlaying   Boolean  @default(false)
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  COMUNICAÇÃO AVANÇADA                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+model Handout {
+  id              String       @id @default(cuid())
+  sessionId       String
+
+  // ── Identidade ──
+  name            String       @db.VarChar(200)
+  description     String?      @db.VarChar(500)
+
+  // ── Tipo ──
+  handoutType     HandoutType
+
+  // ── Conteúdo (seções reveláveis) ──
+  sections        Json
+
+  // ── Visual ──
+  coverImageUrl   String?
+  style           String       @default("parchment")
+
+  // ── Acesso ──
+  visibleTo       String[]     @default([])
+  isPinned        Boolean      @default(false)
+  createdById     String
+
+  metadata        Json         @default("{}")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, isPinned])
+}
+
+model SoundtrackTrack {
+  id              String        @id @default(cuid())
+
+  // ── Identidade ──
+  name            String        @db.VarChar(200)
+  category        SoundCategory
+  tags            String[]      @default([])
+
+  // ── Áudio ──
+  audioUrl        String
+  duration        Int
+  fileSize        Float
+  format          String        @default("mp3")
+
+  // ── Tipo ──
+  trackType       TrackType     @default(AMBIENT)
+
+  // ── Source ──
+  isBuiltIn       Boolean       @default(true)
+  uploadedById    String?
+
+  // ── Visual ──
+  coverUrl        String?
+  waveformData    Json?
+
+  // ── Licenciamento ──
+  license         String?       @db.VarChar(200)
+  artist          String?       @db.VarChar(200)
+  source          String?       @db.VarChar(500)
+
+  metadata        Json          @default("{}")
+  createdAt       DateTime      @default(now())
+
+  @@index([category])
+  @@index([isBuiltIn])
+  @@index([uploadedById])
+}
+
+model SessionSoundtrackState {
+  id              String    @id @default(cuid())
+  sessionId       String    @unique
+
+  // ── Faixa atual ──
+  activeTrackId   String?
+  isPlaying       Boolean   @default(false)
+  volume          Float     @default(0.5)
+  position        Float     @default(0)
+  isLooping       Boolean   @default(true)
+
+  // ── Playlist ──
+  playlist        Json      @default("[]")
+  playlistMode    String    @default("sequential")
+
+  // ── Fade ──
+  fadeInSeconds    Float     @default(2.0)
+  fadeOutSeconds   Float     @default(3.0)
+  crossfade       Boolean   @default(true)
+
+  updatedAt       DateTime  @updatedAt
+
+  @@index([sessionId])
+}
+
+model ChatModeration {
+  id              String           @id @default(cuid())
+  sessionId       String
+  messageId       String?
+  userId          String?
+
+  // ── Ação ──
+  action          ModerationAction
+  reason          String?          @db.VarChar(500)
+
+  // ── Auto-moderação ──
+  isAutomatic     Boolean          @default(false)
+  confidence      Float?
+  categories      String[]         @default([])
+
+  // ── Estado ──
+  status          ModerationStatus @default(ACTIVE)
+  expiresAt       DateTime?
+  resolvedById    String?
+  resolvedAt      DateTime?
+
+  performedById   String
+  createdAt       DateTime         @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
