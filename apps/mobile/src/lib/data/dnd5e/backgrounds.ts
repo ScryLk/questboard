@@ -14,19 +14,22 @@ import {
   Footprints,
 } from "lucide-react-native";
 import type { LucideIcon } from "lucide-react-native";
+import type {
+  BackgroundFeature,
+  PersonalitySuggestion,
+  ClassEquipmentPack,
+} from "@questboard/types";
 
-// ─── Types ──────────────────────────────────────────────
+// Re-export platform-independent types
+export type {
+  BackgroundFeature,
+  PersonalitySuggestion,
+  EquipmentOption,
+  EquipmentChoice,
+  ClassEquipmentPack,
+} from "@questboard/types";
 
-export interface BackgroundFeature {
-  name: string;
-  description: string;
-}
-
-export interface PersonalitySuggestion {
-  id: string;
-  text: string;
-}
-
+// Mobile-specific Background with LucideIcon
 export interface Background {
   id: string;
   name: string;
@@ -42,20 +45,6 @@ export interface Background {
   bonds: PersonalitySuggestion[];
   flaws: PersonalitySuggestion[];
   equipment: string[];
-}
-
-// ─── Equipment Packs (class-based) ──────────────────────
-
-export interface EquipmentChoice {
-  id: string;
-  label: string;
-  options: { id: string; name: string; items: string[] }[];
-}
-
-export interface ClassEquipmentPack {
-  classId: string;
-  fixed: string[];
-  choices: EquipmentChoice[];
 }
 
 // ─── Backgrounds Data ───────────────────────────────────

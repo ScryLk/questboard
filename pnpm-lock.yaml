@@ -82,12 +82,21 @@ importers:
       '@gorhom/bottom-sheet':
         specifier: ^5.2.8
         version: 5.2.8(@types/react@18.3.28)(react-native-gesture-handler@2.20.2(react-native@0.76.9(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@18.3.28)(react@18.3.1))(react@18.3.1))(react-native-reanimated@3.16.7(@babel/core@7.29.0)(react-native@0.76.9(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@18.3.28)(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@18.3.28)(react@18.3.1))(react@18.3.1)
+      '@questboard/constants':
+        specifier: workspace:*
+        version: link:../../packages/constants
       '@questboard/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@questboard/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@questboard/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@questboard/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@react-native-async-storage/async-storage':
         specifier: 1.23.1
         version: 1.23.1(react-native@0.76.9(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@18.3.28)(react@18.3.1))

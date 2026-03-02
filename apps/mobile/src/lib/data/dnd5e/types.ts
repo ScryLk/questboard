@@ -1,29 +1,47 @@
 import type { LucideIcon } from "lucide-react-native";
+import type {
+  AbilityKey,
+  AbilityBonus,
+  RaceChoice,
+  SkillChoices,
+  ClassFeature,
+  ClassRole,
+  ClassComplexity,
+} from "@questboard/types";
 
-// ─── Ability Scores ──────────────────────────────────────
+// ─── Re-export platform-independent types ───────────────
 
-export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+export type {
+  AbilityKey,
+  AbilityBonus,
+  RaceChoice,
+  FeatureChoice,
+  ClassFeature,
+  SkillChoices,
+  ClassRole,
+  ClassComplexity,
+  DiceRollResult,
+  BackgroundFeature,
+  PersonalitySuggestion,
+  EquipmentOption,
+  EquipmentChoice,
+  ClassEquipmentPack,
+  CharacterSheetAbility,
+  CharacterSheetSkill,
+  CharacterSheetFeature,
+  CharacterSheetData,
+  NPCAction,
+  NPCHostility,
+  NPCStatBlock,
+} from "@questboard/types";
 
-export interface AbilityBonus {
-  ability: AbilityKey;
-  bonus: number;
-}
-
-// ─── Races ───────────────────────────────────────────────
+// ─── Mobile-specific types (LucideIcon for native rendering) ──
 
 export interface RacialTrait {
   name: string;
   icon: LucideIcon;
   shortDescription: string;
   description: string;
-}
-
-export interface RaceChoice {
-  id: string;
-  label: string;
-  type: "cantrip" | "language" | "skill" | "tool" | "ability" | "ancestry";
-  count?: number; // for multi-select (e.g., Half-Elf +1 to two abilities)
-  options: { id: string; name: string; description?: string }[];
 }
 
 export interface SubRace {
@@ -48,29 +66,6 @@ export interface Race {
   choices?: RaceChoice[];
 }
 
-// ─── Classes ─────────────────────────────────────────────
-
-export interface FeatureChoice {
-  id: string;
-  label: string;
-  options: { id: string; name: string; description: string }[];
-}
-
-export interface ClassFeature {
-  name: string;
-  description: string;
-  level: number;
-  choices?: FeatureChoice;
-}
-
-export interface SkillChoices {
-  count: number;
-  options: string[];
-}
-
-export type ClassRole = "martial" | "caster" | "hybrid" | "support";
-export type ClassComplexity = "simple" | "moderate" | "complex";
-
 export interface CharacterClass {
   id: string;
   name: string;
@@ -87,13 +82,4 @@ export interface CharacterClass {
   features: ClassFeature[];
   role: ClassRole;
   complexity: ClassComplexity;
-}
-
-// ─── Dice Rolling ────────────────────────────────────────
-
-export interface DiceRollResult {
-  dice: [number, number, number, number];
-  dropped: number;
-  total: number;
-  ability: AbilityKey | null;
 }
