@@ -25,3 +25,5 @@ export const SYSTEM_LABELS: Record<SupportedSystem, string> = {
   coc7: "Call of Cthulhu 7e",
   generic: "Genérico",
 };
+
+export * from "./map-editor.js";

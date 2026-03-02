@@ -159,16 +159,27 @@ model CharacterTemplate {
 }
 
 model Map {
-  id       String   @id @default(cuid())
-  name     String
-  imageUrl String
-  gridType GridType @default(SQUARE)
-  gridSize Int      @default(50)
-  width    Int
-  height   Int
+  id              String   @id @default(cuid())
+  name            String
+  imageUrl        String
+  gridType        GridType @default(SQUARE)
+  gridSize        Int      @default(50)
+  width           Int
+  height          Int
+  tileSize        Int      @default(70)
+  gridScale       String   @default("5 pés")
+  biome           String   @default("dungeon")
+  ambiance        String   @default("dark")
+  description     String   @default("")
+  thumbnailUrl    String?
+  backgroundImage String?
+  settings        Json     @default("{\"enableAutoLighting\":true,\"enableTerrainInteraction\":true,\"defaultFogState\":\"ALL_HIDDEN\"}")
+  layerData       Json?
 
+  creatorId String?
   sessionId String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   session  Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   tokens   Token[]
@@ -176,6 +187,7 @@ model Map {
   layers   MapLayer[]
 
   @@index([sessionId])
+  @@index([creatorId])
 }
 
 model Token {
@@ -228,12 +240,16 @@ model MapGeneration {
   id        String              @id @default(cuid())
   prompt    String
   params    Json
+  result    Json?
   imageUrl  String?
   status    MapGenerationStatus @default(PENDING)
+  type      String              @default("full_map")
+  mapId     String?
   sessionId String
   createdAt DateTime            @default(now())
 
   @@index([sessionId])
+  @@index([mapId])
 }
 
 model Message {

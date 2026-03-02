@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Button, Card } from "@questboard/ui";
 import { SUPPORTED_SYSTEMS, SYSTEM_LABELS, type SupportedSystem } from "@questboard/shared";
 
@@ -10,6 +11,11 @@ export function HomePage() {
             QuestBoard
           </h1>
           <nav className="flex gap-4">
+            <Link to="/editor/map">
+              <Button variant="ghost" size="sm">
+                Editor de Mapas
+              </Button>
+            </Link>
             <Button variant="ghost" size="sm">
               Sessões
             </Button>
