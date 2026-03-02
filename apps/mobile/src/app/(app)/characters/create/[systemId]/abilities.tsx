@@ -116,7 +116,7 @@ export default function AbilitiesScreen() {
   }
 
   function handleNext() {
-    router.push(`/(app)/characters/create/${systemId}/review`);
+    router.push(`/(app)/characters/create/${systemId}/background`);
   }
 
   const pointsRemaining = getPointsRemaining(abilities.baseScores);
@@ -338,7 +338,7 @@ export default function AbilitiesScreen() {
           disabled={!allScoresAssigned}
           onPress={handleNext}
         >
-          Próximo: Revisão →
+          {`Próximo: Antecedente \u2192`}
         </Button>
       </YStack>
     </YStack>

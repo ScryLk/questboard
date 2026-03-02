@@ -7,6 +7,7 @@ import { ComputedStatsPanel } from "../../../../../components/computed-stats";
 import { useCharacterCreationStore, getFinalScores } from "../../../../../lib/character-creation-store";
 import { DND5E_RACES } from "../../../../../lib/data/dnd5e/races";
 import { DND5E_CLASSES } from "../../../../../lib/data/dnd5e/classes";
+import { DND5E_BACKGROUNDS } from "../../../../../lib/data/dnd5e/backgrounds";
 import {
   ABILITY_LABELS,
   ABILITY_ORDER,
@@ -62,10 +63,23 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
       <Text fontSize={13} color="$textMuted">
         {label}
       </Text>
-      <Text fontSize={13} fontWeight="500" color="$textPrimary">
+      <Text fontSize={13} fontWeight="500" color="$textPrimary" flexShrink={1} textAlign="right">
         {value}
       </Text>
     </XStack>
+  );
+}
+
+function ReviewText({ label, value }: { label: string; value: string }) {
+  return (
+    <YStack gap={2}>
+      <Text fontSize={13} color="$textMuted">
+        {label}
+      </Text>
+      <Text fontSize={13} color="$textPrimary" lineHeight={18}>
+        {value}
+      </Text>
+    </YStack>
   );
 }
 
@@ -73,7 +87,7 @@ export default function ReviewScreen() {
   const { systemId } = useLocalSearchParams<{ systemId: string }>();
   const router = useRouter();
   const store = useCharacterCreationStore();
-  const { identity, race, class_, totalSteps, reset } = store;
+  const { identity, race, class_, background, equipment, roleplay, totalSteps, reset } = store;
 
   const systemLabel = SYSTEM_LABELS[systemId ?? ""] ?? systemId;
   const alignmentLabel = DND_ALIGNMENTS.find(
@@ -85,6 +99,7 @@ export default function ReviewScreen() {
     (s) => s.id === race.subRaceId,
   );
   const classData = DND5E_CLASSES.find((c) => c.id === class_.classId);
+  const bgData = DND5E_BACKGROUNDS.find((b) => b.id === background.backgroundId);
   const finalScores = getFinalScores(store);
 
   function handleCreate() {
@@ -102,23 +117,10 @@ export default function ReviewScreen() {
     router.push(`/(app)/characters/create/${systemId}/celebration`);
   }
 
-  function handleEditIdentity() {
-    router.back();
-    router.back();
-    router.back();
-  }
-
-  function handleEditRace() {
-    router.back();
-    router.back();
-  }
-
-  function handleEditClass() {
-    router.back();
-  }
-
-  function handleEditAbilities() {
-    router.back();
+  function navigateBackSteps(count: number) {
+    for (let i = 0; i < count; i++) {
+      router.back();
+    }
   }
 
   return (
@@ -153,7 +155,7 @@ export default function ReviewScreen() {
             {identity.name || "Sem nome"}
           </Text>
 
-          <XStack gap={8} alignItems="center">
+          <XStack gap={8} alignItems="center" flexWrap="wrap" justifyContent="center">
             <Stack
               borderRadius={9999}
               backgroundColor="$accentMuted"
@@ -167,23 +169,28 @@ export default function ReviewScreen() {
             <Text fontSize={13} color="$textMuted">
               Nível {identity.level}
             </Text>
+            {bgData && (
+              <Stack
+                borderRadius={9999}
+                backgroundColor="rgba(0, 184, 148, 0.15)"
+                paddingHorizontal={10}
+                paddingVertical={3}
+              >
+                <Text fontSize={12} fontWeight="600" color="#00B894">
+                  {bgData.name}
+                </Text>
+              </Stack>
+            )}
           </XStack>
         </YStack>
 
         {/* Sections */}
         <YStack gap={12}>
           {/* Identity Section */}
-          <ReviewSection title="Identidade" onEdit={handleEditIdentity}>
-            <ReviewRow label="Nome" value={identity.name || "—"} />
+          <ReviewSection title="Identidade" onEdit={() => navigateBackSteps(7)}>
+            <ReviewRow label="Nome" value={identity.name || "\u2014"} />
             {identity.concept ? (
-              <YStack gap={2}>
-                <Text fontSize={13} color="$textMuted">
-                  Conceito
-                </Text>
-                <Text fontSize={13} color="$textPrimary" lineHeight={18}>
-                  {identity.concept}
-                </Text>
-              </YStack>
+              <ReviewText label="Conceito" value={identity.concept} />
             ) : null}
             <ReviewRow label="Nível" value={String(identity.level)} />
             {alignmentLabel && (
@@ -193,7 +200,7 @@ export default function ReviewScreen() {
 
           {/* Race Section */}
           {raceData && (
-            <ReviewSection title="Raça" onEdit={handleEditRace}>
+            <ReviewSection title="Raça" onEdit={() => navigateBackSteps(6)}>
               <ReviewRow label="Raça" value={raceData.name} />
               {subRaceData && (
                 <ReviewRow label="Sub-raça" value={subRaceData.name} />
@@ -219,7 +226,7 @@ export default function ReviewScreen() {
 
           {/* Class Section */}
           {classData && (
-            <ReviewSection title="Classe" onEdit={handleEditClass}>
+            <ReviewSection title="Classe" onEdit={() => navigateBackSteps(5)}>
               <ReviewRow label="Classe" value={classData.name} />
               <ReviewRow label="Dado de Vida" value={`d${classData.hitDie}`} />
               {class_.skills.length > 0 && (
@@ -251,7 +258,7 @@ export default function ReviewScreen() {
 
           {/* Abilities Section */}
           {store.abilities.method && (
-            <ReviewSection title="Atributos" onEdit={handleEditAbilities}>
+            <ReviewSection title="Atributos" onEdit={() => navigateBackSteps(4)}>
               {ABILITY_ORDER.map((ability) => (
                 <ReviewRow
                   key={ability}
@@ -259,6 +266,82 @@ export default function ReviewScreen() {
                   value={`${finalScores[ability]} (${formatModifier(getModifier(finalScores[ability]))})`}
                 />
               ))}
+            </ReviewSection>
+          )}
+
+          {/* Background Section */}
+          {bgData && (
+            <ReviewSection title="Antecedente" onEdit={() => navigateBackSteps(3)}>
+              <ReviewRow label="Antecedente" value={bgData.name} />
+              <ReviewRow
+                label="Perícias"
+                value={bgData.skillProficiencies.join(", ")}
+              />
+              {bgData.toolProficiencies.length > 0 && (
+                <ReviewRow
+                  label="Ferramentas"
+                  value={bgData.toolProficiencies.join(", ")}
+                />
+              )}
+              {bgData.languages > 0 && (
+                <ReviewRow
+                  label="Idiomas"
+                  value={`+${bgData.languages}`}
+                />
+              )}
+              <ReviewRow label="Habilidade" value={bgData.feature.name} />
+            </ReviewSection>
+          )}
+
+          {/* Equipment Section */}
+          <ReviewSection title="Equipamento" onEdit={() => navigateBackSteps(2)}>
+            {equipment.useGold ? (
+              <Text fontSize={13} color="$textMuted">
+                Ouro inicial (compra livre com o mestre)
+              </Text>
+            ) : (
+              <YStack gap={4}>
+                {bgData &&
+                  bgData.equipment.map((item, i) => (
+                    <Text key={`bg-eq-${i}`} fontSize={13} color="$textPrimary">
+                      {item}
+                    </Text>
+                  ))}
+                <Text fontSize={12} color="$textMuted" marginTop={2}>
+                  + Equipamento de classe selecionado
+                </Text>
+              </YStack>
+            )}
+          </ReviewSection>
+
+          {/* Roleplay Section */}
+          {(roleplay.personalityTraits.length > 0 ||
+            roleplay.ideal ||
+            roleplay.bond ||
+            roleplay.flaw ||
+            roleplay.backstory) && (
+            <ReviewSection title="Interpretação" onEdit={() => navigateBackSteps(1)}>
+              {roleplay.personalityTraits.length > 0 && (
+                <ReviewText
+                  label="Traços de Personalidade"
+                  value={roleplay.personalityTraits.join(" | ")}
+                />
+              )}
+              {roleplay.ideal && (
+                <ReviewText label="Ideal" value={roleplay.ideal} />
+              )}
+              {roleplay.bond && (
+                <ReviewText label="Vínculo" value={roleplay.bond} />
+              )}
+              {roleplay.flaw && (
+                <ReviewText label="Defeito" value={roleplay.flaw} />
+              )}
+              {roleplay.backstory && (
+                <ReviewText label="História" value={roleplay.backstory} />
+              )}
+              {roleplay.appearance && (
+                <ReviewText label="Aparência" value={roleplay.appearance} />
+              )}
             </ReviewSection>
           )}
 
