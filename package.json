@@ -21,6 +21,12 @@
     "turbo": "^2.4.4",
     "typescript": "^5.7.3"
   },
+  "pnpm": {
+    "overrides": {
+      "expo-crypto": "~14.0.2",
+      "expo-secure-store": "~14.0.1"
+    }
+  },
   "packageManager": "pnpm@10.29.3",
   "engines": {
     "node": ">=20"
