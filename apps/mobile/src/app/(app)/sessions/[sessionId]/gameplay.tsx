@@ -25,6 +25,7 @@ import { SceneCardOverlay } from "../../../../components/gameplay/scene-card-ove
 import { TokenContextMenu } from "../../../../components/gameplay/token-context-menu";
 import { PlayerSheetModal } from "../../../../components/gameplay/player-sheet-modal";
 import { NPCCardModal } from "../../../../components/gameplay/npc-card-modal";
+import { TerrainDetailCard } from "../../../../components/gameplay/terrain-detail-card";
 
 export default function GameplayScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -66,6 +67,9 @@ export default function GameplayScreen() {
           <SoundtrackModal isOpen={activeGMToolView === "soundtrack"} />
         </>
       )}
+
+      {/* Terrain Detail Card */}
+      <TerrainDetailCard />
 
       {/* Character Sheet Modals */}
       <PlayerSheetModal />

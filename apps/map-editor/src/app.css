@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0A0A0F;
+  --color-bg-panel: #111116;
+  --color-bg-card: #16161C;
+  --color-bg-input: #0F0F14;
+  --color-border: #1E1E2A;
+  --color-border-hover: #2A2A35;
+  --color-accent: #6C5CE7;
+  --color-accent-hover: #7D6FF0;
+  --color-accent-muted: rgba(108, 92, 231, 0.12);
+  --color-danger: #E94560;
+  --color-success: #00B894;
+  --color-warning: #FDCB6E;
+  --color-text-primary: #E8E8ED;
+  --color-text-secondary: #9090A0;
+  --color-text-muted: #5A5A6E;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-text-primary);
+}
+
+/* Input focus */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}

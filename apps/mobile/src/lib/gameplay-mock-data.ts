@@ -630,5 +630,90 @@ export function loadMockGameplay(
     },
 
     gmNotes: { ...MOCK_GM_NOTES },
+
+    terrainTiles: MOCK_TERRAIN_TILES,
+    viewingTerrainTile: null,
   });
 }
+
+// ─── Mock Terrain Tiles ─────────────────────────────────
+
+const MOCK_TERRAIN_TILES: import("./gameplay-store").TerrainTileState[] = [
+  {
+    x: 4,
+    y: 3,
+    detail: {
+      name: "Piso de Pedra Rachada",
+      description:
+        "Pedras antigas rachadas pelo tempo e pela umidade. Musgo escuro cresce entre as fendas, e marcas de arranhões sugerem que algo pesado foi arrastado por aqui.",
+      detailImageUrl: null,
+      difficulty: "Terreno Normal",
+      elevation: 0,
+      effect: null,
+      perception: {
+        dc: 14,
+        description:
+          "Você nota marcas de garras recentes no chão, como se uma criatura grande tivesse passado.",
+        passed: true,
+      },
+      investigation: {
+        dc: 16,
+        description:
+          "Há um mecanismo oculto sob uma das pedras. Ao pressionar na sequência correta, um compartimento se abre.",
+        investigated: false,
+        passed: null,
+      },
+      isInteractable: true,
+      interactionLabel: "Examinar mais de perto",
+      interactionResult:
+        "Ao mover o musgo, você encontra runas anãs gravadas na pedra. Elas parecem ser um aviso: 'Não desperte o que jaz abaixo.'",
+      interacted: false,
+      lore: "Esta sala era a antecâmara de uma cripta anã. As runas foram gravadas há 300 anos como proteção contra intrusos.",
+    },
+  },
+  {
+    x: 7,
+    y: 5,
+    detail: {
+      name: "Lareira Acesa",
+      description:
+        "Uma grande lareira de pedra com chamas crepitantes que iluminam o ambiente com tons dourados. O calor é reconfortante após o frio das catacumbas.",
+      detailImageUrl: null,
+      difficulty: "Terreno Normal",
+      elevation: 0,
+      effect: null,
+      perception: null,
+      investigation: null,
+      isInteractable: true,
+      interactionLabel: "Examinar a lareira",
+      interactionResult:
+        "Dentro das cinzas, entre os troncos queimando, você encontra um anel de metal escurecido pelo fogo. Parece valioso.",
+      interacted: false,
+      lore: null,
+    },
+  },
+  {
+    x: 10,
+    y: 8,
+    detail: {
+      name: "Piso Escorregadio",
+      description:
+        "O chão está coberto por uma fina camada de musgo molhado. A umidade constante torna cada passo uma aposta.",
+      detailImageUrl: null,
+      difficulty: "Terreno Difícil",
+      elevation: -1,
+      effect: "Escorregadio: DC 12 DES ou cai",
+      perception: {
+        dc: 10,
+        description: "O brilho na superfície indica que o chão está extremamente escorregadio.",
+        passed: null,
+      },
+      investigation: null,
+      isInteractable: false,
+      interactionLabel: null,
+      interactionResult: null,
+      interacted: false,
+      lore: null,
+    },
+  },
+];

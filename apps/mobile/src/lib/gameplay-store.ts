@@ -102,6 +102,30 @@ export interface OnlinePlayer {
 
 export type PanelType = "chat" | "dice" | "sheet" | "gmtools" | null;
 
+// ─── Terrain Detail Types ───────────────────────────────
+
+export interface TerrainDetailData {
+  name: string;
+  description: string;
+  detailImageUrl: string | null;
+  difficulty: string;
+  elevation: number;
+  effect: string | null;
+  perception: { dc: number; description: string; passed: boolean | null } | null;
+  investigation: { dc: number; description: string; investigated: boolean; passed: boolean | null } | null;
+  isInteractable: boolean;
+  interactionLabel: string | null;
+  interactionResult: string | null;
+  interacted: boolean;
+  lore: string | null;
+}
+
+export interface TerrainTileState {
+  x: number;
+  y: number;
+  detail: TerrainDetailData;
+}
+
 // ─── GM Tool Sub-Modal Types ────────────────────────────
 
 export type GMToolView =
@@ -285,6 +309,10 @@ export interface GameplayStore {
   viewingType: "player" | "npc" | null;
   gmNotes: Record<string, string>;
 
+  // Terrain Interaction
+  terrainTiles: TerrainTileState[];
+  viewingTerrainTile: TerrainTileState | null;
+
   // ─── Actions ───────────────────────────────────────
 
   // Viewport
@@ -368,6 +396,12 @@ export interface GameplayStore {
   updateGMNote: (characterId: string, note: string) => void;
   updateTokenConditions: (tokenId: string, conditions: string[]) => void;
 
+  // Terrain Interaction
+  openTerrainDetail: (tile: TerrainTileState) => void;
+  closeTerrainDetail: () => void;
+  investigateTerrain: () => void;
+  interactTerrain: () => void;
+
   // Init
   loadMockData: () => void;
 }
@@ -448,6 +482,10 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   viewingTokenId: null,
   viewingType: null,
   gmNotes: {},
+
+  // Terrain Interaction
+  terrainTiles: [],
+  viewingTerrainTile: null,
 
   // ─── Actions ───────────────────────────────────────
 
@@ -785,6 +823,49 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
         tokens: {
           ...s.tokens,
           [tokenId]: { ...token, conditions },
+        },
+      };
+    }),
+
+  // Terrain Interaction
+  openTerrainDetail: (tile) =>
+    set({
+      viewingTerrainTile: tile,
+      activePanel: null,
+    }),
+
+  closeTerrainDetail: () => set({ viewingTerrainTile: null }),
+
+  investigateTerrain: () =>
+    set((s) => {
+      const tile = s.viewingTerrainTile;
+      if (!tile?.detail.investigation) return s;
+      // Simulate a d20 roll + modifier
+      const roll = Math.floor(Math.random() * 20) + 1 + 3;
+      const passed = roll >= tile.detail.investigation.dc;
+      return {
+        viewingTerrainTile: {
+          ...tile,
+          detail: {
+            ...tile.detail,
+            investigation: {
+              ...tile.detail.investigation,
+              investigated: true,
+              passed,
+            },
+          },
+        },
+      };
+    }),
+
+  interactTerrain: () =>
+    set((s) => {
+      const tile = s.viewingTerrainTile;
+      if (!tile?.detail.isInteractable) return s;
+      return {
+        viewingTerrainTile: {
+          ...tile,
+          detail: { ...tile.detail, interacted: true },
         },
       };
     }),
