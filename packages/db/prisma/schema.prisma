@@ -80,6 +80,7 @@ model User {
   characters     Character[]
   messages       Message[]
   diceRolls      DiceRoll[]
+  createdMaps    Map[]            @relation("createdMaps")
 }
 
 model Session {
@@ -159,23 +160,36 @@ model CharacterTemplate {
 }
 
 model Map {
-  id       String   @id @default(cuid())
-  name     String
-  imageUrl String
-  gridType GridType @default(SQUARE)
-  gridSize Int      @default(50)
-  width    Int
-  height   Int
+  id          String   @id @default(cuid())
+  name        String
+  imageUrl    String?
+  gridType    GridType @default(SQUARE)
+  gridSize    Int      @default(50)
+  tileSize    Int      @default(70)
+  width       Int
+  height      Int
+  gridScale   String   @default("5 pés")
+  biome       String   @default("dungeon")
+  ambiance    String   @default("dark")
+  description String   @default("")
+  thumbnailUrl String?
+  backgroundImage String?
+  settings    Json     @default("{\"enableAutoLighting\":false,\"enableTerrainInteraction\":true,\"defaultFogState\":\"ALL_HIDDEN\"}")
+  layerData   Json     @default("{}")
+  creatorId   String?
 
-  sessionId String
-  createdAt DateTime @default(now())
+  sessionId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  session  Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session  Session?   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  creator  User?      @relation("createdMaps", fields: [creatorId], references: [id])
   tokens   Token[]
   fogAreas FogArea[]
   layers   MapLayer[]
 
   @@index([sessionId])
+  @@index([creatorId])
 }
 
 model Token {
