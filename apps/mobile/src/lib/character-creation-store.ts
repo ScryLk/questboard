@@ -39,6 +39,24 @@ export interface CharacterAbilitiesState {
   standardArrayAssignment: Record<AbilityKey, number | null>;
 }
 
+export interface CharacterBackgroundState {
+  backgroundId: string | null;
+}
+
+export interface CharacterEquipmentState {
+  choices: Record<string, string>;
+  useGold: boolean;
+}
+
+export interface CharacterRoleplayState {
+  personalityTraits: string[];
+  ideal: string;
+  bond: string;
+  flaw: string;
+  backstory: string;
+  appearance: string;
+}
+
 export interface CharacterCreationState {
   systemId: string | null;
   currentStep: number;
@@ -48,6 +66,9 @@ export interface CharacterCreationState {
   race: CharacterRaceState;
   class_: CharacterClassState;
   abilities: CharacterAbilitiesState;
+  background: CharacterBackgroundState;
+  equipment: CharacterEquipmentState;
+  roleplay: CharacterRoleplayState;
 
   setSystem: (systemId: string) => void;
   setStep: (step: number) => void;
@@ -56,6 +77,10 @@ export interface CharacterCreationState {
   updateClass: (data: Partial<CharacterClassState>) => void;
   updateAbilities: (data: Partial<CharacterAbilitiesState>) => void;
   setAbilityScore: (ability: AbilityKey, value: number) => void;
+  updateBackground: (data: Partial<CharacterBackgroundState>) => void;
+  updateEquipment: (data: Partial<CharacterEquipmentState>) => void;
+  setEquipmentChoice: (choiceId: string, optionId: string) => void;
+  updateRoleplay: (data: Partial<CharacterRoleplayState>) => void;
   reset: () => void;
 }
 
@@ -94,13 +119,31 @@ const INITIAL_ABILITIES: CharacterAbilitiesState = {
   },
 };
 
+const INITIAL_BACKGROUND: CharacterBackgroundState = {
+  backgroundId: null,
+};
+
+const INITIAL_EQUIPMENT: CharacterEquipmentState = {
+  choices: {},
+  useGold: false,
+};
+
+const INITIAL_ROLEPLAY: CharacterRoleplayState = {
+  personalityTraits: [],
+  ideal: "",
+  bond: "",
+  flaw: "",
+  backstory: "",
+  appearance: "",
+};
+
 // ─── Store ───────────────────────────────────────────────
 
 export const useCharacterCreationStore = create<CharacterCreationState>(
   (set) => ({
     systemId: null,
     currentStep: 0,
-    totalSteps: 5,
+    totalSteps: 8,
 
     identity: { ...INITIAL_IDENTITY },
     race: { ...INITIAL_RACE },
@@ -110,6 +153,9 @@ export const useCharacterCreationStore = create<CharacterCreationState>(
       baseScores: { ...INITIAL_ABILITIES.baseScores },
       standardArrayAssignment: { ...INITIAL_ABILITIES.standardArrayAssignment },
     },
+    background: { ...INITIAL_BACKGROUND },
+    equipment: { ...INITIAL_EQUIPMENT, choices: {} },
+    roleplay: { ...INITIAL_ROLEPLAY, personalityTraits: [] },
 
     setSystem: (systemId) => set({ systemId, currentStep: 1 }),
 
@@ -143,6 +189,29 @@ export const useCharacterCreationStore = create<CharacterCreationState>(
         },
       })),
 
+    updateBackground: (data) =>
+      set((state) => ({
+        background: { ...state.background, ...data },
+      })),
+
+    updateEquipment: (data) =>
+      set((state) => ({
+        equipment: { ...state.equipment, ...data },
+      })),
+
+    setEquipmentChoice: (choiceId, optionId) =>
+      set((state) => ({
+        equipment: {
+          ...state.equipment,
+          choices: { ...state.equipment.choices, [choiceId]: optionId },
+        },
+      })),
+
+    updateRoleplay: (data) =>
+      set((state) => ({
+        roleplay: { ...state.roleplay, ...data },
+      })),
+
     reset: () =>
       set({
         systemId: null,
@@ -157,6 +226,9 @@ export const useCharacterCreationStore = create<CharacterCreationState>(
             ...INITIAL_ABILITIES.standardArrayAssignment,
           },
         },
+        background: { ...INITIAL_BACKGROUND },
+        equipment: { ...INITIAL_EQUIPMENT, choices: {} },
+        roleplay: { ...INITIAL_ROLEPLAY, personalityTraits: [] },
       }),
   }),
 );
