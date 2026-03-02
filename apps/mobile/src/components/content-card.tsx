@@ -5,16 +5,16 @@ import type { NewsItem } from "../lib/mock-data";
 import { TYPE_LABELS } from "../lib/mock-data";
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  "🏰": Castle,
-  "🐉": Flame,
-  "⭐": Star,
-  "🌪️": Sparkles,
-  "🎭": Theater,
-  "🍺": BookOpen,
-  "🗺️": Map,
-  "⚔️": Castle,
-  "🎉": Star,
-  "💀": Skull,
+  castle: Castle,
+  flame: Flame,
+  star: Star,
+  sparkles: Sparkles,
+  drama: Theater,
+  tavern: BookOpen,
+  map: Map,
+  swords: Castle,
+  celebration: Star,
+  skull: Skull,
 };
 
 interface ContentCardProps {

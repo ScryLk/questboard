@@ -1,21 +1,19 @@
-import { memo, useCallback, useRef, useState } from "react";
-import {
-  TextInput,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  View,
-} from "react-native";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { TextInput, StyleSheet, View } from "react-native";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetFlatList,
+  BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import type { BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Send, Lock, Crown } from "lucide-react-native";
+import type {
+  BottomSheetBackdropProps,
+  BottomSheetHandleProps,
+} from "@gorhom/bottom-sheet";
+import { Send, Lock, Crown, X } from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
 import type { ChatMessage, ChatChannel } from "../../lib/gameplay-store";
+import { TokenIcon } from "./token-icon";
 
 // ─── Channel Selector ────────────────────────────────────
 
@@ -25,6 +23,16 @@ const CHANNELS: { key: ChatChannel; label: string }[] = [
   { key: "WHISPER", label: "Sussurro" },
   { key: "GM_ONLY", label: "GM" },
 ];
+
+// ─── Custom Handle ────────────────────────────────────────
+
+const SheetHandle = memo(function SheetHandle(_: BottomSheetHandleProps) {
+  return (
+    <View style={styles.handleContainer}>
+      <View style={styles.handleBar} />
+    </View>
+  );
+});
 
 // ─── Message Bubble ──────────────────────────────────────
 
@@ -83,7 +91,7 @@ const MessageBubble = memo(function MessageBubble({
         gap={4}
       >
         <XStack alignItems="center" gap={6}>
-          <Text fontSize={16}>{message.senderEmoji}</Text>
+          <TokenIcon name={message.senderIcon} size={16} color="#9090A0" />
           <Text fontSize={12} fontWeight="600" color="#E8E8ED">
             {message.senderName}
           </Text>
@@ -125,9 +133,9 @@ const MessageBubble = memo(function MessageBubble({
             : "transparent"
       }
     >
-      <Text fontSize={18} marginTop={2}>
-        {message.senderEmoji}
-      </Text>
+      <Stack marginTop={2}>
+        <TokenIcon name={message.senderIcon} size={18} color="#9090A0" />
+      </Stack>
       <YStack flex={1} gap={2}>
         <XStack alignItems="center" gap={6}>
           <Text fontSize={12} fontWeight="600" color="#E8E8ED">
@@ -164,9 +172,8 @@ const MessageBubble = memo(function MessageBubble({
 
 // ─── Chat Panel ──────────────────────────────────────────
 
-function ChatPanelInner() {
-  const insets = useSafeAreaInsets();
-  const sheetRef = useRef<BottomSheet>(null);
+function ChatPanelInner({ isOpen }: { isOpen: boolean }) {
+  const bottomSheetRef = useRef<BottomSheet>(null);
   const [inputText, setInputText] = useState("");
 
   const messages = useGameplayStore((s) => s.messages);
@@ -176,7 +183,14 @@ function ChatPanelInner() {
   const setActivePanel = useGameplayStore((s) => s.setActivePanel);
   const clearUnread = useGameplayStore((s) => s.clearUnread);
 
-  // Filter messages by channel (SYSTEM shows everywhere)
+  useEffect(() => {
+    if (isOpen) {
+      bottomSheetRef.current?.snapToIndex(1);
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [isOpen]);
+
   const filtered = messages.filter(
     (m) => m.channel === activeChannel || m.channel === "SYSTEM",
   );
@@ -189,7 +203,7 @@ function ChatPanelInner() {
       type: activeChannel === "IN_CHARACTER" ? "in_character" : "text",
       content: inputText.trim(),
       senderName: "Você",
-      senderEmoji: "👤",
+      senderIcon: "user",
       timestamp: new Date().toLocaleTimeString("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
@@ -199,9 +213,14 @@ function ChatPanelInner() {
     setInputText("");
   }, [inputText, activeChannel, addMessage]);
 
-  const handleClose = useCallback(() => {
-    setActivePanel(null);
-  }, [setActivePanel]);
+  const handleSheetChange = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        setActivePanel(null);
+      }
+    },
+    [setActivePanel],
+  );
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
@@ -210,124 +229,122 @@ function ChatPanelInner() {
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         pressBehavior="close"
-        opacity={0.4}
+        opacity={0.5}
       />
     ),
     [],
   );
 
-  const renderHeader = useCallback(
-    () => (
-      <XStack paddingHorizontal={12} gap={6} marginBottom={8}>
-        {CHANNELS.map((ch) => {
-          const isActive = activeChannel === ch.key;
-          return (
-            <Stack
-              key={ch.key}
-              paddingHorizontal={12}
-              paddingVertical={6}
-              borderRadius={8}
-              backgroundColor={isActive ? "#6C5CE7" : "#1A1A24"}
-              pressStyle={{ opacity: 0.7 }}
-              onPress={() => {
-                setActiveChannel(ch.key);
-                clearUnread();
-              }}
-            >
-              <Text
-                fontSize={12}
-                fontWeight="600"
-                color={isActive ? "white" : "#5A5A6E"}
-              >
-                {ch.label}
-              </Text>
-            </Stack>
-          );
-        })}
-      </XStack>
-    ),
-    [activeChannel, setActiveChannel, clearUnread],
-  );
-
-  const renderFooter = useCallback(
-    () => (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <XStack
-          paddingHorizontal={12}
-          paddingVertical={8}
-          gap={8}
-          borderTopWidth={StyleSheet.hairlineWidth}
-          borderTopColor="#2A2A35"
-          alignItems="center"
-        >
-          <Stack
-            flex={1}
-            backgroundColor="#12121A"
-            borderRadius={10}
-            borderWidth={1}
-            borderColor="#2A2A35"
-            paddingHorizontal={12}
-            paddingVertical={8}
-          >
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Enviar mensagem..."
-              placeholderTextColor="#5A5A6E"
-              style={styles.input}
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-            />
-          </Stack>
-          <Stack
-            width={38}
-            height={38}
-            borderRadius={19}
-            backgroundColor={inputText.trim() ? "#6C5CE7" : "#1A1A24"}
-            alignItems="center"
-            justifyContent="center"
-            pressStyle={{ opacity: 0.7 }}
-            onPress={handleSend}
-          >
-            <Send size={16} color={inputText.trim() ? "white" : "#5A5A6E"} />
-          </Stack>
-        </XStack>
-      </KeyboardAvoidingView>
-    ),
-    [inputText, handleSend],
-  );
-
   return (
     <BottomSheet
-      ref={sheetRef}
-      snapPoints={["35%", "60%", "88%"]}
-      index={0}
-      bottomInset={56 + insets.bottom}
-      enablePanDownToClose
+      ref={bottomSheetRef}
+      snapPoints={["45%", "90%"]}
+      index={-1}
+      bottomInset={0}
+      enablePanDownToClose={true}
       enableContentPanningGesture={false}
       enableHandlePanningGesture={true}
       enableOverDrag={true}
       enableDynamicSizing={false}
-      overDragResistanceFactor={2.5}
-      onClose={handleClose}
+      animateOnMount={true}
+      onChange={handleSheetChange}
       backdropComponent={renderBackdrop}
+      handleComponent={SheetHandle}
       backgroundStyle={styles.sheetBg}
-      handleIndicatorStyle={styles.handle}
     >
-      <View style={styles.sheetContent}>
-        {renderHeader()}
+      <BottomSheetView style={styles.outerContainer}>
+        {/* ─── Fixed Header: Channel Tabs + Close ──── */}
+        <View style={styles.headerSection}>
+          <XStack paddingHorizontal={12} gap={6} alignItems="center">
+            {CHANNELS.map((ch) => {
+              const isActive = activeChannel === ch.key;
+              return (
+                <Stack
+                  key={ch.key}
+                  paddingHorizontal={12}
+                  paddingVertical={6}
+                  borderRadius={8}
+                  backgroundColor={isActive ? "#6C5CE7" : "#1A1A24"}
+                  pressStyle={{ opacity: 0.7 }}
+                  onPress={() => {
+                    setActiveChannel(ch.key);
+                    clearUnread();
+                  }}
+                >
+                  <Text
+                    fontSize={12}
+                    fontWeight="600"
+                    color={isActive ? "white" : "#5A5A6E"}
+                  >
+                    {ch.label}
+                  </Text>
+                </Stack>
+              );
+            })}
+            <Stack flex={1} />
+            <Stack
+              width={32}
+              height={32}
+              borderRadius={16}
+              backgroundColor="#1A1A24"
+              alignItems="center"
+              justifyContent="center"
+              pressStyle={{ opacity: 0.7 }}
+              onPress={() => setActivePanel(null)}
+            >
+              <X size={16} color="#5A5A6E" />
+            </Stack>
+          </XStack>
+        </View>
+
+        {/* ─── Messages ────────────────────────────── */}
         <BottomSheetFlatList
           data={filtered}
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => <MessageBubble message={item} />}
-          contentContainerStyle={{ paddingBottom: 80 }}
-          style={{ flex: 1 }}
+          contentContainerStyle={styles.listContent}
+          style={styles.listFlex}
           nestedScrollEnabled={true}
         />
-        {renderFooter()}
-      </View>
+
+        {/* ─── Sticky Input Footer ─────────────────── */}
+        <View style={styles.inputFooter}>
+          <XStack gap={8} alignItems="center">
+            <Stack
+              flex={1}
+              height={40}
+              backgroundColor="#0F0F12"
+              borderRadius={20}
+              borderWidth={1}
+              borderColor="#2A2A35"
+              justifyContent="center"
+              paddingHorizontal={16}
+            >
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Enviar mensagem..."
+                placeholderTextColor="#5A5A6E"
+                style={styles.input}
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
+              />
+            </Stack>
+            <Stack
+              width={40}
+              height={40}
+              borderRadius={20}
+              backgroundColor={inputText.trim() ? "#6C5CE7" : "#1A1A24"}
+              alignItems="center"
+              justifyContent="center"
+              pressStyle={{ opacity: 0.7 }}
+              onPress={handleSend}
+            >
+              <Send size={18} color={inputText.trim() ? "white" : "#5A5A6E"} />
+            </Stack>
+          </XStack>
+        </View>
+      </BottomSheetView>
     </BottomSheet>
   );
 }
@@ -336,21 +353,45 @@ export const ChatPanel = memo(ChatPanelInner);
 
 const styles = StyleSheet.create({
   sheetBg: {
-    backgroundColor: "#0F0F12",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: "#16161C",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#2A2A35",
   },
-  handle: {
-    backgroundColor: "#5A5A6E",
+  handleContainer: {
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#16161C",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  handleBar: {
     width: 40,
     height: 4,
     borderRadius: 2,
+    backgroundColor: "#5A5A6E",
   },
-  sheetContent: {
+  outerContainer: {
     flex: 1,
-    paddingTop: 4,
+  },
+  headerSection: {
+    paddingVertical: 8,
+  },
+  listFlex: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  inputFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#1E1E2A",
+    backgroundColor: "#16161C",
   },
   input: {
     color: "#E8E8ED",

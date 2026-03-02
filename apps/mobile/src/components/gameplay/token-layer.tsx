@@ -1,14 +1,19 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useContext } from "react";
 import { StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withDelay,
+  withTiming,
   runOnJS,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { Text } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { TokenIcon } from "./token-icon";
+import { useMapPanRef } from "./map-canvas";
 import type { TokenState } from "../../lib/gameplay-store";
 
 // ─── Single Token ────────────────────────────────────────
@@ -26,21 +31,38 @@ const TokenItem = memo(function TokenItem({
   isSelected,
   isGM,
 }: TokenProps) {
-  const selectToken = useGameplayStore((s) => s.selectToken);
   const moveToken = useGameplayStore((s) => s.moveToken);
   const showContextMenu = useGameplayStore((s) => s.showContextMenu);
+  const myTokenId = useGameplayStore((s) => s.myTokenId);
+  const mapPanRef = useMapPanRef();
 
   const size = token.size * gridSize;
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const isDragging = useSharedValue(false);
+  const pressScale = useSharedValue(1);
+  const borderHighlight = useSharedValue(0);
 
   // If not visible and not GM, don't render
   if (!token.visible && !isGM) return null;
 
-  const handleSelect = useCallback(() => {
-    selectToken(token.id);
-  }, [token.id, selectToken]);
+  const handleTokenPress = useCallback(() => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (_) {
+      // Haptics not available (e.g. simulator)
+    }
+    const store = useGameplayStore.getState();
+
+    if (token.id === myTokenId) {
+      // My token → open SheetPanel
+      store.closeAllPanels();
+      store.setActivePanel("sheet");
+    } else {
+      // Other token → openCharacterSheet (already closes panels internally)
+      store.openCharacterSheet(token.id);
+    }
+  }, [token.id, myTokenId]);
 
   const handleDrop = useCallback(
     (finalX: number, finalY: number) => {
@@ -59,7 +81,13 @@ const TokenItem = memo(function TokenItem({
   );
 
   const tapGesture = Gesture.Tap().onEnd(() => {
-    runOnJS(handleSelect)();
+    // Scale press feedback
+    pressScale.value = withSpring(0.92, { damping: 15, stiffness: 300 });
+    pressScale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 200 }));
+    // Accent border flash
+    borderHighlight.value = 1;
+    borderHighlight.value = withDelay(300, withTiming(0, { duration: 200 }));
+    runOnJS(handleTokenPress)();
   });
 
   const longPressGesture = Gesture.LongPress()
@@ -86,6 +114,13 @@ const TokenItem = memo(function TokenItem({
       offsetY.value = withSpring(0);
     });
 
+  // Block map pan when interacting with token
+  if (mapPanRef) {
+    tapGesture.blocksExternalGesture(mapPanRef);
+    longPressGesture.blocksExternalGesture(mapPanRef);
+    dragGesture.blocksExternalGesture(mapPanRef);
+  }
+
   const composed = Gesture.Race(
     dragGesture,
     Gesture.Simultaneous(tapGesture, longPressGesture),
@@ -95,9 +130,13 @@ const TokenItem = memo(function TokenItem({
     transform: [
       { translateX: offsetX.value },
       { translateY: offsetY.value },
-      { scale: isDragging.value ? 1.15 : 1 },
+      { scale: isDragging.value ? 1.15 : pressScale.value },
     ],
     zIndex: isDragging.value ? 100 : 1,
+  }));
+
+  const borderStyle = useAnimatedStyle(() => ({
+    borderColor: borderHighlight.value > 0.5 ? "#6C5CE7" : (token.layer === "npc" ? "#FF6B6B" : token.color),
   }));
 
   const pixelX = token.x * gridSize;
@@ -144,15 +183,13 @@ const TokenItem = memo(function TokenItem({
               width: size - 4,
               height: size - 4,
               borderRadius: (size - 4) / 2,
-              borderColor: token.layer === "npc" ? "#FF6B6B" : token.color,
               borderStyle: isHidden ? "dashed" : "solid",
               opacity: isHidden ? 0.5 : 1,
             },
+            borderStyle,
           ]}
         >
-          <Text fontSize={size * 0.4} textAlign="center">
-            {token.emoji}
-          </Text>
+          <TokenIcon name={token.icon} size={size * 0.4} color="#E8E8ED" />
         </Animated.View>
 
         {/* Name label */}

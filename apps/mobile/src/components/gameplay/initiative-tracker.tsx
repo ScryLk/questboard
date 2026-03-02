@@ -1,9 +1,10 @@
-import { memo, useRef, useEffect } from "react";
+import { memo, useRef, useEffect, useCallback } from "react";
 import { ScrollView, StyleSheet, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronRight } from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { TokenIcon } from "./token-icon";
 
 function InitiativeTrackerInner() {
   const insets = useSafeAreaInsets();
@@ -13,10 +14,19 @@ function InitiativeTrackerInner() {
   const currentTurnIndex = useGameplayStore((s) => s.currentTurnIndex);
   const isGM = useGameplayStore((s) => s.isGM);
   const myPlayerId = useGameplayStore((s) => s.myPlayerId);
+  const myTokenId = useGameplayStore((s) => s.myTokenId);
   const tokens = useGameplayStore((s) => s.tokens);
   const nextTurn = useGameplayStore((s) => s.nextTurn);
+  const activePanel = useGameplayStore((s) => s.activePanel);
+  const viewingType = useGameplayStore((s) => s.viewingType);
+  const openCharacterSheet = useGameplayStore((s) => s.openCharacterSheet);
+  const setActivePanel = useGameplayStore((s) => s.setActivePanel);
+  const closeAllPanels = useGameplayStore((s) => s.closeAllPanels);
 
   const slideAnim = useRef(new Animated.Value(-80)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  const isHidden = !!(activePanel || viewingType);
 
   useEffect(() => {
     Animated.spring(slideAnim, {
@@ -27,15 +37,38 @@ function InitiativeTrackerInner() {
     }).start();
   }, [combatActive, slideAnim]);
 
+  // Fade out when any panel or character sheet is open
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: isHidden ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isHidden, opacityAnim]);
+
+  const handleAvatarPress = useCallback(
+    (tokenId: string) => {
+      if (tokenId === myTokenId) {
+        closeAllPanels();
+        setActivePanel("sheet");
+      } else {
+        openCharacterSheet(tokenId);
+      }
+    },
+    [myTokenId, closeAllPanels, setActivePanel, openCharacterSheet],
+  );
+
   if (!combatActive || participants.length === 0) return null;
 
   return (
     <Animated.View
+      pointerEvents={isHidden ? "none" : "auto"}
       style={[
         styles.container,
         {
           top: 48 + insets.top,
           transform: [{ translateY: slideAnim }],
+          opacity: opacityAnim,
         },
       ]}
     >
@@ -85,8 +118,10 @@ function InitiativeTrackerInner() {
                 }
                 alignItems="center"
                 justifyContent="center"
+                onPress={() => handleAvatarPress(p.tokenId)}
+                pressStyle={{ opacity: 0.7, scale: 0.95 }}
               >
-                <Text fontSize={isCurrent ? 20 : 16}>{p.emoji}</Text>
+                <TokenIcon name={p.icon} size={isCurrent ? 20 : 16} color={isCurrent ? "#E8E8ED" : "#9090A0"} />
               </Stack>
 
               <Text

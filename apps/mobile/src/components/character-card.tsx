@@ -4,9 +4,9 @@ import type { MockCharacter } from "../lib/mock-data";
 import { SYSTEM_LABELS } from "../lib/mock-data";
 
 const AVATAR_ICON_MAP: Record<string, typeof Wand2> = {
-  "🧙": Wand2,
-  "⚔️": Sword,
-  "🗡️": Crosshair,
+  wand: Wand2,
+  sword: Sword,
+  crosshair: Crosshair,
 };
 
 function getHpColor(ratio: number): string {

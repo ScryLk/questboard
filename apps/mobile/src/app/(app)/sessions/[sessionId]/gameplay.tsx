@@ -14,13 +14,22 @@ import { ChatPanel } from "../../../../components/gameplay/chat-panel";
 import { DicePanel } from "../../../../components/gameplay/dice-panel";
 import { SheetPanel } from "../../../../components/gameplay/sheet-panel";
 import { GMToolsPanel } from "../../../../components/gameplay/gm-tools-panel";
+import {
+  TokenManagerModal,
+  CombatManagerModal,
+  SceneCardModal,
+  SoundtrackModal,
+} from "../../../../components/gameplay/gm-tools";
 import { DiceResultOverlay } from "../../../../components/gameplay/dice-result-overlay";
 import { SceneCardOverlay } from "../../../../components/gameplay/scene-card-overlay";
 import { TokenContextMenu } from "../../../../components/gameplay/token-context-menu";
+import { PlayerSheetModal } from "../../../../components/gameplay/player-sheet-modal";
+import { NPCCardModal } from "../../../../components/gameplay/npc-card-modal";
 
 export default function GameplayScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const activePanel = useGameplayStore((s) => s.activePanel);
+  const activeGMToolView = useGameplayStore((s) => s.activeGMToolView);
   const isGM = useGameplayStore((s) => s.isGM);
   const combatActive = useGameplayStore((s) => s.combatActive);
 
@@ -42,11 +51,25 @@ export default function GameplayScreen() {
       {combatActive && <InitiativeTracker />}
       <QuickActionBar />
 
-      {/* Layer 4: Panels */}
-      {activePanel === "chat" && <ChatPanel />}
-      {activePanel === "dice" && <DicePanel />}
-      {activePanel === "sheet" && <SheetPanel />}
-      {activePanel === "gmtools" && isGM && <GMToolsPanel />}
+      {/* Layer 4: Panels (always rendered, controlled via isOpen) */}
+      <ChatPanel isOpen={activePanel === "chat"} />
+      <DicePanel isOpen={activePanel === "dice"} />
+      <SheetPanel isOpen={activePanel === "sheet"} />
+      {isGM && <GMToolsPanel isOpen={activePanel === "gmtools"} />}
+
+      {/* GM Tool Sub-Modals */}
+      {isGM && (
+        <>
+          <TokenManagerModal isOpen={activeGMToolView === "token-manager"} />
+          <CombatManagerModal isOpen={activeGMToolView === "combat-manager"} />
+          <SceneCardModal isOpen={activeGMToolView === "scene-card"} />
+          <SoundtrackModal isOpen={activeGMToolView === "soundtrack"} />
+        </>
+      )}
+
+      {/* Character Sheet Modals */}
+      <PlayerSheetModal />
+      <NPCCardModal />
 
       {/* Context Menu */}
       <TokenContextMenu />

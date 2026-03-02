@@ -1,7 +1,8 @@
 import { useEffect, useRef, memo } from "react";
 import { Animated, StyleSheet, Pressable } from "react-native";
-import { Text, YStack } from "tamagui";
+import { Text, XStack, YStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { TokenIcon } from "./token-icon";
 
 function DiceResultOverlayInner() {
   const visible = useGameplayStore((s) => s.diceResultVisible);
@@ -120,9 +121,12 @@ function DiceResultOverlayInner() {
           minWidth={200}
         >
           {/* Roller */}
-          <Text fontSize={14} color="#9090A0">
-            {result.rollerEmoji} {result.rollerName}
-          </Text>
+          <XStack alignItems="center" gap={6}>
+            <TokenIcon name={result.rollerIcon} size={14} color="#9090A0" />
+            <Text fontSize={14} color="#9090A0">
+              {result.rollerName}
+            </Text>
+          </XStack>
 
           {/* Label */}
           <Text fontSize={13} fontWeight="600" color="#E8E8ED">

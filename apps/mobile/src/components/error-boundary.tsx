@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { AlertTriangle } from "lucide-react-native";
 import { Stack, Text, YStack } from "tamagui";
 import { Button } from "./button";
 
@@ -53,7 +54,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             justifyContent="center"
             marginBottom={16}
           >
-            <Text fontSize={28}>⚠️</Text>
+            <AlertTriangle size={28} color="#FF6B6B" />
           </Stack>
 
           <Text

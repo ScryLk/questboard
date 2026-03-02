@@ -7,6 +7,7 @@ import {
   Skull,
   Dice5,
   Settings,
+  Rocket,
 } from "lucide-react-native";
 
 // ─── Shared ──────────────────────────────────────────────
@@ -20,13 +21,13 @@ export const SYSTEM_LABELS: Record<string, string> = {
   starfinder: "Starfinder",
 };
 
-export const SYSTEM_ICONS: Record<string, string> = {
-  dnd5e: "⚔️",
-  tormenta20: "🌪️",
-  coc7: "🔍",
-  vampireV5: "🧛",
-  generic: "🎲",
-  starfinder: "🚀",
+export const SYSTEM_ICONS: Record<string, LucideIcon> = {
+  dnd5e: Sword,
+  tormenta20: Flame,
+  coc7: Search,
+  vampireV5: Moon,
+  generic: Dice5,
+  starfinder: Rocket,
 };
 
 // ─── Tab: Novidades ──────────────────────────────────────
@@ -55,7 +56,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Crie mundos épicos",
     subtitle: "Dicas para mestres construírem cenários imersivos para suas mesas.",
     accentColor: "#6C5CE7",
-    icon: "🏰",
+    icon: "castle",
     type: "tip",
   },
   {
@@ -63,7 +64,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Arte: Dragão Ancestral",
     subtitle: "Ilustração da comunidade por @elvenartist.",
     accentColor: "#E94560",
-    icon: "🐉",
+    icon: "flame",
     type: "art",
   },
   {
@@ -71,7 +72,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Sessão destaque da semana",
     subtitle: "\"A Maldição de Strahd\" com 3 sessões ao vivo essa semana!",
     accentColor: "#00B894",
-    icon: "⭐",
+    icon: "star",
     type: "highlight",
   },
   {
@@ -79,7 +80,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Novo sistema: Tormenta20",
     subtitle: "Suporte completo para fichas e dados de Tormenta20.",
     accentColor: "#FDCB6E",
-    icon: "🌪️",
+    icon: "sparkles",
     type: "news",
   },
   {
@@ -87,7 +88,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Guia de roleplay",
     subtitle: "Como interpretar personagens memoráveis em 5 passos.",
     accentColor: "#A29BFE",
-    icon: "🎭",
+    icon: "drama",
     type: "tip",
   },
   {
@@ -95,7 +96,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Arte: Taverna do Grifo",
     subtitle: "Um ponto de encontro clássico para aventureiros.",
     accentColor: "#74B9FF",
-    icon: "🍺",
+    icon: "tavern",
     type: "art",
   },
   {
@@ -103,7 +104,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Mapas interativos",
     subtitle: "Fog of war e tokens agora disponíveis para todas as mesas.",
     accentColor: "#FF6B6B",
-    icon: "🗺️",
+    icon: "map",
     type: "news",
   },
   {
@@ -111,7 +112,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Combate narrativo",
     subtitle: "Técnicas para tornar combates mais cinematográficos.",
     accentColor: "#636E72",
-    icon: "⚔️",
+    icon: "swords",
     type: "tip",
   },
   {
@@ -119,7 +120,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Comunidade crescendo!",
     subtitle: "Mais de 500 mestres já criaram sessões no QuestBoard.",
     accentColor: "#00B894",
-    icon: "🎉",
+    icon: "celebration",
     type: "highlight",
   },
   {
@@ -127,7 +128,7 @@ export const NEWS_ITEMS: NewsItem[] = [
     title: "Arte: Necromante Sombrio",
     subtitle: "Concept art para sua próxima campanha de horror.",
     accentColor: "#4A1942",
-    icon: "💀",
+    icon: "skull",
     type: "art",
   },
 ];
@@ -438,7 +439,7 @@ export const MY_CHARACTERS: MockCharacter[] = [
     currentHp: 45,
     maxHp: 52,
     system: "dnd5e",
-    avatar: "🧙",
+    avatar: "wand",
   },
   {
     id: "char-2",
@@ -448,7 +449,7 @@ export const MY_CHARACTERS: MockCharacter[] = [
     currentHp: 62,
     maxHp: 62,
     system: "dnd5e",
-    avatar: "⚔️",
+    avatar: "sword",
   },
   {
     id: "char-3",
@@ -458,7 +459,7 @@ export const MY_CHARACTERS: MockCharacter[] = [
     currentHp: 18,
     maxHp: 28,
     system: "tormenta20",
-    avatar: "🗡️",
+    avatar: "crosshair",
   },
 ];
 

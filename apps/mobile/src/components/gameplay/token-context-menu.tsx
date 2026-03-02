@@ -8,8 +8,9 @@ import {
   Dices,
   Crosshair,
 } from "lucide-react-native";
-import { Stack, Text, YStack } from "tamagui";
+import { Stack, Text, XStack, YStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { TokenIcon } from "./token-icon";
 
 interface MenuItem {
   label: string;
@@ -28,6 +29,7 @@ function TokenContextMenuInner() {
   const removeToken = useGameplayStore((s) => s.removeToken);
   const showDiceResult = useGameplayStore((s) => s.showDiceResult);
   const addMessage = useGameplayStore((s) => s.addMessage);
+  const openCharacterSheet = useGameplayStore((s) => s.openCharacterSheet);
 
   const handleRollInitiative = useCallback(() => {
     if (!tokenId) return;
@@ -37,7 +39,7 @@ function TokenContextMenuInner() {
     const roll = Math.floor(Math.random() * 20) + 1;
     showDiceResult({
       rollerName: token.name,
-      rollerEmoji: token.emoji,
+      rollerIcon: token.icon,
       label: "Iniciativa",
       formula: "1d20",
       rolls: [roll],
@@ -52,7 +54,7 @@ function TokenContextMenuInner() {
       type: "dice_roll",
       content: "Iniciativa",
       senderName: token.name,
-      senderEmoji: token.emoji,
+      senderIcon: token.icon,
       timestamp: new Date().toLocaleTimeString("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
@@ -83,12 +85,23 @@ function TokenContextMenuInner() {
     hideContextMenu();
   }, [tokenId, removeToken, hideContextMenu]);
 
+  const handleViewSheet = useCallback(() => {
+    if (tokenId) openCharacterSheet(tokenId);
+    hideContextMenu();
+  }, [tokenId, openCharacterSheet, hideContextMenu]);
+
   if (!tokenId || !position) return null;
 
   const token = tokens[tokenId];
   if (!token) return null;
 
   const items: MenuItem[] = [
+    {
+      label: "Ver Ficha",
+      Icon: Eye,
+      color: "#6C5CE7",
+      action: handleViewSheet,
+    },
     {
       label: "Rolar Iniciativa",
       Icon: Dices,
@@ -139,9 +152,12 @@ function TokenContextMenuInner() {
           borderBottomWidth={StyleSheet.hairlineWidth}
           borderBottomColor="#2A2A35"
         >
-          <Text fontSize={13} fontWeight="700" color="#E8E8ED">
-            {token.emoji} {token.name}
-          </Text>
+          <XStack alignItems="center" gap={6}>
+            <TokenIcon name={token.icon} size={16} color="#E8E8ED" />
+            <Text fontSize={13} fontWeight="700" color="#E8E8ED">
+              {token.name}
+            </Text>
+          </XStack>
           {token.hp && (
             <Text fontSize={11} color="#5A5A6E">
               PV: {token.hp.current}/{token.hp.max}

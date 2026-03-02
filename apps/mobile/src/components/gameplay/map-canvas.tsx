@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, useRef, type ReactNode } from "react";
 import { Dimensions, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import type { GestureType } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,6 +9,14 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { useGameplayStore } from "../../lib/gameplay-store";
+
+// Context to share the map pan gesture ref with child components (TokenLayer)
+const MapPanRefContext = createContext<React.MutableRefObject<
+  GestureType | undefined
+> | null>(null);
+export function useMapPanRef() {
+  return useContext(MapPanRefContext);
+}
 
 const SCREEN = Dimensions.get("window");
 const MIN_ZOOM = 0.25;
@@ -19,6 +28,7 @@ interface Props {
 
 export function MapCanvas({ children }: Props) {
   const mapImage = useGameplayStore((s) => s.mapImage);
+  const panRef = useRef<GestureType | undefined>(undefined);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -30,6 +40,8 @@ export function MapCanvas({ children }: Props) {
   const savedScale = useSharedValue(1);
 
   const panGesture = Gesture.Pan()
+    .withRef(panRef)
+    .minDistance(10)
     .onStart(() => {
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
@@ -102,7 +114,9 @@ export function MapCanvas({ children }: Props) {
         )}
 
         {/* Overlay layers: grid, tokens, fog */}
-        {children}
+        <MapPanRefContext.Provider value={panRef}>
+          {children}
+        </MapPanRefContext.Provider>
       </Animated.View>
     </GestureDetector>
   );

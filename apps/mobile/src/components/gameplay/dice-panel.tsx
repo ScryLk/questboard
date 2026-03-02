@@ -1,14 +1,25 @@
-import { memo, useCallback, useState } from "react";
-import { TextInput, StyleSheet } from "react-native";
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import type { BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Dices } from "lucide-react-native";
-import { Stack, Text, XStack, YStack } from "tamagui";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
+import type {
+  BottomSheetBackdropProps,
+  BottomSheetHandleProps,
+} from "@gorhom/bottom-sheet";
+import { Text } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
 import { MOCK_DICE_PRESETS } from "../../lib/gameplay-mock-data";
+import { QuickDiceRow } from "./quick-dice-row";
+import { FormulaInput } from "./formula-input";
+import { DicePresets } from "./dice-presets";
+import { VisibilitySelector } from "./visibility-selector";
+import type { DiceVisibility } from "./visibility-selector";
+import { DiceHistory } from "./dice-history";
 
-const QUICK_DICE = ["d4", "d6", "d8", "d10", "d12", "d20"] as const;
+// ─── Dice Helpers ─────────────────────────────────────────
 
 function rollDice(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
@@ -19,10 +30,8 @@ function parseAndRoll(formula: string): {
   total: number;
   formula: string;
 } {
-  // Simple parser: handles NdM+K format
   const match = formula.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
   if (!match) {
-    // Fallback: just roll d20
     const r = rollDice(20);
     return { rolls: [r], total: r, formula: "1d20" };
   }
@@ -42,29 +51,52 @@ function parseAndRoll(formula: string): {
   return { rolls, total: sum + modifier, formula };
 }
 
-function DicePanelInner() {
-  const insets = useSafeAreaInsets();
-  const [customFormula, setCustomFormula] = useState("1d20");
+// ─── Custom Handle ────────────────────────────────────────
+
+const SheetHandle = memo(function SheetHandle(_: BottomSheetHandleProps) {
+  return (
+    <View style={styles.handleContainer}>
+      <View style={styles.handleBar} />
+    </View>
+  );
+});
+
+// ─── Dice Panel ───────────────────────────────────────────
+
+function DicePanelInner({ isOpen }: { isOpen: boolean }) {
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const [visibility, setVisibility] = useState<DiceVisibility>("public");
+
   const showDiceResult = useGameplayStore((s) => s.showDiceResult);
   const addMessage = useGameplayStore((s) => s.addMessage);
   const setActivePanel = useGameplayStore((s) => s.setActivePanel);
+
+  useEffect(() => {
+    if (isOpen) {
+      bottomSheetRef.current?.snapToIndex(0);
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [isOpen]);
 
   const handleRoll = useCallback(
     (formula: string, label?: string) => {
       const result = parseAndRoll(formula);
       const isD20 = formula.match(/d20/i);
-      const isNat20 = isD20 && result.rolls.length === 1 && result.rolls[0] === 20;
-      const isNat1 = isD20 && result.rolls.length === 1 && result.rolls[0] === 1;
+      const isNat20 =
+        !!isD20 && result.rolls.length === 1 && result.rolls[0] === 20;
+      const isNat1 =
+        !!isD20 && result.rolls.length === 1 && result.rolls[0] === 1;
 
       showDiceResult({
         rollerName: "Você",
-        rollerEmoji: "👤",
+        rollerIcon: "user",
         label: label || formula,
         formula: result.formula,
         rolls: result.rolls,
         total: result.total,
-        isNat20: !!isNat20,
-        isNat1: !!isNat1,
+        isNat20,
+        isNat1,
       });
 
       addMessage({
@@ -73,7 +105,7 @@ function DicePanelInner() {
         type: "dice_roll",
         content: label || formula,
         senderName: "Você",
-        senderEmoji: "👤",
+        senderIcon: "user",
         timestamp: new Date().toLocaleTimeString("pt-BR", {
           hour: "2-digit",
           minute: "2-digit",
@@ -83,17 +115,22 @@ function DicePanelInner() {
           rolls: result.rolls,
           total: result.total,
           label,
-          isNat20: !!isNat20,
-          isNat1: !!isNat1,
+          isNat20,
+          isNat1,
         },
       });
     },
     [showDiceResult, addMessage],
   );
 
-  const handleClose = useCallback(() => {
-    setActivePanel(null);
-  }, [setActivePanel]);
+  const handleChange = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        setActivePanel(null);
+      }
+    },
+    [setActivePanel],
+  );
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
@@ -102,7 +139,7 @@ function DicePanelInner() {
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         pressBehavior="close"
-        opacity={0.4}
+        opacity={0.5}
       />
     ),
     [],
@@ -110,119 +147,49 @@ function DicePanelInner() {
 
   return (
     <BottomSheet
-      snapPoints={["30%", "55%"]}
-      index={0}
-      bottomInset={56 + insets.bottom}
-      enablePanDownToClose
-      enableContentPanningGesture={true}
+      ref={bottomSheetRef}
+      snapPoints={["40%", "88%"]}
+      index={-1}
+      bottomInset={0}
+      enablePanDownToClose={true}
+      enableContentPanningGesture={false}
       enableHandlePanningGesture={true}
       enableOverDrag={true}
       enableDynamicSizing={false}
-      overDragResistanceFactor={2.5}
-      onClose={handleClose}
+      animateOnMount={true}
+      onChange={handleChange}
       backdropComponent={renderBackdrop}
+      handleComponent={SheetHandle}
       backgroundStyle={styles.sheetBg}
-      handleIndicatorStyle={styles.handle}
     >
-      <BottomSheetScrollView
-        showsVerticalScrollIndicator={false}
-        nestedScrollEnabled={true}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, paddingTop: 4 }}
-      >
-          {/* Quick dice row */}
-          <Text fontSize={13} fontWeight="600" color="#9090A0" marginBottom={8}>
-            Dados rápidos
+      <BottomSheetView style={styles.outerContainer}>
+        {/* ─── Fixed Header ──────────────────────────── */}
+        <View style={styles.headerSection}>
+          <Text
+            paddingHorizontal={16}
+            fontSize={16}
+            fontWeight="600"
+            color="#E8E8ED"
+            marginBottom={12}
+          >
+            Rolar Dados
           </Text>
-          <XStack flexWrap="wrap" gap={10} marginBottom={20}>
-            {QUICK_DICE.map((die) => {
-              const sides = parseInt(die.slice(1), 10);
-              return (
-                <Stack
-                  key={die}
-                  width={52}
-                  height={52}
-                  borderRadius={26}
-                  backgroundColor="#1A1A24"
-                  borderWidth={1}
-                  borderColor="#2A2A35"
-                  alignItems="center"
-                  justifyContent="center"
-                  pressStyle={{ opacity: 0.7, scale: 0.95, backgroundColor: "#6C5CE7" }}
-                  onPress={() => handleRoll(`1${die}`, die.toUpperCase())}
-                >
-                  <Text fontSize={14} fontWeight="700" color="#E8E8ED">
-                    {die}
-                  </Text>
-                </Stack>
-              );
-            })}
-          </XStack>
+          <QuickDiceRow onRoll={handleRoll} />
+          <FormulaInput onRoll={(f) => handleRoll(f)} />
+        </View>
 
-          {/* Custom formula */}
-          <Text fontSize={13} fontWeight="600" color="#9090A0" marginBottom={8}>
-            Fórmula personalizada
-          </Text>
-          <XStack gap={8} marginBottom={20}>
-            <Stack
-              flex={1}
-              backgroundColor="#12121A"
-              borderRadius={10}
-              borderWidth={1}
-              borderColor="#2A2A35"
-              paddingHorizontal={14}
-              paddingVertical={10}
-            >
-              <TextInput
-                value={customFormula}
-                onChangeText={setCustomFormula}
-                placeholder="Ex: 2d6+3"
-                placeholderTextColor="#5A5A6E"
-                style={styles.input}
-              />
-            </Stack>
-            <Stack
-              width={52}
-              height={44}
-              borderRadius={12}
-              backgroundColor="#6C5CE7"
-              alignItems="center"
-              justifyContent="center"
-              pressStyle={{ opacity: 0.85, scale: 0.95 }}
-              onPress={() => handleRoll(customFormula)}
-            >
-              <Dices size={20} color="white" />
-            </Stack>
-          </XStack>
-
-          {/* Presets */}
-          <Text fontSize={13} fontWeight="600" color="#9090A0" marginBottom={8}>
-            Presets da ficha
-          </Text>
-          <YStack gap={6}>
-            {MOCK_DICE_PRESETS.map((preset, i) => (
-              <Stack
-                key={`${preset.label}-${i}`}
-                backgroundColor="#16161C"
-                borderRadius={10}
-                borderWidth={1}
-                borderColor="#2A2A35"
-                paddingHorizontal={14}
-                paddingVertical={10}
-                pressStyle={{ opacity: 0.7, backgroundColor: "#1A1A2E" }}
-                onPress={() => handleRoll(preset.formula, preset.label)}
-              >
-                <XStack justifyContent="space-between" alignItems="center">
-                  <Text fontSize={13} fontWeight="600" color="#E8E8ED">
-                    {preset.label}
-                  </Text>
-                  <Text fontSize={12} color="#6C5CE7">
-                    {preset.formula}
-                  </Text>
-                </XStack>
-              </Stack>
-            ))}
-          </YStack>
-      </BottomSheetScrollView>
+        {/* ─── Scrollable Content ────────────────────── */}
+        <BottomSheetScrollView
+          style={styles.scrollFlex}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <DicePresets presets={MOCK_DICE_PRESETS} onRoll={handleRoll} />
+          <VisibilitySelector value={visibility} onChange={setVisibility} />
+          <DiceHistory onReroll={handleRoll} />
+        </BottomSheetScrollView>
+      </BottomSheetView>
     </BottomSheet>
   );
 }
@@ -231,21 +198,36 @@ export const DicePanel = memo(DicePanelInner);
 
 const styles = StyleSheet.create({
   sheetBg: {
-    backgroundColor: "#0F0F12",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: "#16161C",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#2A2A35",
   },
-  handle: {
-    backgroundColor: "#5A5A6E",
+  handleContainer: {
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#16161C",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  handleBar: {
     width: 40,
     height: 4,
     borderRadius: 2,
+    backgroundColor: "#5A5A6E",
   },
-  input: {
-    color: "#E8E8ED",
-    fontSize: 15,
-    padding: 0,
+  outerContainer: {
+    flex: 1,
+  },
+  headerSection: {
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  scrollFlex: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 24,
   },
 });

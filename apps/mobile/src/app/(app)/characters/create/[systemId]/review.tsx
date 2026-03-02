@@ -96,7 +96,7 @@ export default function ReviewScreen() {
       currentHp: 10 + identity.level * 5,
       maxHp: 10 + identity.level * 5,
       system: systemId ?? "dnd5e",
-      avatar: "⚔️",
+      avatar: "sword",
     };
     MY_CHARACTERS.push(newChar);
     router.push(`/(app)/characters/create/${systemId}/celebration`);

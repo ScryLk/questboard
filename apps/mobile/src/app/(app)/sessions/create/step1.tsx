@@ -1,5 +1,6 @@
 import { ScrollView, TextInput } from "react-native";
 import { useRouter } from "expo-router";
+import { Dice5 } from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { WizardHeader } from "../../../../components/wizard-header";
 import { TagInput } from "../../../../components/tag-input";
@@ -18,7 +19,7 @@ import {
 const SYSTEMS = Object.entries(SYSTEM_LABELS).map(([key, label]) => ({
   key,
   label,
-  icon: SYSTEM_ICONS[key] ?? "🎲",
+  icon: SYSTEM_ICONS[key] ?? Dice5,
 }));
 
 export default function Step1Identity() {
@@ -98,6 +99,7 @@ export default function Step1Identity() {
           >
             {SYSTEMS.map((sys) => {
               const isSelected = identity.system === sys.key;
+              const SysIcon = sys.icon;
               return (
                 <Stack
                   key={sys.key}
@@ -113,7 +115,7 @@ export default function Step1Identity() {
                   pressStyle={{ opacity: 0.85 }}
                 >
                   <XStack alignItems="center" gap={6}>
-                    <Text fontSize={16}>{sys.icon}</Text>
+                    <SysIcon size={16} color={isSelected ? "#E8E8ED" : "#9090A0"} />
                     <Text
                       fontSize={13}
                       fontWeight="600"
