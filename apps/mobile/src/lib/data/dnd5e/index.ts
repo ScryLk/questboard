@@ -4,3 +4,4 @@ export * from "./classes";
 export * from "./abilities";
 export * from "./conditions";
 export * from "./backgrounds";
+export * from "./skills";

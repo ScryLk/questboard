@@ -47,9 +47,14 @@ export default function CharactersScreen() {
           </Stack>
         );
       }
-      return <CharacterCard character={item} />;
+      return (
+        <CharacterCard
+          character={item}
+          onPress={() => router.push(`/(app)/characters/${item.id}`)}
+        />
+      );
     },
-    [],
+    [router],
   );
 
   return (
