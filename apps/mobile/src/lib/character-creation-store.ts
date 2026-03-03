@@ -1,13 +1,8 @@
 import { create } from "zustand";
-import type { AbilityKey, DiceRollResult } from "./data/dnd5e/types";
+import type { AbilityKey, DiceRollResult } from "@questboard/types";
+import { getModifier, computeHP, computeBaseAC, computeInitiative } from "@questboard/utils";
 import { DND5E_RACES } from "./data/dnd5e/races";
 import { DND5E_CLASSES } from "./data/dnd5e/classes";
-import {
-  getModifier,
-  computeHP,
-  computeBaseAC,
-  computeInitiative,
-} from "./data/dnd5e/abilities";
 
 // ─── State Interfaces ────────────────────────────────────
 
