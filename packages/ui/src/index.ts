@@ -1,3 +1,3 @@
-export { Button } from "./button.js";
-export { TextInput } from "./text-input.js";
-export { Card } from "./card.js";
+export { Button } from "./button";
+export { TextInput } from "./text-input";
+export { Card } from "./card";

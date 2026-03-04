@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DiceRollMode } from "../types/enums.js";
+import { DiceRollMode } from "../types/enums";
 
 export const DICE_FORMULA_REGEX = /^(\d+d\d+([kd][hl]\d+)?([!><=]\d+)?([+-]\d+)?)(([+-]\d+d\d+([kd][hl]\d+)?([!><=]\d+)?([+-]\d+)?)|([+-]\d+))*$/;
 

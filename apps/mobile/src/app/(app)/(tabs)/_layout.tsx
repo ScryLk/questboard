@@ -13,7 +13,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="explore" options={{ title: "Explorar" }} />
-      <Tabs.Screen name="sessions" options={{ title: "Sessões" }} />
+      <Tabs.Screen name="campaigns" options={{ title: "Campanhas" }} />
       <Tabs.Screen name="create" options={{ title: "Criar" }} />
       <Tabs.Screen name="characters" options={{ title: "Heróis" }} />
       <Tabs.Screen name="profile" options={{ title: "Perfil" }} />

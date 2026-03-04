@@ -1,6 +1,6 @@
-import type { GridConfig, GridPosition } from "./grid.js";
-import { getNeighbors } from "./grid.js";
-import { calculateDistance } from "./distance.js";
+import type { GridConfig, GridPosition } from "./grid";
+import { getNeighbors } from "./grid";
+import { calculateDistance } from "./distance";
 
 interface PathNode {
   position: GridPosition;

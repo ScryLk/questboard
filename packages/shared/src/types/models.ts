@@ -6,7 +6,7 @@ import type {
   GridType,
   ChatChannel,
   MessageType,
-} from "./enums.js";
+} from "./enums";
 
 export interface User {
   id: string;

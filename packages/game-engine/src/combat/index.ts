@@ -1,3 +1,3 @@
-export * from "./initiative.js";
-export * from "./line-of-sight.js";
-export * from "./area-of-effect.js";
+export * from "./initiative";
+export * from "./line-of-sight";
+export * from "./area-of-effect";

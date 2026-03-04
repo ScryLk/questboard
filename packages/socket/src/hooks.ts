@@ -1,7 +1,7 @@
 // ── React Hooks for Socket.IO ──
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import type { QuestBoardSocket } from "./client.js";
+import type { QuestBoardSocket } from "./client";
 import type { ServerToClientEvents } from "@questboard/types";
 
 export function useSocketEvent<K extends keyof ServerToClientEvents>(

@@ -1,9 +1,9 @@
 // ── Socket Event Types ──
 
-import type { TokenDTO, FogAreaDTO } from "./map.js";
-import type { MessageDTO, DiceRollDTO, DiceRollMode, ChatChannel } from "./chat.js";
-import type { InitiativeEntry } from "./combat.js";
-import type { SessionStatus, SessionPlayerDTO } from "./session.js";
+import type { TokenDTO, FogAreaDTO } from "./map";
+import type { MessageDTO, DiceRollDTO, DiceRollMode, ChatChannel } from "./chat";
+import type { InitiativeEntry } from "./combat";
+import type { SessionStatus, SessionPlayerDTO } from "./session";
 
 export interface SessionAudioDTO {
   layer: string;
@@ -12,6 +12,21 @@ export interface SessionAudioDTO {
   trackUrl: string;
   volume: number;
   isPlaying: boolean;
+}
+
+// ── Lobby Types ──
+
+export type LobbyPlayerStatus = "ready" | "joining" | "offline";
+
+export interface LobbyPlayerDTO {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: "GM" | "PLAYER";
+  characterName: string | null;
+  characterClass: string | null;
+  characterLevel: number | null;
+  status: LobbyPlayerStatus;
 }
 
 export interface ServerToClientEvents {
@@ -42,6 +57,13 @@ export interface ServerToClientEvents {
     x: number;
     y: number;
   }) => void;
+
+  // Lobby events
+  "lobby:player-joined": (data: { player: LobbyPlayerDTO }) => void;
+  "lobby:player-left": (data: { userId: string }) => void;
+  "lobby:player-ready": (data: { userId: string; ready: boolean }) => void;
+  "lobby:started": (data: { sessionId: string }) => void;
+  "lobby:cancelled": () => void;
 }
 
 export interface ClientToServerEvents {
@@ -63,4 +85,11 @@ export interface ClientToServerEvents {
   }) => void;
 
   "cursor:move": (data: { x: number; y: number }) => void;
+
+  // Lobby events
+  "lobby:join": (data: { sessionId: string }) => void;
+  "lobby:ready": (data: { ready: boolean }) => void;
+  "lobby:start": () => void;
+  "lobby:cancel": () => void;
+  "lobby:disconnect": () => void;
 }

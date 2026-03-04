@@ -1,14 +1,15 @@
 // ── @questboard/types barrel export ──
 
-export * from "./user.js";
-export * from "./session.js";
-export * from "./character.js";
-export * from "./map.js";
-export * from "./combat.js";
-export * from "./chat.js";
-export * from "./story.js";
-export * from "./analytics.js";
-export * from "./world.js";
-export * from "./socket.js";
-export * from "./api.js";
-export * from "./audio.js";
+export * from "./user";
+export * from "./session";
+export * from "./character";
+export * from "./map";
+export * from "./combat";
+export * from "./chat";
+export * from "./story";
+export * from "./analytics";
+export * from "./world";
+export * from "./socket";
+export * from "./api";
+export * from "./audio";
+export * from "./campaign";

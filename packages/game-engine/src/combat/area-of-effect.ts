@@ -1,4 +1,4 @@
-import type { GridPosition } from "../grid/grid.js";
+import type { GridPosition } from "../grid/grid";
 
 export type AoEShape = "circle" | "cone" | "cube" | "line" | "cylinder";
 

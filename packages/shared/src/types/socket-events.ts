@@ -6,8 +6,8 @@ import type {
   MessageDTO,
   SessionAudioDTO,
   InitiativeEntry,
-} from "./dto.js";
-import type { SessionStatus, ChatChannel, DiceRollMode } from "./enums.js";
+} from "./dto";
+import type { SessionStatus, ChatChannel, DiceRollMode } from "./enums";
 
 export interface ServerToClientEvents {
   "session:player-joined": (data: { player: SessionPlayerDTO }) => void;

@@ -2,19 +2,28 @@
 
 @theme {
   --color-brand-primary: #0A0A0F;
-  --color-brand-accent: #7C3AED;
-  --color-brand-accent-light: #A78BFA;
+  --color-brand-accent: #6C5CE7;
+  --color-brand-accent-hover: #5A4DD6;
+  --color-brand-accent-muted: #6C5CE71F;
   --color-brand-surface: #111116;
   --color-brand-surface-light: #1A1A24;
-  --color-brand-border: rgba(255, 255, 255, 0.1);
-  --color-brand-success: #10B981;
-  --color-brand-warning: #F59E0B;
-  --color-brand-danger: #EF4444;
+  --color-brand-sidebar: #0D0D12;
+  --color-brand-border: #1E1E2A;
+  --color-brand-text: #E8E8ED;
+  --color-brand-muted: #9090A0;
+  --color-brand-success: #00B894;
+  --color-brand-warning: #FDCB6E;
+  --color-brand-danger: #FF6B6B;
   --color-brand-info: #3B82F6;
   --font-heading: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+html,
 body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   background-color: var(--color-brand-primary);
   color: white;
 }
@@ -32,4 +41,19 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Hide scrollbars on canvas scroll container */
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Light source pulsing glow */
+@keyframes lightPulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
 }

@@ -12,7 +12,7 @@ interface TabDef {
 
 const TAB_CONFIG: TabDef[] = [
   { name: "explore", label: "Explorar", icon: Compass },
-  { name: "sessions", label: "Sessões", icon: Castle },
+  { name: "campaigns", label: "Campanhas", icon: Castle },
   { name: "create", label: "", icon: Plus, isCenter: true },
   { name: "characters", label: "Heróis", icon: Shield },
   { name: "profile", label: "Perfil", icon: User },

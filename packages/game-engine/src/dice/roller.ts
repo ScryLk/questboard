@@ -1,5 +1,5 @@
-import type { ParsedFormula, DiceTerm, DiceModifier } from "./parser.js";
-import { parseFormula } from "./parser.js";
+import type { ParsedFormula, DiceTerm, DiceModifier } from "./parser";
+import { parseFormula } from "./parser";
 
 export interface RollResult {
   formula: string;

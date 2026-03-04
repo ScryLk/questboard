@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ChatChannel } from "../types/enums.js";
+import { ChatChannel } from "../types/enums";
 
 export const sendMessageSchema = z.object({
   channel: z.nativeEnum(ChatChannel).default(ChatChannel.GENERAL),

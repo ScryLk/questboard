@@ -2,7 +2,7 @@ import type {
   PlayerRole,
   ChatChannel,
   MessageType,
-} from "./enums.js";
+} from "./enums";
 
 export interface SessionPlayerDTO {
   id: string;

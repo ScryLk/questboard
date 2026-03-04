@@ -1,7 +1,15 @@
 import { Alert, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
-import { Castle, ChevronRight, Map, Sparkles, Shield } from "lucide-react-native";
+import {
+  Castle,
+  Calendar,
+  ChevronRight,
+  LogIn,
+  Map,
+  Sparkles,
+  Shield,
+} from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { useCreateSheet } from "../lib/create-sheet-context";
 
@@ -18,23 +26,37 @@ const OPTIONS: Option[] = [
   {
     key: "session",
     icon: Castle,
-    title: "Nova Sessão",
-    description: "Crie uma mesa e convide jogadores",
+    title: "Criar Campanha",
+    description: "Comece uma nova aventura",
     accentColor: "#6C5CE7",
+  },
+  {
+    key: "join",
+    icon: LogIn,
+    title: "Entrar com Código",
+    description: "Campanha ou sessão",
+    accentColor: "#00CEC9",
   },
   {
     key: "character",
     icon: Shield,
-    title: "Novo Personagem",
-    description: "Crie uma ficha de qualquer sistema",
+    title: "Criar Personagem",
+    description: "Novo herói para suas aventuras",
     accentColor: "#00B894",
+  },
+  {
+    key: "schedule",
+    icon: Calendar,
+    title: "Agendar Sessão",
+    description: "Marque a próxima sessão",
+    accentColor: "#FDCB6E",
   },
   {
     key: "map",
     icon: Map,
     title: "Novo Mapa",
     description: "Faça upload ou gere com IA",
-    accentColor: "#FDCB6E",
+    accentColor: "#FF6B6B",
     badge: "IA",
   },
 ];
@@ -53,7 +75,11 @@ export function CreateActionSheet() {
       router.push("/(app)/sessions/create");
       return;
     }
-    Alert.alert("Em breve", "A criação de mapas estará disponível em breve!");
+    if (key === "join") {
+      router.push("/(app)/join");
+      return;
+    }
+    Alert.alert("Em breve", "Esta funcionalidade estará disponível em breve!");
   }
 
   return (
@@ -93,10 +119,7 @@ export function CreateActionSheet() {
 
           <YStack paddingHorizontal={24}>
             <Text fontSize={20} fontWeight="700" color="$textPrimary">
-              Criar
-            </Text>
-            <Text marginTop={4} fontSize={14} color="$textSecondary">
-              O que você quer criar?
+              O que deseja fazer?
             </Text>
 
             <YStack marginTop={20} gap={12}>

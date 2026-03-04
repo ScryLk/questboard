@@ -1,3 +1,3 @@
-export * from "./grid.js";
-export * from "./distance.js";
-export * from "./pathfinding.js";
+export * from "./grid";
+export * from "./distance";
+export * from "./pathfinding";

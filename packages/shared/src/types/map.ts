@@ -1,7 +1,7 @@
 // ── Map System Types ──
 // Full type system for the QuestBoard interactive map editor
 
-import type { GridType } from "./enums.js";
+import type { GridType } from "./enums";
 
 // ── Terrain Types ──
 

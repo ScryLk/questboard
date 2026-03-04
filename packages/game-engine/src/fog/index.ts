@@ -1,2 +1,2 @@
-export * from "./fog-manager.js";
-export * from "./visibility.js";
+export * from "./fog-manager";
+export * from "./visibility";

@@ -11,17 +11,21 @@ export function HomePage() {
             QuestBoard
           </h1>
           <nav className="flex gap-4">
+            <Link to="/campaign/camp_01">
+              <Button variant="ghost" size="sm">
+                Dashboard
+              </Button>
+            </Link>
             <Link to="/maps">
               <Button variant="ghost" size="sm">
                 Mapas
               </Button>
             </Link>
-            <Button variant="ghost" size="sm">
-              Sessões
-            </Button>
-            <Button variant="primary" size="sm">
-              Criar Sessão
-            </Button>
+            <Link to="/join">
+              <Button variant="primary" size="sm">
+                Entrar com Código
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>

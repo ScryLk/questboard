@@ -1,5 +1,5 @@
-import type { FogState } from "./fog-manager.js";
-import { isPointFogged } from "./fog-manager.js";
+import type { FogState } from "./fog-manager";
+import { isPointFogged } from "./fog-manager";
 
 export interface VisibilityResult {
   x: number;
