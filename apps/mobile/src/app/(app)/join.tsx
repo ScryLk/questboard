@@ -55,7 +55,7 @@ export default function JoinScreen() {
         });
       } else if (result.type === "session") {
         if (result.status === "LIVE" || result.status === "LOBBY") {
-          router.push(`/(app)/sessions/${result.id}/lobby`);
+          router.push(`/(app)/sessions/${result.id}/select-character`);
         } else if (result.status === "SCHEDULED") {
           showToast("info", "Sessao agendada. Voce sera notificado quando comecar.");
           router.back();
@@ -64,7 +64,7 @@ export default function JoinScreen() {
             joinError: "Esta sessao ja foi encerrada",
           });
         } else {
-          router.push(`/(app)/sessions/${result.id}/lobby`);
+          router.push(`/(app)/sessions/${result.id}/select-character`);
         }
       }
     },

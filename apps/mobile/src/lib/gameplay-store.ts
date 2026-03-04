@@ -368,6 +368,9 @@ export interface GameplayStore {
   updateGMNote: (characterId: string, note: string) => void;
   updateTokenConditions: (tokenId: string, conditions: string[]) => void;
 
+  // Map image
+  setMapImage: (image: GameplayStore["mapImage"]) => void;
+
   // Init
   loadMockData: () => void;
 }
@@ -788,6 +791,8 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
         },
       };
     }),
+
+  setMapImage: (image) => set({ mapImage: image }),
 
   loadMockData: () => {
     // Populated by gameplay-mock-data.ts

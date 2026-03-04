@@ -12,7 +12,9 @@ import {
   Fence,
   Grid3x3,
   Hand,
+  Mountain,
   MousePointer2,
+  Package,
   Pause,
   Pencil,
   Ruler,
@@ -47,6 +49,8 @@ const MAP_TOOLS: {
   { tool: "region", icon: BoxSelect, label: "Selecionar Regiao", shortcut: "S" },
   { tool: "wall", icon: Fence, label: "Paredes", shortcut: "B" },
   { tool: "vision", icon: Eye, label: "Visao", shortcut: "W" },
+  { tool: "terrain", icon: Mountain, label: "Terreno", shortcut: "T" },
+  { tool: "objects", icon: Package, label: "Objetos", shortcut: "O" },
 ];
 
 const SESSION_ACTIONS: {
@@ -110,6 +114,8 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
         S: "region",
         B: "wall",
         W: "vision",
+        T: "terrain",
+        O: "objects",
       };
       if (toolMap[key]) {
         e.preventDefault();

@@ -12,6 +12,10 @@ import { GameplayToolbar } from "./toolbar/gameplay-toolbar";
 import { AoeShapePicker } from "./toolbar/aoe-shape-picker";
 import { DrawToolPicker } from "./toolbar/draw-tool-picker";
 import { FogToolPicker } from "./toolbar/fog-tool-picker";
+import { TerrainToolPicker } from "./toolbar/terrain-tool-picker";
+import { WallToolPicker } from "./toolbar/wall-tool-picker";
+import { ObjectToolPicker } from "./toolbar/object-tool-picker";
+import { GridAlignmentPanel } from "./toolbar/grid-alignment-panel";
 import { VisionPanel } from "./toolbar/vision-panel";
 import { LeftPanel } from "./left-panel/left-panel";
 import { RightPanel } from "./right-panel/right-panel";
@@ -49,6 +53,10 @@ export function GameplayLayout() {
       <AoeShapePicker />
       <DrawToolPicker />
       <FogToolPicker />
+      <TerrainToolPicker />
+      <WallToolPicker />
+      <ObjectToolPicker />
+      <GridAlignmentPanel />
       <VisionPanel />
 
       {/* Main content: 3-panel layout */}

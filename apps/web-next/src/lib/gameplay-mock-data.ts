@@ -15,7 +15,9 @@ export type MapTool =
   | "draw"
   | "region"
   | "wall"
-  | "vision";
+  | "vision"
+  | "terrain"
+  | "objects";
 export type RightPanelTab = "chat" | "dice" | "sheet";
 export type DieType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100";
 export type TokenVisibility = "visible" | "hidden" | "invisible";
@@ -216,7 +218,43 @@ export interface DamageFloat {
 }
 
 export type DrawingTool = "freehand" | "line" | "rect" | "eraser";
-export type TerrainType = "normal" | "difficult" | "water" | "lava" | "pit" | "ice";
+export type TerrainType =
+  // Legacy (kept for backward compat)
+  | "normal"
+  | "difficult"
+  | "water"
+  // Dungeon
+  | "stone_floor"
+  | "stone_wall"
+  | "dirt_floor"
+  | "wooden_floor"
+  | "cobblestone"
+  | "marble"
+  | "carpet"
+  // Natural
+  | "grass"
+  | "forest_floor"
+  | "sand"
+  | "mud"
+  | "snow"
+  | "rocky"
+  | "swamp"
+  | "water_shallow"
+  | "water_deep"
+  | "lava"
+  | "ice"
+  // Special
+  | "void"
+  | "magic_circle"
+  | "trap"
+  | "pit"
+  | "bridge"
+  | "stairs_up"
+  | "stairs_down"
+  | "portal"
+  | "altar";
+
+export type TerrainEditorTool = "brush" | "rectangle" | "fill" | "eraser";
 
 export interface DrawStroke {
   id: string;
@@ -274,6 +312,8 @@ export type VisionType = "normal" | "darkvision" | "blindsight" | "truesight" | 
 export type LightType = "none" | "torch" | "lamp" | "light_cantrip" | "custom";
 export type FogMode = "manual" | "dynamic" | "hybrid";
 export type WallSide = "top" | "right" | "bottom" | "left";
+export type WallMaterial = "stone" | "wood" | "iron" | "magic";
+export type DoorState = "none" | "open" | "closed" | "locked" | "secret";
 
 export interface VisionConfig {
   enabled: boolean;
@@ -315,7 +355,88 @@ export interface WallSegment {
   side: WallSide;
   isDoor: boolean;
   doorOpen: boolean;
+  wallType?: WallMaterial;
+  doorState?: DoorState;
 }
+
+// ── Map Objects ──
+
+export type MapObjectType =
+  | "table"
+  | "chair"
+  | "bed"
+  | "chest"
+  | "barrel"
+  | "bookshelf"
+  | "throne"
+  | "fountain"
+  | "statue"
+  | "pillar"
+  | "campfire"
+  | "tree"
+  | "bush"
+  | "rock_large"
+  | "rock_small"
+  | "torch_stand"
+  | "banner"
+  | "rug"
+  | "cage"
+  | "well"
+  | "cart"
+  | "crate"
+  | "sack"
+  | "weapon_rack"
+  | "anvil"
+  | "cauldron";
+
+export interface MapObjectCell {
+  id: string;
+  x: number;
+  y: number;
+  type: MapObjectType;
+  rotation: number;
+}
+
+export interface MapObjectInfo {
+  type: MapObjectType;
+  label: string;
+  icon: string;
+  category: "furniture" | "container" | "decoration" | "nature" | "light";
+}
+
+export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
+  // Furniture
+  { type: "table", label: "Mesa", icon: "🪑", category: "furniture" },
+  { type: "chair", label: "Cadeira", icon: "💺", category: "furniture" },
+  { type: "bed", label: "Cama", icon: "🛏️", category: "furniture" },
+  { type: "throne", label: "Trono", icon: "👑", category: "furniture" },
+  { type: "bookshelf", label: "Estante", icon: "📚", category: "furniture" },
+  { type: "weapon_rack", label: "Rack de Armas", icon: "⚔️", category: "furniture" },
+  // Containers
+  { type: "chest", label: "Bau", icon: "📦", category: "container" },
+  { type: "barrel", label: "Barril", icon: "🛢️", category: "container" },
+  { type: "crate", label: "Caixote", icon: "📥", category: "container" },
+  { type: "sack", label: "Saco", icon: "👝", category: "container" },
+  { type: "cage", label: "Jaula", icon: "🗑️", category: "container" },
+  { type: "cart", label: "Carrinho", icon: "🛒", category: "container" },
+  // Decoration
+  { type: "statue", label: "Estatua", icon: "🗿", category: "decoration" },
+  { type: "pillar", label: "Pilar", icon: "🏛️", category: "decoration" },
+  { type: "fountain", label: "Fonte", icon: "⛲", category: "decoration" },
+  { type: "banner", label: "Bandeira", icon: "🚩", category: "decoration" },
+  { type: "rug", label: "Tapete", icon: "🟫", category: "decoration" },
+  { type: "well", label: "Poco", icon: "🕳️", category: "decoration" },
+  { type: "anvil", label: "Bigorna", icon: "🔨", category: "decoration" },
+  { type: "cauldron", label: "Caldeirao", icon: "🫕", category: "decoration" },
+  // Nature
+  { type: "tree", label: "Arvore", icon: "🌳", category: "nature" },
+  { type: "bush", label: "Arbusto", icon: "🌿", category: "nature" },
+  { type: "rock_large", label: "Pedra Grande", icon: "🪨", category: "nature" },
+  { type: "rock_small", label: "Pedra Peq.", icon: "🪨", category: "nature" },
+  // Light
+  { type: "torch_stand", label: "Tocha", icon: "🔥", category: "light" },
+  { type: "campfire", label: "Fogueira", icon: "🏕️", category: "light" },
+];
 
 export interface LightSourceFixed {
   id: string;

@@ -18,6 +18,7 @@ import type {
   DrawingTool,
   DrawStroke,
   TerrainType,
+  TerrainEditorTool,
   TerrainCell,
   FogSettings,
   MapPin,
@@ -26,7 +27,10 @@ import type {
   VisionConfig,
   WallSegment,
   WallSide,
+  WallMaterial,
   LightSourceFixed,
+  MapObjectCell,
+  MapObjectType,
 } from "./gameplay-mock-data";
 import {
   MOCK_COMBAT,
@@ -34,7 +38,10 @@ import {
   MOCK_MESSAGES,
   DEFAULT_FOG_SETTINGS,
   DEFAULT_VISION,
+  MOCK_MAP,
 } from "./gameplay-mock-data";
+import type { TerrainCategoryId } from "./terrain-catalog";
+import type { RoomTemplate } from "./room-templates";
 
 
 export type ModalName =
@@ -229,6 +236,21 @@ interface GameplayState {
   paintTerrain: (x: number, y: number) => void;
   clearTerrain: () => void;
 
+  // Terrain editor
+  terrainEditorTool: TerrainEditorTool;
+  terrainBrushSize: 1 | 2 | 3;
+  terrainCategory: TerrainCategoryId | "all";
+  terrainRectPreview: { x1: number; y1: number; x2: number; y2: number } | null;
+  hoverCell: { x: number; y: number } | null;
+  setTerrainEditorTool: (tool: TerrainEditorTool) => void;
+  setTerrainBrushSize: (size: 1 | 2 | 3) => void;
+  setTerrainCategory: (cat: TerrainCategoryId | "all") => void;
+  paintTerrainArea: (cells: { x: number; y: number }[]) => void;
+  fillTerrain: (x: number, y: number) => void;
+  eraseTerrainArea: (cells: { x: number; y: number }[]) => void;
+  setTerrainRectPreview: (rect: { x1: number; y1: number; x2: number; y2: number } | null) => void;
+  setHoverCell: (cell: { x: number; y: number } | null) => void;
+
   // Attack line
   attackLine: {
     attackerId: string;
@@ -257,6 +279,13 @@ interface GameplayState {
   setZoom: (z: number) => void;
   gridVisible: boolean;
   toggleGrid: () => void;
+  mapBackgroundImage: string | null;
+  mapBackgroundOpacity: number;
+  mapGridOffsetX: number;
+  mapGridOffsetY: number;
+  setMapBackgroundImage: (url: string | null) => void;
+  setMapBackgroundOpacity: (opacity: number) => void;
+  setMapGridOffset: (x: number, y: number) => void;
 
   // Map viewport (for placing tokens in visible area)
   mapViewport: { scrollLeft: number; scrollTop: number; viewportW: number; viewportH: number; cellSize: number };
@@ -304,11 +333,33 @@ interface GameplayState {
 
   setTokenVision: (tokenId: string, config: Partial<VisionConfig>) => void;
   toggleTokenVision: (tokenId: string) => void;
+  activeWallType: WallMaterial;
+  setActiveWallType: (type: WallMaterial) => void;
   addWall: (w: WallSegment) => void;
   removeWall: (x: number, y: number, side: WallSide) => void;
   toggleDoor: (x: number, y: number, side: WallSide) => void;
+  clearWalls: () => void;
   addLightSource: (l: LightSourceFixed) => void;
   removeLightSource: (id: string) => void;
+
+  // Map objects
+  mapObjects: MapObjectCell[];
+  activeObjectType: MapObjectType;
+  setActiveObjectType: (type: MapObjectType) => void;
+  placeObject: (x: number, y: number) => void;
+  removeObject: (id: string) => void;
+  rotateObject: (id: string) => void;
+  clearObjects: () => void;
+
+  // Terrain undo/redo
+  terrainHistory: TerrainCell[][];
+  terrainFuture: TerrainCell[][];
+  pushTerrainSnapshot: () => void;
+  undoTerrain: () => void;
+  redoTerrain: () => void;
+
+  // Room template stamp
+  stampTemplate: (template: RoomTemplate, originX: number, originY: number) => void;
 }
 
 const DEFAULT_CONTEXT_MENU: ContextMenuState = {
@@ -671,7 +722,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   clearStrokes: () => set({ drawStrokes: [] }),
 
   terrainCells: [],
-  activeTerrainType: "difficult" as TerrainType,
+  activeTerrainType: "stone_floor" as TerrainType,
   setActiveTerrainType: (t) => set({ activeTerrainType: t }),
   paintTerrain: (x, y) =>
     set((s) => {
@@ -687,6 +738,90 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       return { terrainCells: [...s.terrainCells, { x, y, type: s.activeTerrainType }] };
     }),
   clearTerrain: () => set({ terrainCells: [] }),
+
+  // Terrain editor
+  terrainEditorTool: "brush" as TerrainEditorTool,
+  terrainBrushSize: 1 as 1 | 2 | 3,
+  terrainCategory: "all" as TerrainCategoryId | "all",
+  terrainRectPreview: null,
+  hoverCell: null,
+  setTerrainEditorTool: (tool) => set({ terrainEditorTool: tool }),
+  setTerrainBrushSize: (size) => set({ terrainBrushSize: size }),
+  setTerrainCategory: (cat) => set({ terrainCategory: cat }),
+  paintTerrainArea: (cells) =>
+    set((s) => {
+      const newCells = [...s.terrainCells];
+      for (const { x, y } of cells) {
+        const idx = newCells.findIndex((c) => c.x === x && c.y === y);
+        if (idx >= 0) {
+          newCells[idx] = { x, y, type: s.activeTerrainType };
+        } else {
+          newCells.push({ x, y, type: s.activeTerrainType });
+        }
+      }
+      return {
+        terrainCells: newCells,
+        terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
+        terrainFuture: [],
+      };
+    }),
+  fillTerrain: (x, y) =>
+    set((s) => {
+      const { gridCols, gridRows } = MOCK_MAP;
+      const targetType =
+        s.terrainCells.find((c) => c.x === x && c.y === y)?.type ?? null;
+      if (targetType === s.activeTerrainType) return s;
+
+      const visited = new Set<string>();
+      const queue: { x: number; y: number }[] = [{ x, y }];
+      const filled: { x: number; y: number }[] = [];
+
+      while (queue.length > 0) {
+        const cell = queue.pop()!;
+        const key = `${cell.x},${cell.y}`;
+        if (visited.has(key)) continue;
+        if (cell.x < 0 || cell.y < 0 || cell.x >= gridCols || cell.y >= gridRows) continue;
+        const cellType =
+          s.terrainCells.find((c) => c.x === cell.x && c.y === cell.y)?.type ?? null;
+        if (cellType !== targetType) continue;
+        visited.add(key);
+        filled.push(cell);
+        queue.push(
+          { x: cell.x + 1, y: cell.y },
+          { x: cell.x - 1, y: cell.y },
+          { x: cell.x, y: cell.y + 1 },
+          { x: cell.x, y: cell.y - 1 },
+        );
+      }
+
+      if (filled.length === 0) return s;
+
+      const newCells = [...s.terrainCells];
+      for (const fc of filled) {
+        const idx = newCells.findIndex((c) => c.x === fc.x && c.y === fc.y);
+        if (idx >= 0) {
+          newCells[idx] = { x: fc.x, y: fc.y, type: s.activeTerrainType };
+        } else {
+          newCells.push({ x: fc.x, y: fc.y, type: s.activeTerrainType });
+        }
+      }
+      return {
+        terrainCells: newCells,
+        terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
+        terrainFuture: [],
+      };
+    }),
+  eraseTerrainArea: (cells) =>
+    set((s) => {
+      const removeSet = new Set(cells.map((c) => `${c.x},${c.y}`));
+      return {
+        terrainCells: s.terrainCells.filter((c) => !removeSet.has(`${c.x},${c.y}`)),
+        terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
+        terrainFuture: [],
+      };
+    }),
+  setTerrainRectPreview: (rect) => set({ terrainRectPreview: rect }),
+  setHoverCell: (cell) => set({ hoverCell: cell }),
 
   attackLine: null,
   setAttackLine: (line) => set({ attackLine: line }),
@@ -766,6 +901,13 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setZoom: (z) => set({ zoom: Math.max(50, Math.min(200, z)) }),
   gridVisible: true,
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
+  mapBackgroundImage: null,
+  mapBackgroundOpacity: 0.5,
+  mapGridOffsetX: 0,
+  mapGridOffsetY: 0,
+  setMapBackgroundImage: (url) => set({ mapBackgroundImage: url }),
+  setMapBackgroundOpacity: (opacity) => set({ mapBackgroundOpacity: Math.max(0, Math.min(1, opacity)) }),
+  setMapGridOffset: (x, y) => set({ mapGridOffsetX: x, mapGridOffsetY: y }),
 
   mapViewport: { scrollLeft: 0, scrollTop: 0, viewportW: 800, viewportH: 600, cellSize: 40 },
   setMapViewport: (v) => set({ mapViewport: v }),
@@ -871,8 +1013,10 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       };
     });
   },
+  activeWallType: "stone" as WallMaterial,
+  setActiveWallType: (type) => set({ activeWallType: type }),
   addWall: (w) => {
-    set((s) => ({ walls: [...s.walls, w] }));
+    set((s) => ({ walls: [...s.walls, { ...w, wallType: w.wallType ?? s.activeWallType }] }));
   },
   removeWall: (x, y, side) => {
     set((s) => ({
@@ -883,13 +1027,18 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   },
   toggleDoor: (x, y, side) => {
     set((s) => ({
-      walls: s.walls.map((w) =>
-        w.x === x && w.y === y && w.side === side
-          ? { ...w, doorOpen: !w.doorOpen }
-          : w,
-      ),
+      walls: s.walls.map((w) => {
+        if (w.x !== x || w.y !== y || w.side !== side) return w;
+        // Cycle: closed -> open -> locked -> secret -> closed
+        const states: import("./gameplay-mock-data").DoorState[] = ["closed", "open", "locked", "secret"];
+        const current = w.doorState ?? (w.doorOpen ? "open" : "closed");
+        const idx = states.indexOf(current);
+        const next = states[(idx + 1) % states.length];
+        return { ...w, doorOpen: next === "open", doorState: next };
+      }),
     }));
   },
+  clearWalls: () => set({ walls: [] }),
   addLightSource: (l) => {
     set((s) => ({ lightSources: [...s.lightSources, l] }));
   },
@@ -898,4 +1047,136 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       lightSources: s.lightSources.filter((l) => l.id !== id),
     }));
   },
+
+  // Map objects
+  mapObjects: [] as MapObjectCell[],
+  activeObjectType: "chest" as MapObjectType,
+  setActiveObjectType: (type) => set({ activeObjectType: type }),
+  placeObject: (x, y) =>
+    set((s) => {
+      const existing = s.mapObjects.find((o) => o.x === x && o.y === y);
+      if (existing) {
+        return {
+          mapObjects: s.mapObjects.map((o) =>
+            o.x === x && o.y === y
+              ? { ...o, type: s.activeObjectType }
+              : o,
+          ),
+        };
+      }
+      return {
+        mapObjects: [
+          ...s.mapObjects,
+          {
+            id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            x,
+            y,
+            type: s.activeObjectType,
+            rotation: 0,
+          },
+        ],
+      };
+    }),
+  removeObject: (id) =>
+    set((s) => ({ mapObjects: s.mapObjects.filter((o) => o.id !== id) })),
+  rotateObject: (id) =>
+    set((s) => ({
+      mapObjects: s.mapObjects.map((o) =>
+        o.id === id ? { ...o, rotation: (o.rotation + 90) % 360 } : o,
+      ),
+    })),
+  clearObjects: () => set({ mapObjects: [] }),
+
+  // Terrain undo/redo
+  terrainHistory: [] as TerrainCell[][],
+  terrainFuture: [] as TerrainCell[][],
+  pushTerrainSnapshot: () =>
+    set((s) => ({
+      terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
+      terrainFuture: [],
+    })),
+  undoTerrain: () =>
+    set((s) => {
+      if (s.terrainHistory.length === 0) return s;
+      const prev = s.terrainHistory[s.terrainHistory.length - 1];
+      return {
+        terrainHistory: s.terrainHistory.slice(0, -1),
+        terrainFuture: [...s.terrainFuture, [...s.terrainCells]],
+        terrainCells: prev,
+      };
+    }),
+  redoTerrain: () =>
+    set((s) => {
+      if (s.terrainFuture.length === 0) return s;
+      const next = s.terrainFuture[s.terrainFuture.length - 1];
+      return {
+        terrainFuture: s.terrainFuture.slice(0, -1),
+        terrainHistory: [...s.terrainHistory, [...s.terrainCells]],
+        terrainCells: next,
+      };
+    }),
+
+  // Room template stamp
+  stampTemplate: (template, originX, originY) =>
+    set((s) => {
+      // Snapshot terrain for undo
+      const newTerrainCells = [...s.terrainCells];
+      for (const t of template.terrain) {
+        const x = originX + t.dx;
+        const y = originY + t.dy;
+        if (x < 0 || y < 0 || x >= MOCK_MAP.gridCols || y >= MOCK_MAP.gridRows) continue;
+        const idx = newTerrainCells.findIndex((c) => c.x === x && c.y === y);
+        if (idx >= 0) {
+          newTerrainCells[idx] = { x, y, type: t.type };
+        } else {
+          newTerrainCells.push({ x, y, type: t.type });
+        }
+      }
+
+      // Add walls
+      const newWalls = [...s.walls];
+      for (const w of template.walls) {
+        const x = originX + w.dx;
+        const y = originY + w.dy;
+        if (x < 0 || y < 0 || x >= MOCK_MAP.gridCols || y >= MOCK_MAP.gridRows) continue;
+        const exists = newWalls.some((e) => e.x === x && e.y === y && e.side === w.side);
+        if (!exists) {
+          newWalls.push({
+            x,
+            y,
+            side: w.side,
+            isDoor: w.isDoor ?? false,
+            doorOpen: w.doorState === "open",
+            wallType: s.activeWallType,
+            doorState: w.doorState ?? (w.isDoor ? "closed" : undefined),
+          });
+        }
+      }
+
+      // Add objects
+      const newObjects = [...s.mapObjects];
+      for (const o of template.objects) {
+        const x = originX + o.dx;
+        const y = originY + o.dy;
+        if (x < 0 || y < 0 || x >= MOCK_MAP.gridCols || y >= MOCK_MAP.gridRows) continue;
+        const exists = newObjects.some((e) => e.x === x && e.y === y);
+        if (!exists) {
+          newObjects.push({
+            id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            x,
+            y,
+            type: o.type as import("./gameplay-mock-data").MapObjectType,
+            rotation: 0,
+          });
+        }
+      }
+
+      return {
+        terrainCells: newTerrainCells,
+        terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
+        terrainFuture: [],
+        walls: newWalls,
+        mapObjects: newObjects,
+      };
+    }),
 }));

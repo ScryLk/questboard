@@ -33,6 +33,9 @@ import { ToastOverlay } from "./overlays/toast-overlay";
 import { VisionOverlay } from "./overlays/vision-overlay";
 import { WallRenderer } from "./overlays/wall-renderer";
 import { LightSourceOverlay } from "./overlays/light-source-overlay";
+import { TerrainBrushPreview, getBrushCells } from "./overlays/terrain-brush-preview";
+import { TerrainRectPreview } from "./overlays/terrain-rect-preview";
+import { ObjectOverlay } from "./overlays/object-overlay";
 import { MiniMap } from "./overlays/mini-map";
 
 export function MapCanvas() {
@@ -84,6 +87,10 @@ export function MapCanvas() {
   const clearRegion = useGameplayStore((s) => s.clearRegion);
   const markers = useGameplayStore((s) => s.markers);
   const notes = useGameplayStore((s) => s.notes);
+  const mapBackgroundImage = useGameplayStore((s) => s.mapBackgroundImage);
+  const mapBackgroundOpacity = useGameplayStore((s) => s.mapBackgroundOpacity);
+  const mapGridOffsetX = useGameplayStore((s) => s.mapGridOffsetX);
+  const mapGridOffsetY = useGameplayStore((s) => s.mapGridOffsetY);
 
   const { gridCols, gridRows, cellSize, cellSizeFt, name } = MOCK_MAP;
   const scaledCell = cellSize;
@@ -606,6 +613,118 @@ export function MapCanvas() {
         return;
       }
 
+      // Terrain
+      if (activeTool === "terrain") {
+        const cell = getGridCell(e);
+        if (!cell) return;
+        const st = useGameplayStore.getState();
+        const editorTool = st.terrainEditorTool;
+
+        if (editorTool === "fill") {
+          st.fillTerrain(cell.x, cell.y);
+          return;
+        }
+
+        if (editorTool === "eraser") {
+          const cells = getBrushCells(cell.x, cell.y, st.terrainBrushSize, gridCols, gridRows);
+          st.eraseTerrainArea(cells);
+          const erased = new Set(cells.map((c) => `${c.x},${c.y}`));
+          function onEraseMove(ev: MouseEvent) {
+            const c = getGridCell(ev);
+            if (!c) return;
+            const s = useGameplayStore.getState();
+            const brushCells = getBrushCells(c.x, c.y, s.terrainBrushSize, gridCols, gridRows)
+              .filter((bc) => !erased.has(`${bc.x},${bc.y}`));
+            if (brushCells.length === 0) return;
+            brushCells.forEach((bc) => erased.add(`${bc.x},${bc.y}`));
+            s.eraseTerrainArea(brushCells);
+            s.setHoverCell(c);
+          }
+          function onEraseUp() {
+            document.removeEventListener("mousemove", onEraseMove);
+            document.removeEventListener("mouseup", onEraseUp);
+          }
+          document.addEventListener("mousemove", onEraseMove);
+          document.addEventListener("mouseup", onEraseUp);
+          return;
+        }
+
+        if (editorTool === "brush") {
+          const cells = getBrushCells(cell.x, cell.y, st.terrainBrushSize, gridCols, gridRows);
+          st.paintTerrainArea(cells);
+          const painted = new Set(cells.map((c) => `${c.x},${c.y}`));
+          function onBrushMove(ev: MouseEvent) {
+            const c = getGridCell(ev);
+            if (!c) return;
+            const s = useGameplayStore.getState();
+            const brushCells = getBrushCells(c.x, c.y, s.terrainBrushSize, gridCols, gridRows)
+              .filter((bc) => !painted.has(`${bc.x},${bc.y}`));
+            if (brushCells.length === 0) return;
+            brushCells.forEach((bc) => painted.add(`${bc.x},${bc.y}`));
+            s.paintTerrainArea(brushCells);
+            s.setHoverCell(c);
+          }
+          function onBrushUp() {
+            document.removeEventListener("mousemove", onBrushMove);
+            document.removeEventListener("mouseup", onBrushUp);
+          }
+          document.addEventListener("mousemove", onBrushMove);
+          document.addEventListener("mouseup", onBrushUp);
+          return;
+        }
+
+        if (editorTool === "rectangle") {
+          const startCell = cell;
+          st.setTerrainRectPreview({ x1: cell.x, y1: cell.y, x2: cell.x, y2: cell.y });
+          function onRectMove(ev: MouseEvent) {
+            const c = getGridCell(ev);
+            if (!c) return;
+            useGameplayStore.getState().setTerrainRectPreview({
+              x1: startCell.x, y1: startCell.y, x2: c.x, y2: c.y,
+            });
+          }
+          function onRectUp(ev: MouseEvent) {
+            const c = getGridCell(ev);
+            const s = useGameplayStore.getState();
+            s.setTerrainRectPreview(null);
+            if (c) {
+              const minX = Math.min(startCell.x, c.x);
+              const minY = Math.min(startCell.y, c.y);
+              const maxX = Math.max(startCell.x, c.x);
+              const maxY = Math.max(startCell.y, c.y);
+              const rectCells: { x: number; y: number }[] = [];
+              for (let x = minX; x <= maxX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                  rectCells.push({ x, y });
+                }
+              }
+              s.paintTerrainArea(rectCells);
+            }
+            document.removeEventListener("mousemove", onRectMove);
+            document.removeEventListener("mouseup", onRectUp);
+          }
+          document.addEventListener("mousemove", onRectMove);
+          document.addEventListener("mouseup", onRectUp);
+          return;
+        }
+        return;
+      }
+
+      // Objects tool
+      if (activeTool === "objects") {
+        const cell = getGridCell(e);
+        if (!cell) return;
+        const store = useGameplayStore.getState();
+        if (e.shiftKey) {
+          // Shift+click removes object at cell
+          const obj = store.mapObjects.find((o) => o.x === cell.x && o.y === cell.y);
+          if (obj) store.removeObject(obj.id);
+        } else {
+          store.placeObject(cell.x, cell.y);
+        }
+        return;
+      }
+
       // Pan
       if (activeTool === "pan" || spaceHeld) {
         panRef.current = { lastX: e.clientX, lastY: e.clientY };
@@ -705,7 +824,8 @@ export function MapCanvas() {
     [getGridCell, onMapTokens, selectToken, openTokenContextMenu, openCellContextMenu],
   );
 
-  // Canvas mouse move (ruler, wall hover)
+  // Canvas mouse move (ruler, wall hover, terrain hover)
+  const setHoverCell = useGameplayStore((s) => s.setHoverCell);
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (activeTool === "ruler" && rulerActive) {
@@ -718,8 +838,14 @@ export function MapCanvas() {
       } else if (hoverWall) {
         setHoverWall(null);
       }
+      if (activeTool === "terrain") {
+        const cell = getGridCell(e);
+        setHoverCell(cell);
+      } else {
+        setHoverCell(null);
+      }
     },
-    [activeTool, rulerActive, getGridCell, getClosestWallSide, hoverWall],
+    [activeTool, rulerActive, getGridCell, getClosestWallSide, hoverWall, setHoverCell],
   );
 
   // Keyboard
@@ -757,10 +883,17 @@ export function MapCanvas() {
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "a") { e.preventDefault(); useGameplayStore.getState().selectAllTokens(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        useGameplayStore.getState().redoTerrain();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
         const st = useGameplayStore.getState();
-        if (st.activeTool === "draw") {
+        if (st.activeTool === "terrain") {
+          st.undoTerrain();
+        } else if (st.activeTool === "draw") {
           st.undoStroke();
         } else {
           const ids = st.selectedTokenIds;
@@ -869,7 +1002,7 @@ export function MapCanvas() {
   const cursorClass =
     activeTool === "pan" || spaceHeld ? "cursor-grab"
     : activeTool === "ruler" || activeTool === "aoe" || activeTool === "region" ? "cursor-crosshair"
-    : activeTool === "draw" || activeTool === "wall" ? "cursor-crosshair"
+    : activeTool === "draw" || activeTool === "wall" || activeTool === "terrain" || activeTool === "objects" ? "cursor-crosshair"
     : "cursor-default";
 
   return (
@@ -883,6 +1016,23 @@ export function MapCanvas() {
           onMouseMove={handleCanvasMouseMove}
           onContextMenu={handleCanvasContextMenu}
         >
+          {/* Background image */}
+          {mapBackgroundImage && (
+            <img
+              src={mapBackgroundImage}
+              alt=""
+              className="pointer-events-none absolute inset-0"
+              style={{
+                width: canvasW,
+                height: canvasH,
+                objectFit: "cover",
+                opacity: mapBackgroundOpacity,
+                transform: `translate(${mapGridOffsetX}px, ${mapGridOffsetY}px)`,
+              }}
+              draggable={false}
+            />
+          )}
+
           {/* Grid */}
           {gridVisible && (
             <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH}>
@@ -897,9 +1047,14 @@ export function MapCanvas() {
 
           {/* Terrain */}
           <TerrainOverlay cells={terrainCells} scaledCell={scaledCell} />
+          <TerrainBrushPreview scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
+          <TerrainRectPreview scaledCell={scaledCell} />
 
           {/* Walls */}
           <WallRenderer scaledCell={scaledCell} canvasW={canvasW} canvasH={canvasH} hoverWall={hoverWall} />
+
+          {/* Map objects */}
+          <ObjectOverlay scaledCell={scaledCell} />
 
           {/* Vision circle (selected token only) */}
           <VisionOverlay

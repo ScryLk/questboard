@@ -1,7 +1,8 @@
-import { Alert, ScrollView, TextInput } from "react-native";
+import { ScrollView, TextInput } from "react-native";
 import { useRouter } from "expo-router";
-import { Image } from "lucide-react-native";
-import { Stack, Text, YStack } from "tamagui";
+import { Image as ImageIcon, X } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Image, Stack, Text, YStack } from "tamagui";
 import { WizardHeader } from "../../../../components/wizard-header";
 import { Button } from "../../../../components/button";
 import { ToggleRow } from "../../../../components/toggle-row";
@@ -16,8 +17,22 @@ export default function Step3Ambiance() {
     router.push("/(app)/sessions/create/step4");
   }
 
-  function handleMapUpload() {
-    Alert.alert("Em breve", "Upload de mapas estará disponível em breve!");
+  async function handleMapUpload() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      store.updateAmbiance({ mapUrl: asset.uri });
+      router.push("/(app)/sessions/create/grid-adjust");
+    }
+  }
+
+  function handleRemoveMap() {
+    store.updateAmbiance({ mapUrl: null });
   }
 
   return (
@@ -38,29 +53,66 @@ export default function Step3Ambiance() {
           Tudo nesta etapa é opcional. Você pode configurar depois.
         </Text>
 
-        {/* Map placeholder */}
+        {/* Map */}
         <YStack gap={6} marginBottom={24}>
           <Text fontSize={14} fontWeight="600" color="$textPrimary">
             Mapa
           </Text>
-          <Stack
-            height={160}
-            borderRadius={14}
-            borderWidth={2}
-            borderColor="$border"
-            borderStyle="dashed"
-            backgroundColor="$bgCard"
-            alignItems="center"
-            justifyContent="center"
-            gap={8}
-            onPress={handleMapUpload}
-            pressStyle={{ opacity: 0.7 }}
-          >
-            <Image size={36} color="#5A5A6E" />
-            <Text fontSize={13} color="$textMuted" textAlign="center">
-              Toque para adicionar{"\n"}um mapa inicial
-            </Text>
-          </Stack>
+
+          {ambiance.mapUrl ? (
+            <Stack
+              borderRadius={14}
+              borderWidth={1}
+              borderColor="$border"
+              backgroundColor="$bgCard"
+              overflow="hidden"
+            >
+              <Image
+                source={{ uri: ambiance.mapUrl }}
+                width="100%"
+                height={160}
+                resizeMode="cover"
+                borderTopLeftRadius={14}
+                borderTopRightRadius={14}
+              />
+              <Stack
+                position="absolute"
+                top={8}
+                right={8}
+                backgroundColor="rgba(0,0,0,0.6)"
+                borderRadius={20}
+                padding={6}
+                onPress={handleRemoveMap}
+                pressStyle={{ opacity: 0.7 }}
+              >
+                <X size={16} color="#fff" />
+              </Stack>
+              <Stack paddingHorizontal={12} paddingVertical={8}>
+                <Text fontSize={11} color="$textMuted">
+                  Imagem carregada
+                </Text>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack
+              height={160}
+              borderRadius={14}
+              borderWidth={2}
+              borderColor="$border"
+              borderStyle="dashed"
+              backgroundColor="$bgCard"
+              alignItems="center"
+              justifyContent="center"
+              gap={8}
+              onPress={handleMapUpload}
+              pressStyle={{ opacity: 0.7 }}
+            >
+              <ImageIcon size={36} color="#5A5A6E" />
+              <Text fontSize={13} color="$textMuted" textAlign="center">
+                Toque para adicionar{"\n"}um mapa inicial
+              </Text>
+            </Stack>
+          )}
         </YStack>
 
         {/* Grid toggle */}
