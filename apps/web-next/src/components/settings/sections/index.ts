@@ -1,0 +1,15 @@
+export { ProfileSection } from "./ProfileSection";
+export { AppearanceSection } from "./AppearanceSection";
+export { SessionSection } from "./SessionSection";
+export { MapSection } from "./MapSection";
+export { CombatSection } from "./CombatSection";
+export { PlayerViewSection } from "./PlayerViewSection";
+export { ChatSection } from "./ChatSection";
+export { AudioSection } from "./AudioSection";
+export { DiceSection } from "./DiceSection";
+export { NotificationsSection } from "./NotificationsSection";
+export { AccessibilitySection } from "./AccessibilitySection";
+export { PerformanceSection } from "./PerformanceSection";
+export { StorageSection } from "./StorageSection";
+export { LanguageSection } from "./LanguageSection";
+export { AboutSection } from "./AboutSection";
