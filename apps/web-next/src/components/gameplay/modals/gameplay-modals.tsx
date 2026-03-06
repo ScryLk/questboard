@@ -10,6 +10,9 @@ import { ShareSessionModal } from "./share-session-modal";
 import { HpAdjustModal } from "./hp-adjust-modal";
 import { CharacterSheetModal } from "./character-sheet-modal";
 import { CreatureCompendiumModal } from "./creature-compendium-modal";
+import { NPCEditorModal } from "./npc-editor/npc-editor-modal";
+import { TokenEditorModal } from "./token-editor/token-editor-modal";
+import { EncounterGroupEditor } from "./encounter-group-editor";
 
 export function GameplayModals() {
   const activeModal = useGameplayStore((s) => s.activeModal);
@@ -36,6 +39,12 @@ export function GameplayModals() {
       return <CharacterSheetModal onClose={closeModal} />;
     case "creatureCompendium":
       return <CreatureCompendiumModal onClose={closeModal} />;
+    case "npcEditor":
+      return <NPCEditorModal onClose={closeModal} />;
+    case "tokenEditor":
+      return <TokenEditorModal onClose={closeModal} />;
+    case "encounterGroupEditor":
+      return <EncounterGroupEditor onClose={closeModal} />;
     default:
       return null;
   }

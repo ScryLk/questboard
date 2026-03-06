@@ -14,6 +14,7 @@ import {
   LogOut,
   Package,
   Palette,
+  Settings,
   Trophy,
   Users,
 } from "lucide-react-native";
@@ -73,7 +74,13 @@ export default function ProfileScreen() {
     router.replace("/");
   }
 
+  const SETTINGS_ITEMS = new Set(["Aparência", "Idioma", "Sistemas Favoritos"]);
+
   function handleMenuPress(label: string) {
+    if (SETTINGS_ITEMS.has(label)) {
+      router.push("/(app)/settings");
+      return;
+    }
     Alert.alert("Em breve", `"${label}" estará disponível em breve!`);
   }
 
@@ -190,6 +197,30 @@ export default function ProfileScreen() {
             </YStack>
           </YStack>
         ))}
+
+        {/* Settings button */}
+        <YStack marginTop={28} paddingHorizontal={16}>
+          <Stack
+            borderRadius={12}
+            backgroundColor="$bgCard"
+            overflow="hidden"
+          >
+            <XStack
+              height={52}
+              alignItems="center"
+              paddingHorizontal={16}
+              gap={12}
+              pressStyle={{ backgroundColor: "$border" }}
+              onPress={() => router.push("/(app)/settings")}
+            >
+              <Settings size={18} color="#6C5CE7" />
+              <Text flex={1} fontSize={15} color="$textPrimary">
+                Configurações
+              </Text>
+              <ChevronRight size={16} color="#5A5A6E" />
+            </XStack>
+          </Stack>
+        </YStack>
 
         {/* Sign out */}
         <YStack marginTop={32} paddingHorizontal={24} gap={12}>

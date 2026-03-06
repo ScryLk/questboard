@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useCustomCreaturesStore } from "@/lib/custom-creatures-store";
 import {
   CREATURE_COMPENDIUM,
   parseCR,
   CR_FILTER_OPTIONS,
+  type Creature,
   type CreatureType,
   type CreatureSize,
 } from "@/lib/creature-data";
 import { CompendiumFilters } from "./creature-compendium/compendium-filters";
 import { CreatureListItem } from "./creature-compendium/creature-list-item";
+import { AIGeneratePanel } from "./creature-compendium/ai-generate-panel";
 
 export interface CompendiumFilterState {
   cr: number | null;
@@ -33,7 +36,9 @@ export function CreatureCompendiumModal({
     size: null,
   });
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAIPanel, setShowAIPanel] = useState(false);
 
+  const customCreatures = useCustomCreaturesStore((s) => s.creatures);
   const compendiumFavorites = useGameplayStore((s) => s.compendiumFavorites);
   const toggleCompendiumFavorite = useGameplayStore(
     (s) => s.toggleCompendiumFavorite,
@@ -50,7 +55,7 @@ export function CreatureCompendiumModal({
 
   // Filter + sort creatures
   const filteredCreatures = useMemo(() => {
-    let result = CREATURE_COMPENDIUM;
+    let result: Creature[] = [...CREATURE_COMPENDIUM, ...customCreatures];
 
     // Search filter
     if (searchQuery.trim()) {
@@ -91,7 +96,7 @@ export function CreatureCompendiumModal({
       if (aFav !== bFav) return aFav - bFav;
       return parseCR(a.cr) - parseCR(b.cr);
     });
-  }, [searchQuery, filters, compendiumFavorites]);
+  }, [searchQuery, filters, compendiumFavorites, customCreatures]);
 
   const favoriteCreatures = useMemo(
     () => filteredCreatures.filter((c) => compendiumFavorites.has(c.id)),
@@ -118,13 +123,29 @@ export function CreatureCompendiumModal({
           <h2 className="text-sm font-bold uppercase tracking-wider text-brand-text">
             Compendio de Criaturas
           </h2>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAIPanel(!showAIPanel)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                showAIPanel
+                  ? "bg-brand-accent/30 text-brand-accent"
+                  : "bg-brand-accent/10 text-brand-accent/70 hover:bg-brand-accent/20"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Gerar com IA
+            </button>
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
+
+        {/* AI Generation Panel */}
+        {showAIPanel && <AIGeneratePanel />}
 
         {/* Filters */}
         <div className="shrink-0 border-b border-brand-border px-5 py-3">

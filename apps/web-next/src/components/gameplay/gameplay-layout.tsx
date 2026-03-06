@@ -22,6 +22,9 @@ import { RightPanel } from "./right-panel/right-panel";
 import { MapCanvas } from "./map-canvas/map-canvas";
 import { ResizableDivider } from "./shared/resizable-divider";
 import { GameplayModals } from "./modals/gameplay-modals";
+import { ActionBar } from "./action-bar/action-bar";
+import { OAAlertVignette } from "./effects/oa-alert-vignette";
+import { SFXProvider } from "./audio/sfx-provider";
 
 export function GameplayLayout() {
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
@@ -32,8 +35,10 @@ export function GameplayLayout() {
   const toggleRightPanel = useGameplayStore((s) => s.toggleRightPanel);
   const setLeftPanelWidth = useGameplayStore((s) => s.setLeftPanelWidth);
   const setRightPanelWidth = useGameplayStore((s) => s.setRightPanelWidth);
+  const pendingReaction = useGameplayStore((s) => s.pendingReaction);
 
   return (
+    <SFXProvider>
     <div
       className="bg-[#0A0A0F]"
       style={{
@@ -136,8 +141,15 @@ export function GameplayLayout() {
         )}
       </div>
 
+      {/* Action Bar — combat turn controls */}
+      <ActionBar />
+
       {/* Modals */}
       <GameplayModals />
+
+      {/* OA dramatic vignette */}
+      <OAAlertVignette active={pendingReaction !== null} />
     </div>
+    </SFXProvider>
   );
 }

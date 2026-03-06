@@ -234,6 +234,8 @@ export function PlayerCanvas() {
         <TerrainOverlay
           cells={terrainCells}
           scaledCell={scaledCell}
+          gridCols={gridCols}
+          gridRows={gridRows}
         />
 
         {/* AOE zones */}

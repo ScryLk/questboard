@@ -25,6 +25,7 @@ import { SceneCardOverlay } from "../../../../components/gameplay/scene-card-ove
 import { TokenContextMenu } from "../../../../components/gameplay/token-context-menu";
 import { PlayerSheetModal } from "../../../../components/gameplay/player-sheet-modal";
 import { NPCCardModal } from "../../../../components/gameplay/npc-card-modal";
+import { GameplaySettingsModal } from "../../../../components/gameplay/gameplay-settings-modal";
 
 export default function GameplayScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -32,6 +33,7 @@ export default function GameplayScreen() {
   const activeGMToolView = useGameplayStore((s) => s.activeGMToolView);
   const isGM = useGameplayStore((s) => s.isGM);
   const combatActive = useGameplayStore((s) => s.combatActive);
+  const settingsModalOpen = useGameplayStore((s) => s.settingsModalOpen);
 
   useEffect(() => {
     loadMockGameplay(useGameplayStore.setState);
@@ -70,6 +72,9 @@ export default function GameplayScreen() {
       {/* Character Sheet Modals */}
       <PlayerSheetModal />
       <NPCCardModal />
+
+      {/* Settings Modal */}
+      <GameplaySettingsModal isOpen={settingsModalOpen} />
 
       {/* Context Menu */}
       <TokenContextMenu />

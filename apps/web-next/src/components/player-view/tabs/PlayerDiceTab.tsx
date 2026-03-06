@@ -6,6 +6,7 @@ import type { DieType, ChatMessage } from "@/lib/gameplay-mock-data";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { broadcastSend } from "@/lib/broadcast-sync";
+import { playSFX } from "@/lib/audio/sfx-triggers";
 
 const DICE: { type: DieType; sides: number; label: string }[] = [
   { type: "d4", sides: 4, label: "D4" },
@@ -66,6 +67,11 @@ export function PlayerDiceTab() {
         isNat1,
       };
       setHistory((prev) => [entry, ...prev].slice(0, 20));
+
+      // SFX
+      if (isNat20) playSFX("dice:nat20");
+      else if (isNat1) playSFX("dice:nat1");
+      else playSFX("dice:roll");
 
       // Trigger nat celebration
       if (isNat20) {

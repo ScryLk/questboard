@@ -8,8 +8,9 @@ import {
   getHpColor,
   gridDistance,
 } from "@/lib/gameplay-mock-data";
-import type { RulerPoint, WallSide } from "@/lib/gameplay-mock-data";
+import type { RulerPoint } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { getNearestEdge, rectangleWallKeys, type NearestEdge } from "@/lib/wall-helpers";
 import { TokenContextMenu } from "./menus/token-context-menu";
 import { CellContextMenu } from "./menus/cell-context-menu";
 import { CanvasContextMenu } from "./menus/canvas-context-menu";
@@ -37,6 +38,25 @@ import { TerrainBrushPreview, getBrushCells } from "./overlays/terrain-brush-pre
 import { TerrainRectPreview } from "./overlays/terrain-rect-preview";
 import { ObjectOverlay } from "./overlays/object-overlay";
 import { MiniMap } from "./overlays/mini-map";
+import { OAPreviewOverlay } from "./overlays/oa-preview-overlay";
+import { ReactionPrompt } from "./overlays/reaction-prompt";
+import { detectOpportunityAttacks, executeOpportunityAttack } from "@/lib/reactions";
+import { playOAAlertSound } from "@/lib/oa-alert-sound";
+import { PathOverlay } from "./overlays/path-overlay";
+import { PathPreviewPanel } from "./overlays/path-preview-panel";
+import { findPath } from "@/lib/pathfinding";
+import { calculateStepCost } from "@/lib/movement-cost";
+import { detectStepEvents } from "@/lib/path-event-detection";
+import type { PathCell } from "@/lib/gameplay-store";
+import { useSettingsStore } from "@/lib/settings-store";
+import { useNPCStore } from "@/lib/npc-store";
+import type { TokenAlignment } from "@/lib/gameplay-mock-data";
+import { CREATURE_COMPENDIUM } from "@/lib/creature-data";
+import { useCustomCreaturesStore } from "@/lib/custom-creatures-store";
+import { useTokenLibraryStore } from "@/lib/token-library-store";
+import { useMapSidebarStore } from "@/lib/map-sidebar-store";
+import { AMBIENT_LIGHT_CONFIG } from "@/lib/map-sidebar-types";
+import type { LayerId } from "@/lib/map-sidebar-types";
 
 export function MapCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
@@ -91,6 +111,28 @@ export function MapCanvas() {
   const mapBackgroundOpacity = useGameplayStore((s) => s.mapBackgroundOpacity);
   const mapGridOffsetX = useGameplayStore((s) => s.mapGridOffsetX);
   const mapGridOffsetY = useGameplayStore((s) => s.mapGridOffsetY);
+  const turnActions = useGameplayStore((s) => s.turnActions);
+  const reactionUsedMap = useGameplayStore((s) => s.reactionUsedMap);
+  const pendingReaction = useGameplayStore((s) => s.pendingReaction);
+  const pathPlanningActive = useGameplayStore((s) => s.pathPlanningActive);
+  const pathPlanningTokenId = useGameplayStore((s) => s.pathPlanningTokenId);
+  const plannedPath = useGameplayStore((s) => s.plannedPath);
+  const enterPathPlanning = useGameplayStore((s) => s.enterPathPlanning);
+  const exitPathPlanning = useGameplayStore((s) => s.exitPathPlanning);
+  const addPathCell = useGameplayStore((s) => s.addPathCell);
+  const undoPathStep = useGameplayStore((s) => s.undoPathStep);
+
+  // Map sidebar store — layers, lighting, annotations visibility
+  const layers = useMapSidebarStore((s) => s.layers);
+  const ambientLight = useMapSidebarStore((s) => s.ambientLight);
+  const showGMNotes = useMapSidebarStore((s) => s.showGMNotes);
+  const showMarkers = useMapSidebarStore((s) => s.showMarkers);
+
+  // Helper: get layer state by id
+  const getLayer = useCallback(
+    (id: LayerId) => layers.find((l) => l.id === id),
+    [layers],
+  );
 
   const { gridCols, gridRows, cellSize, cellSizeFt, name } = MOCK_MAP;
   const scaledCell = cellSize;
@@ -127,8 +169,8 @@ export function MapCanvas() {
   // Selection box ref
   const selBoxRef = useRef<{ startPxX: number; startPxY: number } | null>(null);
 
-  // Wall tool hover
-  const [hoverWall, setHoverWall] = useState<{ x: number; y: number; side: WallSide } | null>(null);
+  // Wall tool hover (edge-based)
+  const [hoverEdge, setHoverEdge] = useState<NearestEdge | null>(null);
 
   // Space pan
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -159,36 +201,16 @@ export function MapCanvas() {
     [scaledCell, gridCols, gridRows],
   );
 
-  // Get closest wall side from mouse position
-  const getClosestWallSide = useCallback(
-    (e: MouseEvent | React.MouseEvent): { x: number; y: number; side: WallSide } | null => {
+  // Get nearest wall edge from mouse position (edge-based)
+  const getMouseEdge = useCallback(
+    (e: MouseEvent | React.MouseEvent): NearestEdge | null => {
       if (!canvasRef.current) return null;
       const rect = canvasRef.current.getBoundingClientRect();
       const sLeft = scrollRef.current?.scrollLeft ?? 0;
       const sTop = scrollRef.current?.scrollTop ?? 0;
       const px = e.clientX - rect.left + sLeft;
       const py = e.clientY - rect.top + sTop;
-
-      const cellX = Math.floor(px / scaledCell);
-      const cellY = Math.floor(py / scaledCell);
-      if (cellX < 0 || cellX >= gridCols || cellY < 0 || cellY >= gridRows) return null;
-
-      const localX = (px / scaledCell) - cellX;
-      const localY = (py / scaledCell) - cellY;
-
-      const distTop = localY;
-      const distBottom = 1 - localY;
-      const distLeft = localX;
-      const distRight = 1 - localX;
-
-      const min = Math.min(distTop, distBottom, distLeft, distRight);
-      let side: WallSide;
-      if (min === distTop) side = "top";
-      else if (min === distBottom) side = "bottom";
-      else if (min === distLeft) side = "left";
-      else side = "right";
-
-      return { x: cellX, y: cellY, side };
+      return getNearestEdge(px, py, scaledCell, gridCols, gridRows);
     },
     [scaledCell, gridCols, gridRows],
   );
@@ -267,6 +289,15 @@ export function MapCanvas() {
       if (e.ctrlKey || e.metaKey) { toggleTokenSelection(tokenId); return; }
       selectToken(tokenId);
 
+      // Path planning: clicking own token during combat turn enters planning mode
+      if (combat.active && currentTurnTokenId === tokenId && !pathPlanningActive) {
+        enterPathPlanning(tokenId);
+        return;
+      }
+
+      // If path planning is active, don't start drag
+      if (pathPlanningActive) return;
+
       const token = tokens.find((t) => t.id === tokenId);
       if (!token || !canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
@@ -336,6 +367,34 @@ export function MapCanvas() {
           }
           addMovementFt(totalDist);
           moveToken(orig.tokenId, gx, gy);
+
+          // Check for Opportunity Attacks
+          const state = useGameplayStore.getState();
+          if (state.combat.active) {
+            const pendingOAs = detectOpportunityAttacks(
+              orig.tokenId,
+              orig.originX,
+              orig.originY,
+              gx,
+              gy,
+              state.tokens,
+              state.reactionUsedMap,
+              state.turnActions.isDisengaging,
+              cellSizeFt,
+            );
+            if (pendingOAs.length > 0) {
+              state.setPendingReaction(pendingOAs[0]);
+
+              // Dramatic alert: sound + screen shake
+              const audioSettings = useSettingsStore.getState().audio;
+              if (!audioSettings.muteAll) {
+                const vol = (audioSettings.effectsVolume * audioSettings.masterVolume) / 10000;
+                playOAAlertSound(vol);
+              }
+              canvasRef.current?.classList.add("animate-oa-shake");
+              setTimeout(() => canvasRef.current?.classList.remove("animate-oa-shake"), 150);
+            }
+          }
         }
         dragRef.current = null;
         setDragPos(null);
@@ -355,7 +414,7 @@ export function MapCanvas() {
       document.body.style.cursor = "grabbing";
       document.body.style.userSelect = "none";
     },
-    [tokens, scaledCell, gridCols, gridRows, cellSizeFt, selectToken, toggleTokenSelection, moveToken, pushMovementHistory, addMovementFt, closeContextMenu],
+    [tokens, scaledCell, gridCols, gridRows, cellSizeFt, selectToken, toggleTokenSelection, moveToken, pushMovementHistory, addMovementFt, closeContextMenu, combat.active, currentTurnTokenId, pathPlanningActive, enterPathPlanning],
   );
 
   // Canvas mousedown (selection box, ruler, ping, pan)
@@ -363,6 +422,75 @@ export function MapCanvas() {
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
       closeContextMenu();
+
+      // Path planning: clicks on map add cells to planned path
+      if (pathPlanningActive && pathPlanningTokenId) {
+        const cell = getGridCell(e);
+        if (!cell) return;
+
+        const state = useGameplayStore.getState();
+        const token = state.tokens.find((t) => t.id === pathPlanningTokenId);
+        if (!token) return;
+
+        const currentPath = state.plannedPath;
+        const lastCell = currentPath.length > 0
+          ? { x: currentPath[currentPath.length - 1].x, y: currentPath[currentPath.length - 1].y }
+          : { x: token.x, y: token.y };
+
+        // Don't add if clicking the same cell
+        if (cell.x === lastCell.x && cell.y === lastCell.y) return;
+
+        // Check if adjacent (Chebyshev distance = 1) or needs pathfinding
+        const dist = Math.max(Math.abs(cell.x - lastCell.x), Math.abs(cell.y - lastCell.y));
+
+        if (dist === 1) {
+          // Adjacent: add single cell
+          const step = calculateStepCost(lastCell.x, lastCell.y, cell.x, cell.y, state.terrainCells, cellSizeFt);
+          if (step.isImpassable) return;
+          const prevTotalFt = currentPath.length > 0 ? currentPath[currentPath.length - 1].totalFt : 0;
+          const events = detectStepEvents(
+            lastCell.x, lastCell.y, cell.x, cell.y,
+            pathPlanningTokenId, state.tokens, state.reactionUsedMap,
+            state.turnActions.isDisengaging, state.wallEdges, state.terrainCells, cellSizeFt,
+          );
+          addPathCell({
+            x: cell.x, y: cell.y,
+            ftCost: step.ftCost, totalFt: prevTotalFt + step.ftCost,
+            isDiagonal: step.isDiagonal, isDifficultTerrain: step.isDifficultTerrain,
+            events,
+          });
+        } else {
+          // Distant: use A* to find route
+          const result = findPath(
+            lastCell.x, lastCell.y, cell.x, cell.y,
+            state.wallEdges, state.terrainCells, gridCols, gridRows, cellSizeFt,
+          );
+          if (!result.found || result.path.length === 0) return;
+
+          let prevX = lastCell.x;
+          let prevY = lastCell.y;
+          let runningFt = currentPath.length > 0 ? currentPath[currentPath.length - 1].totalFt : 0;
+
+          for (const p of result.path) {
+            const step = calculateStepCost(prevX, prevY, p.x, p.y, state.terrainCells, cellSizeFt);
+            runningFt += step.ftCost;
+            const events = detectStepEvents(
+              prevX, prevY, p.x, p.y,
+              pathPlanningTokenId, state.tokens, state.reactionUsedMap,
+              state.turnActions.isDisengaging, state.wallEdges, state.terrainCells, cellSizeFt,
+            );
+            addPathCell({
+              x: p.x, y: p.y,
+              ftCost: step.ftCost, totalFt: runningFt,
+              isDiagonal: step.isDiagonal, isDifficultTerrain: step.isDifficultTerrain,
+              events,
+            });
+            prevX = p.x;
+            prevY = p.y;
+          }
+        }
+        return;
+      }
 
       // Click-outside dismisses finalized region
       if (regionSelection?.finalized) {
@@ -378,54 +506,95 @@ export function MapCanvas() {
         }
       }
 
-      // Wall tool
+      // Wall tool (edge-based)
       if (activeTool === "wall") {
-        const wallInfo = getClosestWallSide(e);
-        if (!wallInfo) return;
+        if (getLayer("walls")?.locked) return;
+        const edge = getMouseEdge(e);
+        if (!edge) return;
         const st = useGameplayStore.getState();
+        const { wallDrawMode, activeWallEdgeType, activeWallStyle } = st;
 
+        if (wallDrawMode === "rectangle") {
+          // Rectangle mode: drag to define rectangle, walls on release
+          const startCell = getGridCell(e);
+          if (!startCell) return;
+
+          function onRectMove(ev: MouseEvent) {
+            // The rectangle preview is handled by hoverEdge + rectangle state
+            // For now, just update the end cell (could store in ref for preview)
+          }
+          function onRectUp(ev: MouseEvent) {
+            const endCell = getGridCell(ev);
+            if (endCell && startCell) {
+              const keys = rectangleWallKeys(
+                startCell.x, startCell.y, endCell.x, endCell.y,
+                gridCols, gridRows,
+              );
+              const s = useGameplayStore.getState();
+              for (const key of keys) {
+                s.addWallEdge(key, { type: s.activeWallEdgeType, style: s.activeWallStyle });
+              }
+            }
+            document.removeEventListener("mousemove", onRectMove);
+            document.removeEventListener("mouseup", onRectUp);
+          }
+          document.addEventListener("mousemove", onRectMove);
+          document.addEventListener("mouseup", onRectUp);
+          return;
+        }
+
+        if (wallDrawMode === "erase") {
+          // Erase mode: click to remove, drag to erase multiple
+          st.removeWallEdge(edge.key);
+          const erased = new Set<string>([edge.key]);
+          function onEraseMove(ev: MouseEvent) {
+            const e2 = getMouseEdge(ev);
+            if (!e2 || erased.has(e2.key)) return;
+            erased.add(e2.key);
+            useGameplayStore.getState().removeWallEdge(e2.key);
+          }
+          function onEraseUp() {
+            document.removeEventListener("mousemove", onEraseMove);
+            document.removeEventListener("mouseup", onEraseUp);
+          }
+          document.addEventListener("mousemove", onEraseMove);
+          document.addEventListener("mouseup", onEraseUp);
+          return;
+        }
+
+        // Line mode (default)
         if (e.shiftKey) {
-          // Shift+click: create/toggle door
-          const existing = st.walls.find(
-            (w) => w.x === wallInfo.x && w.y === wallInfo.y && w.side === wallInfo.side,
-          );
+          // Shift+click: create/toggle door on this edge
+          const existing = st.wallEdges[edge.key];
           if (existing) {
-            if (existing.isDoor) {
-              st.toggleDoor(wallInfo.x, wallInfo.y, wallInfo.side);
+            if (existing.type === "door-closed" || existing.type === "door-open" || existing.type === "door-locked") {
+              st.toggleDoorEdge(edge.key);
             } else {
               // Convert wall to door
-              st.removeWall(wallInfo.x, wallInfo.y, wallInfo.side);
-              st.addWall({ ...wallInfo, isDoor: true, doorOpen: false });
+              st.updateWallEdge(edge.key, { type: "door-closed" });
             }
           } else {
-            st.addWall({ ...wallInfo, isDoor: true, doorOpen: false });
+            st.addWallEdge(edge.key, { type: "door-closed", style: activeWallStyle });
           }
         } else {
-          // Normal click: toggle wall
-          const existing = st.walls.find(
-            (w) => w.x === wallInfo.x && w.y === wallInfo.y && w.side === wallInfo.side,
-          );
-          if (existing) {
-            st.removeWall(wallInfo.x, wallInfo.y, wallInfo.side);
+          // Normal click: toggle wall (place or remove)
+          const existing = st.wallEdges[edge.key];
+          if (existing && existing.type === activeWallEdgeType && existing.style === activeWallStyle) {
+            st.removeWallEdge(edge.key);
           } else {
-            st.addWall({ ...wallInfo, isDoor: false, doorOpen: false });
+            st.addWallEdge(edge.key, { type: activeWallEdgeType, style: activeWallStyle });
           }
         }
 
         // Drag to add multiple walls
-        const paintedWalls = new Set<string>([`${wallInfo.x},${wallInfo.y},${wallInfo.side}`]);
+        const painted = new Set<string>([edge.key]);
         function onWallMove(ev: MouseEvent) {
-          const wi = getClosestWallSide(ev);
-          if (!wi) return;
-          const key = `${wi.x},${wi.y},${wi.side}`;
-          if (paintedWalls.has(key)) return;
-          paintedWalls.add(key);
+          const e2 = getMouseEdge(ev);
+          if (!e2 || painted.has(e2.key)) return;
+          painted.add(e2.key);
           const s = useGameplayStore.getState();
-          const exists = s.walls.find(
-            (w) => w.x === wi.x && w.y === wi.y && w.side === wi.side,
-          );
-          if (!exists) {
-            s.addWall({ ...wi, isDoor: false, doorOpen: false });
+          if (!s.wallEdges[e2.key]) {
+            s.addWallEdge(e2.key, { type: s.activeWallEdgeType, style: s.activeWallStyle });
           }
         }
         function onWallUp() {
@@ -582,6 +751,7 @@ export function MapCanvas() {
 
       // Fog
       if (activeTool === "fog") {
+        if (getLayer("fog")?.locked) return;
         const cell = getGridCell(e);
         if (!cell) return;
         useGameplayStore.getState().toggleFogCell(cell.x, cell.y);
@@ -615,6 +785,7 @@ export function MapCanvas() {
 
       // Terrain
       if (activeTool === "terrain") {
+        if (getLayer("terrain")?.locked) return;
         const cell = getGridCell(e);
         if (!cell) return;
         const st = useGameplayStore.getState();
@@ -712,6 +883,7 @@ export function MapCanvas() {
 
       // Objects tool
       if (activeTool === "objects") {
+        if (getLayer("decorations")?.locked) return;
         const cell = getGridCell(e);
         if (!cell) return;
         const store = useGameplayStore.getState();
@@ -802,13 +974,18 @@ export function MapCanvas() {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [activeTool, spaceHeld, scaledCell, onMapTokens, getGridCell, closeContextMenu, clearSelection, setSelectionBox, addRulerPoint, setRulerActive, clearRuler, addPing, aoeShape, aoeColor, setAoePlacing, addAoe, drawingTool, drawColor, drawWidth, regionSelection, clearRegion, startRegionDrag],
+    [activeTool, spaceHeld, scaledCell, onMapTokens, getGridCell, closeContextMenu, clearSelection, setSelectionBox, addRulerPoint, setRulerActive, clearRuler, addPing, aoeShape, aoeColor, setAoePlacing, addAoe, drawingTool, drawColor, drawWidth, regionSelection, clearRegion, startRegionDrag, pathPlanningActive, pathPlanningTokenId, addPathCell, cellSizeFt, gridCols, gridRows],
   );
 
   // Canvas right-click
   const handleCanvasContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      // Right-click exits path planning
+      if (pathPlanningActive) {
+        exitPathPlanning();
+        return;
+      }
       const cell = getGridCell(e);
       if (!cell) return;
       const hit = onMapTokens.find(
@@ -821,7 +998,7 @@ export function MapCanvas() {
         openCellContextMenu(cell.x, cell.y, e.clientX, e.clientY);
       }
     },
-    [getGridCell, onMapTokens, selectToken, openTokenContextMenu, openCellContextMenu],
+    [getGridCell, onMapTokens, selectToken, openTokenContextMenu, openCellContextMenu, pathPlanningActive, exitPathPlanning],
   );
 
   // Canvas mouse move (ruler, wall hover, terrain hover)
@@ -833,10 +1010,10 @@ export function MapCanvas() {
         if (cell) setRulerMouse(cell);
       }
       if (activeTool === "wall") {
-        const wallInfo = getClosestWallSide(e);
-        setHoverWall(wallInfo);
-      } else if (hoverWall) {
-        setHoverWall(null);
+        const edge = getMouseEdge(e);
+        setHoverEdge(edge);
+      } else if (hoverEdge) {
+        setHoverEdge(null);
       }
       if (activeTool === "terrain") {
         const cell = getGridCell(e);
@@ -845,7 +1022,23 @@ export function MapCanvas() {
         setHoverCell(null);
       }
     },
-    [activeTool, rulerActive, getGridCell, getClosestWallSide, hoverWall, setHoverCell],
+    [activeTool, rulerActive, getGridCell, getMouseEdge, hoverEdge, setHoverCell],
+  );
+
+  // Double-click: toggle doors
+  const handleCanvasDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (activeTool !== "wall") return;
+      const edge = getMouseEdge(e);
+      if (!edge) return;
+      const st = useGameplayStore.getState();
+      const wall = st.wallEdges[edge.key];
+      if (!wall) return;
+      if (wall.type === "door-closed" || wall.type === "door-open" || wall.type === "door-locked") {
+        st.toggleDoorEdge(edge.key);
+      }
+    },
+    [activeTool, getMouseEdge],
   );
 
   // Keyboard
@@ -863,6 +1056,25 @@ export function MapCanvas() {
         if (k === "T") { useGameplayStore.getState().regionPaintTerrain(); return; }
         if (e.key === "Delete" || e.key === "Backspace") { useGameplayStore.getState().regionClear(); return; }
         if (e.key === "Escape") { clearRegion(); return; }
+      }
+
+      // Path planning keyboard shortcuts
+      const ppState = useGameplayStore.getState();
+      if (ppState.pathPlanningActive) {
+        if (e.key === "Escape") { ppState.exitPathPlanning(); return; }
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (ppState.plannedPath.length > 0) {
+            // Dynamically import to avoid circular dependency
+            import("@/lib/path-execution").then(({ executePath }) => {
+              executePath(ppState.pathPlanningTokenId!, ppState.plannedPath);
+            });
+          }
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); ppState.undoPathStep(); return; }
+        if (e.key === "Backspace") { ppState.undoPathStep(); return; }
+        return; // Consume all other keys during path planning
       }
 
       if (e.key === "Escape") {
@@ -999,6 +1211,91 @@ export function MapCanvas() {
     ? tokens.find((t) => t.id === contextMenu.tokenId)
     : null;
 
+  // NPC drag-and-drop from sidebar
+  const addToken = useGameplayStore((s) => s.addToken);
+  const linkTokenToCreature = useGameplayStore((s) => s.linkTokenToCreature);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    // Convert drop position to grid cell
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cellX = Math.floor((e.clientX - rect.left) / scaledCell);
+    const cellY = Math.floor((e.clientY - rect.top) / scaledCell);
+
+    // ── NPC drop ──
+    const npcId = e.dataTransfer.getData("application/questboard-npc");
+    if (npcId) {
+      e.preventDefault();
+      const npcStore = useNPCStore.getState();
+      const npc = npcStore.npcs.find((n) => n.id === npcId);
+      if (!npc) return;
+
+      let hp = 10, maxHp = 10, ac = 10, speed = 30, size = 1;
+      let creatureId: string | null = null;
+
+      if (npc.statBlockSource === "inline" && npc.inlineStats) {
+        hp = npc.inlineStats.hp; maxHp = npc.inlineStats.maxHp;
+        ac = npc.inlineStats.ac; speed = npc.inlineStats.speed;
+        size = npc.inlineStats.size;
+      } else if (npc.statBlockSource === "compendium" && npc.compendiumCreatureId) {
+        const c = CREATURE_COMPENDIUM.find((cr) => cr.id === npc.compendiumCreatureId);
+        if (c) { hp = c.hp; maxHp = c.hp; ac = c.ac; speed = parseInt(c.speed) || 30; creatureId = c.id; }
+      } else if (npc.statBlockSource === "custom" && npc.customCreatureId) {
+        const c = useCustomCreaturesStore.getState().creatures.find((cr) => cr.id === npc.customCreatureId);
+        if (c) { hp = c.hp; maxHp = c.hp; ac = c.ac; speed = parseInt(c.speed) || 30; creatureId = c.id; }
+      }
+
+      const alignmentMap: Record<string, TokenAlignment> = { hostile: "hostile", neutral: "neutral", ally: "ally", merchant: "neutral" };
+      const tokenId = `tok_npc_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+
+      addToken({ id: tokenId, name: npc.name, alignment: alignmentMap[npc.type] ?? "neutral", hp, maxHp, ac, speed, size, x: cellX, y: cellY, icon: npc.portrait || undefined });
+      npcStore.linkTokenToNpc(npcId, tokenId);
+      if (creatureId) linkTokenToCreature(tokenId, creatureId);
+      return;
+    }
+
+    // ── Saved Token drop ──
+    const savedTokenId = e.dataTransfer.getData("application/questboard-token");
+    if (savedTokenId) {
+      e.preventDefault();
+      const savedToken = useTokenLibraryStore.getState().savedTokens.find((t) => t.id === savedTokenId);
+      if (!savedToken) return;
+
+      const typeAlignMap: Record<string, TokenAlignment> = { hostile: "hostile", ally: "ally", neutral: "neutral", object: "neutral", trap: "neutral", mount: "ally" };
+      const tokenId = `tok_lib_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+      addToken({
+        id: tokenId, name: savedToken.name,
+        alignment: typeAlignMap[savedToken.type] ?? "neutral",
+        hp: savedToken.hp, maxHp: savedToken.hp, ac: savedToken.ac,
+        speed: parseInt(savedToken.speed) || 30, size: savedToken.gridSize,
+        x: cellX, y: cellY, icon: savedToken.icon || undefined,
+      });
+      if (savedToken.compendiumId) linkTokenToCreature(tokenId, savedToken.compendiumId);
+      return;
+    }
+
+    // ── Compendium creature drop ──
+    const compendiumId = e.dataTransfer.getData("application/questboard-compendium");
+    if (compendiumId) {
+      e.preventDefault();
+      const creature = CREATURE_COMPENDIUM.find((c) => c.id === compendiumId)
+        ?? useCustomCreaturesStore.getState().creatures.find((c) => c.id === compendiumId);
+      if (!creature) return;
+
+      const sizeMap: Record<string, number> = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
+      const tokenId = `tok_comp_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+      addToken({
+        id: tokenId, name: creature.name,
+        alignment: "hostile" as TokenAlignment,
+        hp: creature.hp, maxHp: creature.hp, ac: creature.ac,
+        speed: parseInt(creature.speed) || 30, size: sizeMap[creature.size] ?? 1,
+        x: cellX, y: cellY, icon: creature.icon || undefined,
+      });
+      linkTokenToCreature(tokenId, creature.id);
+      return;
+    }
+  }, [scaledCell, addToken, linkTokenToCreature]);
+
   const cursorClass =
     activeTool === "pan" || spaceHeld ? "cursor-grab"
     : activeTool === "ruler" || activeTool === "aoe" || activeTool === "region" ? "cursor-crosshair"
@@ -1014,10 +1311,13 @@ export function MapCanvas() {
           style={{ width: canvasW, height: canvasH }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
+          onDoubleClick={handleCanvasDoubleClick}
           onContextMenu={handleCanvasContextMenu}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+          onDrop={handleDrop}
         >
-          {/* Background image */}
-          {mapBackgroundImage && (
+          {/* Background image (layer: background) */}
+          {mapBackgroundImage && getLayer("background")?.visible && (
             <img
               src={mapBackgroundImage}
               alt=""
@@ -1026,16 +1326,16 @@ export function MapCanvas() {
                 width: canvasW,
                 height: canvasH,
                 objectFit: "cover",
-                opacity: mapBackgroundOpacity,
+                opacity: mapBackgroundOpacity * (getLayer("background")?.opacity ?? 100) / 100,
                 transform: `translate(${mapGridOffsetX}px, ${mapGridOffsetY}px)`,
               }}
               draggable={false}
             />
           )}
 
-          {/* Grid */}
-          {gridVisible && (
-            <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH}>
+          {/* Grid (layer: grid) */}
+          {gridVisible && getLayer("grid")?.visible && (
+            <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH} style={{ opacity: (getLayer("grid")?.opacity ?? 100) / 100 }}>
               {Array.from({ length: gridCols + 1 }).map((_, i) => (
                 <line key={`v${i}`} x1={i * scaledCell} y1={0} x2={i * scaledCell} y2={canvasH} stroke="#1E1E2A" strokeWidth={1} />
               ))}
@@ -1045,16 +1345,28 @@ export function MapCanvas() {
             </svg>
           )}
 
-          {/* Terrain */}
-          <TerrainOverlay cells={terrainCells} scaledCell={scaledCell} />
-          <TerrainBrushPreview scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
-          <TerrainRectPreview scaledCell={scaledCell} />
+          {/* Terrain (layer: terrain) */}
+          {getLayer("terrain")?.visible && (
+            <div style={{ opacity: (getLayer("terrain")?.opacity ?? 100) / 100 }}>
+              <TerrainOverlay cells={terrainCells} scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
+              <TerrainBrushPreview scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
+              <TerrainRectPreview scaledCell={scaledCell} />
+            </div>
+          )}
 
-          {/* Walls */}
-          <WallRenderer scaledCell={scaledCell} canvasW={canvasW} canvasH={canvasH} hoverWall={hoverWall} />
+          {/* Walls (layer: walls) */}
+          {getLayer("walls")?.visible && (
+            <div style={{ opacity: (getLayer("walls")?.opacity ?? 100) / 100 }}>
+              <WallRenderer scaledCell={scaledCell} canvasW={canvasW} canvasH={canvasH} hoverEdge={hoverEdge} />
+            </div>
+          )}
 
-          {/* Map objects */}
-          <ObjectOverlay scaledCell={scaledCell} />
+          {/* Map objects (layer: decorations) */}
+          {getLayer("decorations")?.visible && (
+            <div style={{ opacity: (getLayer("decorations")?.opacity ?? 100) / 100 }}>
+              <ObjectOverlay scaledCell={scaledCell} />
+            </div>
+          )}
 
           {/* Vision circle (selected token only) */}
           <VisionOverlay
@@ -1067,24 +1379,33 @@ export function MapCanvas() {
           />
 
           {/* Markers & Notes */}
-          <MarkersOverlay markers={markers} scaledCell={scaledCell} />
-          <NotesOverlay notes={notes} scaledCell={scaledCell} />
+          {showMarkers && <MarkersOverlay markers={markers} scaledCell={scaledCell} />}
+          {showGMNotes && <NotesOverlay notes={notes} scaledCell={scaledCell} />}
           <LightSourceOverlay scaledCell={scaledCell} />
 
-          {/* Fog */}
-          <FogOverlay
-            canvasW={canvasW}
-            canvasH={canvasH}
-            scaledCell={scaledCell}
-            scrollLeft={viewport.x}
-            scrollTop={viewport.y}
-            viewportW={viewport.w}
-            viewportH={viewport.h}
-          />
+          {/* Fog (layer: fog) */}
+          {getLayer("fog")?.visible && (
+            <div style={{ opacity: (getLayer("fog")?.opacity ?? 100) / 100 }}>
+              <FogOverlay
+                canvasW={canvasW}
+                canvasH={canvasH}
+                scaledCell={scaledCell}
+                scrollLeft={viewport.x}
+                scrollTop={viewport.y}
+                viewportW={viewport.w}
+                viewportH={viewport.h}
+              />
+            </div>
+          )}
 
-          {/* Movement preview */}
-          {currentTurnToken?.onMap && (
+          {/* Movement preview (hidden during path planning) */}
+          {currentTurnToken?.onMap && !pathPlanningActive && (
             <MovementPreview token={currentTurnToken} scaledCell={scaledCell} movementUsedFt={movementUsedFt} />
+          )}
+
+          {/* Path planning overlay */}
+          {pathPlanningActive && (
+            <PathOverlay scaledCell={scaledCell} cellSizeFt={cellSizeFt} />
           )}
 
           {/* Turn indicator */}
@@ -1105,6 +1426,22 @@ export function MapCanvas() {
             </>
           )}
 
+          {/* OA Preview during drag */}
+          {dragPos && dragRef.current && combat.active && (
+            <OAPreviewOverlay
+              draggedTokenId={dragPos.id}
+              originX={dragRef.current.originX}
+              originY={dragRef.current.originY}
+              currentX={dragPos.x}
+              currentY={dragPos.y}
+              tokens={onMapTokens}
+              reactionUsedMap={reactionUsedMap}
+              isDisengaging={turnActions.isDisengaging}
+              scaledCell={scaledCell}
+              cellSizeFt={cellSizeFt}
+            />
+          )}
+
           {/* Selection box */}
           {selectionBox && <SelectionBoxOverlay box={selectionBox} />}
 
@@ -1123,8 +1460,12 @@ export function MapCanvas() {
             <RulerOverlay points={rulerPoints} mousePoint={rulerActive ? rulerMouse : null} scaledCell={scaledCell} />
           )}
 
-          {/* AOE */}
-          <AOEOverlay instances={aoeInstances} placing={aoePlacing} scaledCell={scaledCell} />
+          {/* AOE (layer: effects) */}
+          {getLayer("effects")?.visible && (
+            <div style={{ opacity: (getLayer("effects")?.opacity ?? 100) / 100 }}>
+              <AOEOverlay instances={aoeInstances} placing={aoePlacing} scaledCell={scaledCell} />
+            </div>
+          )}
 
           {/* Pings */}
           <PingOverlay pings={pings} scaledCell={scaledCell} />
@@ -1147,8 +1488,93 @@ export function MapCanvas() {
             />
           )}
 
-          {/* Tokens */}
-          {onMapTokens.map((token) => {
+          {/* Reaction prompt */}
+          {pendingReaction && (() => {
+            const reactorToken = onMapTokens.find((t) => t.id === pendingReaction.reactorTokenId);
+            const triggerToken = onMapTokens.find((t) => t.id === pendingReaction.triggerTokenId);
+            if (!reactorToken || !triggerToken) return null;
+            return (
+              <ReactionPrompt
+                pending={pendingReaction}
+                reactorToken={reactorToken}
+                triggerToken={triggerToken}
+                scaledCell={scaledCell}
+                onUse={(weaponId) => {
+                  const state = useGameplayStore.getState();
+                  const pr = state.pendingReaction;
+                  if (!pr) return;
+                  const weapon = pr.weaponOptions.find((w) => w.weaponId === weaponId);
+                  if (!weapon) return;
+                  const target = state.tokens.find((t) => t.id === pr.triggerTokenId);
+                  if (!target) return;
+                  const reactor = state.tokens.find((t) => t.id === pr.reactorTokenId);
+
+                  const result = executeOpportunityAttack(pr.reactorTokenId, pr.triggerTokenId, weapon, target.ac);
+
+                  if (result.isHit && result.damageTotal > 0) {
+                    state.updateTokenHp(target.id, target.hp - result.damageTotal);
+                    state.addDamageFloat(target.id, result.damageTotal, false, result.isCrit);
+                  }
+
+                  state.setAttackLine({
+                    attackerId: pr.reactorTokenId,
+                    targetId: pr.triggerTokenId,
+                    roll: result.attackRoll,
+                    damage: result.isHit ? result.damageTotal : null,
+                  });
+
+                  const reactorName = reactor?.name ?? "???";
+                  const hitLabel = result.isCrit ? "CRITICO!!" : result.isFumble ? "FALHA CRITICA!" : result.isHit ? "ACERTOU!" : "ERROU!";
+                  let chatContent = `${reactorName} faz Ataque de Oportunidade contra ${target.name}!\n`;
+                  chatContent += `Ataque: ${result.attackRoll} (${result.attackDetails}) vs CA ${target.ac} — ${hitLabel}`;
+                  if (result.isHit && result.damageTotal > 0) {
+                    chatContent += `\nDano: ${result.damageTotal} (${result.damageDetails}) ${result.damageType}`;
+                  }
+
+                  state.addMessage({
+                    id: `msg_${Date.now()}`,
+                    channel: "geral",
+                    type: "roll",
+                    sender: reactorName,
+                    senderInitials: reactorName.slice(0, 2).toUpperCase(),
+                    isGM: false,
+                    content: chatContent,
+                    timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                    rollFormula: `d20+${weapon.attackBonus}`,
+                    rollResult: result.attackRoll,
+                    rollDetails: result.attackDetails,
+                    isNat20: result.isCrit,
+                    isNat1: result.isFumble,
+                  });
+
+                  state.useReactionFor(pr.reactorTokenId);
+                  state.setPendingReaction(null);
+                }}
+                onSkip={() => {
+                  useGameplayStore.getState().setPendingReaction(null);
+                }}
+              />
+            );
+          })()}
+
+          {/* Ambient lighting overlay */}
+          {ambientLight !== "bright" && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                width: canvasW,
+                height: canvasH,
+                backgroundColor: `rgba(0, 0, 0, ${AMBIENT_LIGHT_CONFIG[ambientLight].overlay})`,
+                filter: AMBIENT_LIGHT_CONFIG[ambientLight].desaturation > 0
+                  ? `saturate(${1 - AMBIENT_LIGHT_CONFIG[ambientLight].desaturation})`
+                  : undefined,
+                zIndex: 25,
+              }}
+            />
+          )}
+
+          {/* Tokens (layer: tokens) */}
+          {getLayer("tokens")?.visible && onMapTokens.map((token) => {
             const color = getAlignmentColor(token.alignment);
             const hpPct = getHpPercent(token.hp, token.maxHp);
             const hpColor = getHpColor(hpPct);
@@ -1254,6 +1680,13 @@ export function MapCanvas() {
         canvasH={canvasH}
         onNavigate={handleMiniMapNavigate}
       />
+
+      {/* Path planning preview panel */}
+      {pathPlanningActive && (
+        <div className="pointer-events-none absolute inset-0 z-40">
+          <PathPreviewPanel />
+        </div>
+      )}
 
 
       {/* Status bar */}

@@ -1,4 +1,4 @@
-import type { TerrainCell, WallSegment, MapObjectCell } from "./gameplay-mock-data";
+import type { TerrainCell, WallSegment, WallData, MapObjectCell } from "./gameplay-mock-data";
 
 const STORAGE_KEY = "questboard_saved_maps";
 
@@ -9,7 +9,8 @@ export interface SavedMap {
   gridCols: number;
   gridRows: number;
   terrainCells: TerrainCell[];
-  walls: WallSegment[];
+  walls: WallSegment[]; // legacy format (kept for backward compat)
+  wallEdges?: Record<string, WallData>; // new edge-based format
   mapObjects: MapObjectCell[];
 }
 

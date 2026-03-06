@@ -1,67 +1,129 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Minus, RectangleHorizontal, Eraser, Trash2 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
-import type { WallMaterial } from "@/lib/gameplay-mock-data";
+import type { WallType, WallStyle, WallDrawMode } from "@/lib/gameplay-mock-data";
 
-const WALL_TYPES: { type: WallMaterial; label: string; color: string }[] = [
-  { type: "stone", label: "Pedra", color: "#8B7355" },
-  { type: "wood", label: "Madeira", color: "#A0764D" },
-  { type: "iron", label: "Ferro", color: "#7A8B99" },
-  { type: "magic", label: "Magica", color: "#9B6CE7" },
+const WALL_TYPES: { type: WallType; label: string; shortLabel: string }[] = [
+  { type: "wall", label: "Parede solida", shortLabel: "Parede" },
+  { type: "door-closed", label: "Porta fechada", shortLabel: "Porta" },
+  { type: "window", label: "Janela (bloqueia movimento, nao visao)", shortLabel: "Janela" },
+  { type: "half-wall", label: "Meia-parede (bloqueia movimento, visao parcial)", shortLabel: "Meia" },
+  { type: "secret", label: "Passagem secreta (so GM ve)", shortLabel: "Secreta" },
+  { type: "portcullis", label: "Grade (bloqueia movimento, nao visao)", shortLabel: "Grade" },
+];
+
+const WALL_STYLES: { style: WallStyle; label: string; color: string }[] = [
+  { style: "stone", label: "Pedra", color: "#777780" },
+  { style: "wood", label: "Madeira", color: "#8B6040" },
+  { style: "metal", label: "Metal", color: "#A0A0B0" },
+  { style: "magic", label: "Magica", color: "#8855DD" },
+  { style: "natural", label: "Natural", color: "#666660" },
+  { style: "brick", label: "Tijolo", color: "#995533" },
+];
+
+const DRAW_MODES: { mode: WallDrawMode; icon: typeof Minus; label: string }[] = [
+  { mode: "line", icon: Minus, label: "Linha" },
+  { mode: "rectangle", icon: RectangleHorizontal, label: "Retangulo" },
+  { mode: "erase", icon: Eraser, label: "Apagar" },
 ];
 
 export function WallToolPicker() {
   const activeTool = useGameplayStore((s) => s.activeTool);
-  const activeWallType = useGameplayStore((s) => s.activeWallType);
-  const setActiveWallType = useGameplayStore((s) => s.setActiveWallType);
-  const clearWalls = useGameplayStore((s) => s.clearWalls);
+  const activeWallEdgeType = useGameplayStore((s) => s.activeWallEdgeType);
+  const activeWallStyle = useGameplayStore((s) => s.activeWallStyle);
+  const wallDrawMode = useGameplayStore((s) => s.wallDrawMode);
+  const setActiveWallEdgeType = useGameplayStore((s) => s.setActiveWallEdgeType);
+  const setActiveWallStyle = useGameplayStore((s) => s.setActiveWallStyle);
+  const setWallDrawMode = useGameplayStore((s) => s.setWallDrawMode);
+  const clearWallEdges = useGameplayStore((s) => s.clearWallEdges);
 
   if (activeTool !== "wall") return null;
 
   return (
-    <div className="absolute left-1/2 top-14 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-brand-border bg-[#111116] px-3 py-2 shadow-xl">
-      {/* Wall type */}
+    <div className="absolute left-1/2 top-14 z-40 flex w-[420px] -translate-x-1/2 flex-col gap-2 rounded-lg border border-brand-border bg-[#111116] p-3 shadow-xl">
+      {/* Wall types */}
       <div className="flex items-center gap-1">
-        <span className="text-[10px] text-brand-muted">Tipo:</span>
-        {WALL_TYPES.map(({ type, label, color }) => (
+        {WALL_TYPES.map(({ type, label, shortLabel }) => (
           <button
             key={type}
             title={label}
-            onClick={() => setActiveWallType(type)}
-            className={`flex h-6 items-center gap-1 rounded px-2 text-[10px] transition-colors ${
-              activeWallType === type
-                ? "bg-white/10 font-semibold text-brand-text"
-                : "text-brand-muted hover:bg-white/[0.04] hover:text-brand-text"
+            onClick={() => setActiveWallEdgeType(type)}
+            className={`flex h-6 flex-1 items-center justify-center rounded px-1 text-[9px] transition-colors ${
+              activeWallEdgeType === type
+                ? "bg-brand-accent text-white font-semibold"
+                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
             }`}
           >
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: color }}
-            />
-            {label}
+            {shortLabel}
           </button>
         ))}
       </div>
 
-      <div className="h-5 w-px bg-brand-border" />
+      <div className="h-px bg-brand-border" />
 
-      {/* Instructions */}
-      <div className="flex flex-col text-[9px] text-brand-muted">
-        <span>Click: parede | Shift+Click: porta</span>
-        <span>Click na porta: abrir/fechar</span>
+      {/* Draw mode + Style */}
+      <div className="flex items-center gap-2">
+        {/* Draw modes */}
+        <div className="flex items-center gap-1">
+          {DRAW_MODES.map(({ mode, icon: Icon, label }) => (
+            <button
+              key={mode}
+              title={label}
+              onClick={() => setWallDrawMode(mode)}
+              className={`flex h-6 items-center gap-1 rounded px-2 text-[9px] transition-colors ${
+                wallDrawMode === mode
+                  ? "bg-brand-accent text-white"
+                  : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-5 w-px bg-brand-border" />
+
+        {/* Wall style */}
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] text-brand-muted">Estilo:</span>
+          {WALL_STYLES.map(({ style, label, color }) => (
+            <button
+              key={style}
+              title={label}
+              onClick={() => setActiveWallStyle(style)}
+              className={`flex h-5 w-5 items-center justify-center rounded-sm transition-colors ${
+                activeWallStyle === style
+                  ? "ring-1 ring-brand-accent ring-offset-1 ring-offset-[#111116]"
+                  : "hover:ring-1 hover:ring-brand-border"
+              }`}
+            >
+              <span
+                className="block h-3 w-3 rounded-sm"
+                style={{ backgroundColor: color }}
+              />
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="h-5 w-px bg-brand-border" />
+      <div className="h-px bg-brand-border" />
 
-      {/* Clear */}
-      <button
-        onClick={clearWalls}
-        title="Limpar paredes"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {/* Instructions + Clear */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col text-[8px] text-brand-muted">
+          <span>Click: colocar | Click em existente: remover</span>
+          <span>Shift+Click: criar porta | Double-click porta: abrir/fechar</span>
+        </div>
+        <button
+          onClick={clearWallEdges}
+          title="Limpar todas as paredes"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
     </div>
   );
 }

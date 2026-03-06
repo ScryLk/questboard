@@ -37,7 +37,23 @@ export type BroadcastMessageType =
   | "player:roll"            // Player rolled dice
   | "player:end-turn"        // Player ends turn
   | "player:join"            // Player connected
-  | "player:leave";          // Player disconnected
+  | "player:leave"           // Player disconnected
+  // Lobby — GM → Players
+  | "lobby:session-info"     // Session metadata
+  | "lobby:player-list"      // Full player list update
+  | "lobby:player-accepted"  // Join request accepted
+  | "lobby:player-rejected"  // Join request rejected
+  | "lobby:player-kicked"    // Player kicked from lobby
+  | "lobby:chat-message"     // Lobby chat message
+  | "lobby:countdown-start"  // Countdown began
+  | "lobby:countdown-cancel" // Countdown cancelled
+  | "lobby:session-start"    // Session started
+  // Lobby — Player → GM
+  | "lobby:join-request"     // Player wants to join
+  | "lobby:character-selected" // Player selected character
+  | "lobby:ready"            // Player ready toggle
+  | "lobby:player-chat"      // Player lobby chat
+  | "lobby:ping";            // Heartbeat
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;

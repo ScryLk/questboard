@@ -3,6 +3,8 @@
 import type { TerrainCell } from "@/lib/gameplay-mock-data";
 import { TERRAIN_CATALOG } from "@/lib/terrain-catalog";
 import { getTerrainCSSPattern } from "@/components/gameplay/map-canvas/terrain-patterns";
+import { hasProceduralTexture } from "@/lib/terrain-texture-generator";
+import { PixiTerrainLayer } from "@/components/gameplay/map-canvas/pixi-terrain-layer";
 
 // Legacy type mapping for backward compat
 const LEGACY_MAP: Record<string, string> = {
@@ -13,18 +15,40 @@ const LEGACY_MAP: Record<string, string> = {
 interface TerrainOverlayProps {
   cells: TerrainCell[];
   scaledCell: number;
+  gridCols: number;
+  gridRows: number;
 }
 
-export function TerrainOverlay({ cells, scaledCell }: TerrainOverlayProps) {
+export function TerrainOverlay({ cells, scaledCell, gridCols, gridRows }: TerrainOverlayProps) {
   if (cells.length === 0) return null;
+
+  // Separate cells: procedural (Pixi.js) vs CSS fallback
+  const pixiCells: TerrainCell[] = [];
+  const fallbackCells: TerrainCell[] = [];
+
+  for (const cell of cells) {
+    const mappedType = LEGACY_MAP[cell.type] ?? cell.type;
+    if (hasProceduralTexture(mappedType)) {
+      pixiCells.push(mappedType !== cell.type ? { ...cell, type: mappedType as TerrainCell["type"] } : cell);
+    } else {
+      fallbackCells.push(cell);
+    }
+  }
 
   return (
     <>
-      {cells.map((cell) => {
+      {pixiCells.length > 0 && (
+        <PixiTerrainLayer
+          cells={pixiCells}
+          scaledCell={scaledCell}
+          gridCols={gridCols}
+          gridRows={gridRows}
+        />
+      )}
+      {fallbackCells.map((cell) => {
         const mappedType = LEGACY_MAP[cell.type] ?? cell.type;
         const info = TERRAIN_CATALOG[mappedType];
 
-        // Fallback for unknown types
         const color = info?.color ?? "rgba(255,255,255,0.05)";
         const borderColor = info?.borderColor ?? "transparent";
         const pattern =

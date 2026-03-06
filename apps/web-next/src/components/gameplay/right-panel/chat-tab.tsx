@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import type { ChatChannel, ChatMessage } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { playSFX } from "@/lib/audio/sfx-triggers";
+import { NPCDialogueButton } from "./npc-dialogue-button";
 
 const CHANNEL_CONFIG: {
   key: ChatChannel;
@@ -25,6 +27,18 @@ export function ChatTab() {
   const chatChannel = useGameplayStore((s) => s.chatChannel);
   const setChatChannel = useGameplayStore((s) => s.setChatChannel);
   const addMessage = useGameplayStore((s) => s.addMessage);
+  const selectedTokenIds = useGameplayStore((s) => s.selectedTokenIds);
+  const tokens = useGameplayStore((s) => s.tokens);
+
+  // Find selected NPC token (non-player, no playerId)
+  const selectedNPCToken = selectedTokenIds.length === 1
+    ? tokens.find(
+        (t) =>
+          t.id === selectedTokenIds[0] &&
+          t.alignment !== "player" &&
+          !t.playerId,
+      ) ?? null
+    : null;
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -49,6 +63,7 @@ export function ChatTab() {
       }),
     };
     addMessage(msg);
+    playSFX("ui:chat_message");
     setInput("");
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({
@@ -87,6 +102,9 @@ export function ChatTab() {
           <MessageBubble key={msg.id} message={msg} />
         ))}
       </div>
+
+      {/* NPC Dialogue */}
+      {selectedNPCToken && <NPCDialogueButton token={selectedNPCToken} />}
 
       {/* Input */}
       <div className="border-t border-brand-border p-2">

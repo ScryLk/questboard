@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  Download,
+  Check,
   Eraser,
   Eye,
   Fence,
+  Hand,
   ImageIcon,
   Mountain,
   Package,
@@ -16,7 +18,6 @@ import {
   Square,
   Stamp,
   Trash2,
-  Upload,
   Undo2,
   Redo2,
   X,
@@ -27,14 +28,21 @@ import Link from "next/link";
 import type {
   TerrainType,
   TerrainEditorTool,
-  WallSide,
-  WallMaterial,
+  WallType,
+  WallStyle,
+  WallData,
+  WallDrawMode,
   MapObjectType,
   TerrainCell,
-  WallSegment,
   MapObjectCell,
 } from "@/lib/gameplay-mock-data";
 import { MAP_OBJECT_CATALOG } from "@/lib/gameplay-mock-data";
+import {
+  getNearestEdge,
+  getWallRenderLine,
+  wallSideToEdgeKey,
+  type NearestEdge,
+} from "@/lib/wall-helpers";
 import {
   TERRAIN_CATALOG,
   TERRAIN_CATEGORIES,
@@ -42,14 +50,12 @@ import {
   type TerrainCategoryId,
 } from "@/lib/terrain-catalog";
 import { getTerrainCSSPattern } from "@/components/gameplay/map-canvas/terrain-patterns";
+import { hasProceduralTexture, getTerrainCanvas } from "@/lib/terrain-texture-generator";
+import { PixiTerrainLayer } from "@/components/gameplay/map-canvas/pixi-terrain-layer";
 import { ROOM_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/room-templates";
-import {
-  saveMap,
-  listSavedMaps,
-  loadMap,
-  deleteMap,
-  type SavedMap,
-} from "@/lib/map-storage";
+import { useMapLibraryStore } from "@/lib/map-library-store";
+import { editorStateToMapData, mapToEditorState } from "@/lib/map-types";
+import { generateMapThumbnail } from "@/lib/map-thumbnail";
 
 // ── Standalone editor state (no gameplay store dependency) ───────────
 
@@ -59,19 +65,21 @@ interface EditorState {
   cellSize: number;
   zoom: number;
   terrainCells: TerrainCell[];
-  walls: WallSegment[];
+  wallEdges: Record<string, WallData>;
   mapObjects: MapObjectCell[];
   // Active selections
-  activeTool: "terrain" | "wall" | "objects" | "eraser";
+  activeTool: "terrain" | "wall" | "objects" | "eraser" | "hand";
   terrainEditorTool: TerrainEditorTool;
   activeTerrainType: TerrainType;
   terrainCategory: TerrainCategoryId | "all";
   brushSize: 1 | 2 | 3;
-  activeWallType: WallMaterial;
+  activeWallEdgeType: WallType;
+  activeWallStyle: WallStyle;
+  wallDrawMode: WallDrawMode;
   activeObjectType: MapObjectType;
   // Undo
-  history: { terrain: TerrainCell[]; walls: WallSegment[]; objects: MapObjectCell[] }[];
-  future: { terrain: TerrainCell[]; walls: WallSegment[]; objects: MapObjectCell[] }[];
+  history: { terrain: TerrainCell[]; wallEdges: Record<string, WallData>; objects: MapObjectCell[] }[];
+  future: { terrain: TerrainCell[]; wallEdges: Record<string, WallData>; objects: MapObjectCell[] }[];
   // Background image
   backgroundImage: string | null;
   backgroundOpacity: number;
@@ -87,14 +95,16 @@ function createInitialState(): EditorState {
     cellSize: 40,
     zoom: 100,
     terrainCells: [],
-    walls: [],
+    wallEdges: {},
     mapObjects: [],
     activeTool: "terrain",
     terrainEditorTool: "brush",
     activeTerrainType: "stone_floor",
     terrainCategory: "all",
     brushSize: 1,
-    activeWallType: "stone",
+    activeWallEdgeType: "wall",
+    activeWallStyle: "stone",
+    wallDrawMode: "line",
     activeObjectType: "chest",
     history: [],
     future: [],
@@ -126,29 +136,32 @@ function getBrushCells(
   return cells;
 }
 
-// ── Wall visual helpers ──────────────────────────────────────────────
+// ── Wall visual config (shared with wall-renderer) ──────────────────
 
-const WALL_COLORS: Record<WallMaterial, string> = {
-  stone: "#8B7355",
-  wood: "#A0764D",
-  iron: "#7A8B99",
-  magic: "#9B6CE7",
+const WALL_TYPE_VISUALS: Record<WallType, { color: string; thickness: number; dash?: string; alpha: number; doorIcon?: string }> = {
+  "wall":        { color: "#888888", thickness: 4, alpha: 1.0 },
+  "door-closed": { color: "#C8A050", thickness: 4, alpha: 1.0, doorIcon: "▯" },
+  "door-open":   { color: "#C8A050", thickness: 2, dash: "4,4", alpha: 0.5, doorIcon: "○" },
+  "door-locked": { color: "#C8A050", thickness: 4, alpha: 1.0, doorIcon: "🔒" },
+  "window":      { color: "#6BB8E0", thickness: 3, dash: "6,3", alpha: 0.8 },
+  "half-wall":   { color: "#888888", thickness: 3, dash: "8,2", alpha: 0.8 },
+  "secret":      { color: "#AA55CC", thickness: 2, dash: "3,5", alpha: 0.4 },
+  "illusory":    { color: "#CC55AA", thickness: 2, dash: "2,4", alpha: 0.3 },
+  "portcullis":  { color: "#999999", thickness: 3, dash: "2,2", alpha: 0.9 },
 };
 
-function getWallLine(
-  w: { x: number; y: number; side: WallSide },
-  cell: number,
-) {
-  const left = w.x * cell;
-  const top = w.y * cell;
-  const right = left + cell;
-  const bottom = top + cell;
-  switch (w.side) {
-    case "top": return { x1: left, y1: top, x2: right, y2: top };
-    case "bottom": return { x1: left, y1: bottom, x2: right, y2: bottom };
-    case "left": return { x1: left, y1: top, x2: left, y2: bottom };
-    case "right": return { x1: right, y1: top, x2: right, y2: bottom };
-  }
+const WALL_STYLE_COLORS: Record<WallStyle, string> = {
+  stone:   "#777780",
+  wood:    "#8B6040",
+  metal:   "#A0A0B0",
+  magic:   "#8855DD",
+  natural: "#666660",
+  brick:   "#995533",
+};
+
+function getEdgeColor(data: WallData): string {
+  if (data.type === "wall" || data.type === "half-wall") return WALL_STYLE_COLORS[data.style];
+  return WALL_TYPE_VISUALS[data.type].color;
 }
 
 // ── Object icon lookup ───────────────────────────────────────────────
@@ -158,18 +171,26 @@ const objectIconMap = new Map(MAP_OBJECT_CATALOG.map((o) => [o.type, o.icon]));
 // ── Component ────────────────────────────────────────────────────────
 
 export default function MapEditorPage() {
+  const searchParams = useSearchParams();
+  const mapIdParam = searchParams.get("id");
+
+  const addMap = useMapLibraryStore((s) => s.addMap);
+  const updateMap = useMapLibraryStore((s) => s.updateMap);
+
   const [state, setState] = useState<EditorState>(createInitialState);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
-  const [hoverWall, setHoverWall] = useState<{ x: number; y: number; side: WallSide } | null>(null);
+  const [hoverEdge, setHoverEdge] = useState<NearestEdge | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateCat, setTemplateCat] = useState("all");
-  const [showSaved, setShowSaved] = useState(false);
-  const [savedMaps, setSavedMaps] = useState<SavedMap[]>([]);
+  const [saveIndicator, setSaveIndicator] = useState<"saved" | null>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scaledCell = Math.round(state.cellSize * (state.zoom / 100));
   const canvasW = state.gridCols * scaledCell;
@@ -182,7 +203,7 @@ export default function MapEditorPage() {
       ...s,
       history: [
         ...s.history.slice(-49),
-        { terrain: [...s.terrainCells], walls: [...s.walls], objects: [...s.mapObjects] },
+        { terrain: [...s.terrainCells], wallEdges: { ...s.wallEdges }, objects: [...s.mapObjects] },
       ],
       future: [],
     }));
@@ -197,10 +218,10 @@ export default function MapEditorPage() {
         history: s.history.slice(0, -1),
         future: [
           ...s.future,
-          { terrain: [...s.terrainCells], walls: [...s.walls], objects: [...s.mapObjects] },
+          { terrain: [...s.terrainCells], wallEdges: { ...s.wallEdges }, objects: [...s.mapObjects] },
         ],
         terrainCells: prev.terrain,
-        walls: prev.walls,
+        wallEdges: prev.wallEdges,
         mapObjects: prev.objects,
       };
     });
@@ -215,10 +236,10 @@ export default function MapEditorPage() {
         future: s.future.slice(0, -1),
         history: [
           ...s.history,
-          { terrain: [...s.terrainCells], walls: [...s.walls], objects: [...s.mapObjects] },
+          { terrain: [...s.terrainCells], wallEdges: { ...s.wallEdges }, objects: [...s.mapObjects] },
         ],
         terrainCells: next.terrain,
-        walls: next.walls,
+        wallEdges: next.wallEdges,
         mapObjects: next.objects,
       };
     });
@@ -248,6 +269,9 @@ export default function MapEditorPage() {
         e.preventDefault();
         handleSave();
       }
+      if (e.key === "h" || e.key === "H") {
+        setState((s) => ({ ...s, activeTool: s.activeTool === "hand" ? "terrain" : "hand" }));
+      }
     }
     function onKeyUp(e: KeyboardEvent) {
       if (e.code === "Space") {
@@ -267,39 +291,27 @@ export default function MapEditorPage() {
 
   const getGridCell = useCallback(
     (e: MouseEvent | React.MouseEvent) => {
-      if (!canvasRef.current) return null;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
-      const px = e.clientX - rect.left + sLeft;
-      const py = e.clientY - rect.top + sTop;
+      if (!containerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+      const px = e.clientX - rect.left - panX;
+      const py = e.clientY - rect.top - panY;
       return {
         x: Math.max(0, Math.min(state.gridCols - 1, Math.floor(px / scaledCell))),
         y: Math.max(0, Math.min(state.gridRows - 1, Math.floor(py / scaledCell))),
       };
     },
-    [scaledCell, state.gridCols, state.gridRows],
+    [scaledCell, state.gridCols, state.gridRows, panX, panY],
   );
 
-  const getClosestWallSide = useCallback(
-    (e: MouseEvent | React.MouseEvent): { x: number; y: number; side: WallSide } | null => {
-      if (!canvasRef.current) return null;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
-      const px = e.clientX - rect.left + sLeft;
-      const py = e.clientY - rect.top + sTop;
-      const cellX = Math.floor(px / scaledCell);
-      const cellY = Math.floor(py / scaledCell);
-      if (cellX < 0 || cellX >= state.gridCols || cellY < 0 || cellY >= state.gridRows) return null;
-      const localX = (px / scaledCell) - cellX;
-      const localY = (py / scaledCell) - cellY;
-      const dists = { top: localY, bottom: 1 - localY, left: localX, right: 1 - localX };
-      const min = Math.min(dists.top, dists.bottom, dists.left, dists.right);
-      const side: WallSide = min === dists.top ? "top" : min === dists.bottom ? "bottom" : min === dists.left ? "left" : "right";
-      return { x: cellX, y: cellY, side };
+  const getMouseEdge = useCallback(
+    (e: MouseEvent | React.MouseEvent): NearestEdge | null => {
+      if (!containerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+      const px = e.clientX - rect.left - panX;
+      const py = e.clientY - rect.top - panY;
+      return getNearestEdge(px, py, scaledCell, state.gridCols, state.gridRows);
     },
-    [scaledCell, state.gridCols, state.gridRows],
+    [scaledCell, state.gridCols, state.gridRows, panX, panY],
   );
 
   // ── Terrain painting ───────────────────────────────────────────────
@@ -375,15 +387,16 @@ export default function MapEditorPage() {
       setIsPanning(true);
       const startX = e.clientX;
       const startY = e.clientY;
-      const el = scrollRef.current;
-      if (!el) return;
-      const startScrollX = el.scrollLeft;
-      const startScrollY = el.scrollTop;
+      let currentPanX = panX;
+      let currentPanY = panY;
 
       function onMove(ev: MouseEvent) {
-        if (!el) return;
-        el.scrollLeft = startScrollX - (ev.clientX - startX);
-        el.scrollTop = startScrollY - (ev.clientY - startY);
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        currentPanX = panX + dx;
+        currentPanY = panY + dy;
+        setPanX(currentPanX);
+        setPanY(currentPanY);
       }
       function onUp() {
         setIsPanning(false);
@@ -393,7 +406,7 @@ export default function MapEditorPage() {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [],
+    [panX, panY],
   );
 
   // ── Canvas mouse handling ──────────────────────────────────────────
@@ -406,8 +419,8 @@ export default function MapEditorPage() {
         return;
       }
       if (e.button !== 0) return;
-      // Space+left-click pan
-      if (spaceHeld) {
+      // Space+left-click pan OR hand tool
+      if (spaceHeld || state.activeTool === "hand") {
         handlePanStart(e);
         return;
       }
@@ -491,47 +504,66 @@ export default function MapEditorPage() {
         }
       }
 
-      // Wall tool
+      // Wall tool (edge-based)
       if (state.activeTool === "wall") {
-        const wallInfo = getClosestWallSide(e);
-        if (!wallInfo) return;
+        const edge = getMouseEdge(e);
+        if (!edge) return;
+
+        if (state.wallDrawMode === "erase") {
+          setState((s) => {
+            const next = { ...s.wallEdges };
+            delete next[edge.key];
+            return { ...s, wallEdges: next };
+          });
+          const erased = new Set([edge.key]);
+          function onEraseMove(ev: MouseEvent) {
+            const e2 = getMouseEdge(ev);
+            if (!e2 || erased.has(e2.key)) return;
+            erased.add(e2.key);
+            setState((s) => {
+              const next = { ...s.wallEdges };
+              delete next[e2.key];
+              return { ...s, wallEdges: next };
+            });
+          }
+          function onEraseUp() { document.removeEventListener("mousemove", onEraseMove); document.removeEventListener("mouseup", onEraseUp); }
+          document.addEventListener("mousemove", onEraseMove);
+          document.addEventListener("mouseup", onEraseUp);
+          return;
+        }
+
         setState((s) => {
-          const exists = s.walls.findIndex((w) => w.x === wallInfo.x && w.y === wallInfo.y && w.side === wallInfo.side);
           if (e.shiftKey) {
-            if (exists >= 0) {
-              const w = s.walls[exists];
-              if (w.isDoor) {
-                const states: ("closed" | "open" | "locked" | "secret")[] = ["closed", "open", "locked", "secret"];
-                const cur = w.doorState ?? "closed";
-                const next = states[(states.indexOf(cur as "closed") + 1) % states.length];
-                const updated = [...s.walls];
-                updated[exists] = { ...w, doorState: next, doorOpen: next === "open" };
-                return { ...s, walls: updated };
+            // Shift+click: create/toggle door
+            const existing = s.wallEdges[edge.key];
+            if (existing) {
+              if (existing.type === "door-closed" || existing.type === "door-open" || existing.type === "door-locked") {
+                const nextType = existing.type === "door-closed" ? "door-open" : "door-closed";
+                return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: { ...existing, type: nextType } } };
               }
-              const updated = [...s.walls];
-              updated[exists] = { ...w, isDoor: true, doorOpen: false, doorState: "closed" };
-              return { ...s, walls: updated };
+              return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: { ...existing, type: "door-closed" } } };
             }
-            return { ...s, walls: [...s.walls, { ...wallInfo, isDoor: true, doorOpen: false, wallType: s.activeWallType, doorState: "closed" }] };
+            return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: { type: "door-closed", style: s.activeWallStyle } } };
           }
-          if (exists >= 0) {
-            return { ...s, walls: s.walls.filter((_, i) => i !== exists) };
+          // Normal click: toggle wall (place or remove)
+          const existing = s.wallEdges[edge.key];
+          if (existing && existing.type === s.activeWallEdgeType && existing.style === s.activeWallStyle) {
+            const next = { ...s.wallEdges };
+            delete next[edge.key];
+            return { ...s, wallEdges: next };
           }
-          return { ...s, walls: [...s.walls, { ...wallInfo, isDoor: false, doorOpen: false, wallType: s.activeWallType }] };
+          return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: { type: s.activeWallEdgeType, style: s.activeWallStyle } } };
         });
 
         // Drag to add walls
-        const painted = new Set([`${wallInfo.x},${wallInfo.y},${wallInfo.side}`]);
+        const painted = new Set([edge.key]);
         function onMove(ev: MouseEvent) {
-          const wi = getClosestWallSide(ev);
-          if (!wi) return;
-          const key = `${wi.x},${wi.y},${wi.side}`;
-          if (painted.has(key)) return;
-          painted.add(key);
+          const e2 = getMouseEdge(ev);
+          if (!e2 || painted.has(e2.key)) return;
+          painted.add(e2.key);
           setState((s) => {
-            const exists = s.walls.some((w) => w.x === wi.x && w.y === wi.y && w.side === wi.side);
-            if (exists) return s;
-            return { ...s, walls: [...s.walls, { ...wi, isDoor: false, doorOpen: false, wallType: s.activeWallType }] };
+            if (s.wallEdges[e2.key]) return s;
+            return { ...s, wallEdges: { ...s.wallEdges, [e2.key]: { type: s.activeWallEdgeType, style: s.activeWallStyle } } };
           });
         }
         function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
@@ -570,12 +602,25 @@ export default function MapEditorPage() {
       if (state.activeTool === "eraser") {
         const cell = getGridCell(e);
         if (!cell) return;
-        setState((s) => ({
-          ...s,
-          terrainCells: s.terrainCells.filter((c) => !(c.x === cell.x && c.y === cell.y)),
-          walls: s.walls.filter((w) => !(w.x === cell.x && w.y === cell.y)),
-          mapObjects: s.mapObjects.filter((o) => !(o.x === cell.x && o.y === cell.y)),
-        }));
+        setState((s) => {
+          // Remove wall edges touching this cell
+          const nextEdges = { ...s.wallEdges };
+          const cx = cell.x, cy = cell.y;
+          for (const key of Object.keys(nextEdges)) {
+            const [a, b] = key.split(":");
+            const [x1, y1] = a.split(",").map(Number);
+            const [x2, y2] = b.split(",").map(Number);
+            if ((x1 === cx && y1 === cy) || (x2 === cx && y2 === cy)) {
+              delete nextEdges[key];
+            }
+          }
+          return {
+            ...s,
+            terrainCells: s.terrainCells.filter((c) => !(c.x === cx && c.y === cy)),
+            wallEdges: nextEdges,
+            mapObjects: s.mapObjects.filter((o) => !(o.x === cx && o.y === cy)),
+          };
+        });
         const erased = new Set([`${cell.x},${cell.y}`]);
         function onMove(ev: MouseEvent) {
           const c = getGridCell(ev);
@@ -583,42 +628,58 @@ export default function MapEditorPage() {
           const key = `${c.x},${c.y}`;
           if (erased.has(key)) return;
           erased.add(key);
-          setState((s) => ({
-            ...s,
-            terrainCells: s.terrainCells.filter((tc) => !(tc.x === c.x && tc.y === c.y)),
-            walls: s.walls.filter((w) => !(w.x === c.x && w.y === c.y)),
-            mapObjects: s.mapObjects.filter((o) => !(o.x === c.x && o.y === c.y)),
-          }));
+          setState((s) => {
+            const nextEdges = { ...s.wallEdges };
+            for (const k of Object.keys(nextEdges)) {
+              const [a, b] = k.split(":");
+              const [x1, y1] = a.split(",").map(Number);
+              const [x2, y2] = b.split(",").map(Number);
+              if ((x1 === c.x && y1 === c.y) || (x2 === c.x && y2 === c.y)) {
+                delete nextEdges[k];
+              }
+            }
+            return {
+              ...s,
+              terrainCells: s.terrainCells.filter((tc) => !(tc.x === c.x && tc.y === c.y)),
+              wallEdges: nextEdges,
+              mapObjects: s.mapObjects.filter((o) => !(o.x === c.x && o.y === c.y)),
+            };
+          });
         }
         function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
       }
     },
-    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallType, state.activeObjectType, getGridCell, getClosestWallSide, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart],
+    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallEdgeType, state.activeWallStyle, state.wallDrawMode, state.activeObjectType, getGridCell, getMouseEdge, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart],
   );
 
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (state.activeTool === "wall") {
-        setHoverWall(getClosestWallSide(e));
+        setHoverEdge(getMouseEdge(e));
       } else {
-        setHoverWall(null);
+        setHoverEdge(null);
       }
       const cell = getGridCell(e);
       setHoverCell(cell);
     },
-    [state.activeTool, getGridCell, getClosestWallSide],
+    [state.activeTool, getGridCell, getMouseEdge],
   );
 
   // ── Wheel zoom ────────────────────────────────────────────────────
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
+      e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
+        // Zoom
         const delta = e.deltaY > 0 ? -10 : 10;
         setState((s) => ({ ...s, zoom: Math.max(25, Math.min(300, s.zoom + delta)) }));
+      } else {
+        // Pan — regular scroll moves the canvas
+        setPanX((p) => p - e.deltaX);
+        setPanY((p) => p - e.deltaY);
       }
     },
     [],
@@ -627,32 +688,64 @@ export default function MapEditorPage() {
   // ── Save / Load ────────────────────────────────────────────────────
 
   const handleSave = useCallback(() => {
-    const saved = saveMap({
-      name: state.mapName,
+    const mapData = editorStateToMapData({
+      mapName: state.mapName,
       gridCols: state.gridCols,
       gridRows: state.gridRows,
       terrainCells: state.terrainCells,
-      walls: state.walls,
+      wallEdges: state.wallEdges,
       mapObjects: state.mapObjects,
+      backgroundImage: state.backgroundImage,
+      backgroundOpacity: state.backgroundOpacity,
     });
-    setState((s) => ({ ...s, savedMapId: saved.id }));
-  }, [state.mapName, state.gridCols, state.gridRows, state.terrainCells, state.walls, state.mapObjects]);
 
-  const handleLoad = useCallback((map: SavedMap) => {
+    // Generate thumbnail
+    const thumbnail = generateMapThumbnail({
+      width: state.gridCols,
+      height: state.gridRows,
+      terrain: mapData.terrain,
+      walls: mapData.walls,
+      objects: mapData.objects,
+    });
+
+    if (state.savedMapId) {
+      updateMap(state.savedMapId, { ...mapData, thumbnail });
+    } else {
+      const newId = addMap({ ...mapData, thumbnail });
+      setState((s) => ({ ...s, savedMapId: newId }));
+      window.history.replaceState(null, "", `/maps/editor?id=${newId}`);
+    }
+    setSaveIndicator("saved");
+    setTimeout(() => setSaveIndicator(null), 2000);
+  }, [state.mapName, state.gridCols, state.gridRows, state.terrainCells, state.wallEdges, state.mapObjects, state.backgroundImage, state.backgroundOpacity, state.savedMapId, addMap, updateMap]);
+
+  // Load map from URL param on mount
+  useEffect(() => {
+    if (!mapIdParam) return;
+    const map = useMapLibraryStore.getState().maps[mapIdParam];
+    if (!map) return;
+    const editorData = mapToEditorState(map);
     setState((s) => ({
       ...s,
-      mapName: map.name,
-      gridCols: map.gridCols,
-      gridRows: map.gridRows,
-      terrainCells: map.terrainCells,
-      walls: map.walls,
-      mapObjects: map.mapObjects,
-      savedMapId: map.id,
+      ...editorData,
+      savedMapId: mapIdParam,
       history: [],
       future: [],
     }));
-    setShowSaved(false);
-  }, []);
+  }, [mapIdParam]);
+
+  // Auto-save with 2s debounce (only if map was already saved once)
+  useEffect(() => {
+    if (!state.savedMapId) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave();
+    }, 2000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.terrainCells, state.wallEdges, state.mapObjects, state.mapName, state.gridCols, state.gridRows]);
 
   const handleImportImage = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -683,13 +776,18 @@ export default function MapEditorPage() {
           if (idx >= 0) newTerrain[idx] = { x, y, type: t.type };
           else newTerrain.push({ x, y, type: t.type });
         }
-        const newWalls = [...s.walls];
+        const newEdges = { ...s.wallEdges };
         for (const w of tmpl.walls) {
           const x = cx + w.dx;
           const y = cy + w.dy;
           if (x < 0 || y < 0 || x >= s.gridCols || y >= s.gridRows) continue;
-          if (!newWalls.some((e) => e.x === x && e.y === y && e.side === w.side)) {
-            newWalls.push({ x, y, side: w.side, isDoor: w.isDoor ?? false, doorOpen: w.doorState === "open", wallType: s.activeWallType, doorState: w.doorState ?? (w.isDoor ? "closed" : undefined) });
+          const edgeKey = wallSideToEdgeKey(x, y, w.side);
+          if (!newEdges[edgeKey]) {
+            let wt: import("@/lib/gameplay-mock-data").WallType = "wall";
+            if (w.isDoor) {
+              wt = w.doorState === "open" ? "door-open" : w.doorState === "locked" ? "door-locked" : "door-closed";
+            }
+            newEdges[edgeKey] = { type: wt, style: s.activeWallStyle };
           }
         }
         const newObjects = [...s.mapObjects];
@@ -701,7 +799,7 @@ export default function MapEditorPage() {
             newObjects.push({ id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, x, y, type: o.type as MapObjectType, rotation: 0 });
           }
         }
-        return { ...s, terrainCells: newTerrain, walls: newWalls, mapObjects: newObjects };
+        return { ...s, terrainCells: newTerrain, wallEdges: newEdges, mapObjects: newObjects };
       });
     },
     [state.gridCols, state.gridRows, hoverCell, pushSnapshot],
@@ -711,11 +809,22 @@ export default function MapEditorPage() {
 
   const terrains = getTerrainsByCategory(state.terrainCategory);
 
-  const WALL_TYPES: { type: WallMaterial; label: string; color: string }[] = [
-    { type: "stone", label: "Pedra", color: "#8B7355" },
-    { type: "wood", label: "Madeira", color: "#A0764D" },
-    { type: "iron", label: "Ferro", color: "#7A8B99" },
-    { type: "magic", label: "Magica", color: "#9B6CE7" },
+  const EDITOR_WALL_TYPES: { type: WallType; label: string }[] = [
+    { type: "wall", label: "Parede" },
+    { type: "door-closed", label: "Porta" },
+    { type: "window", label: "Janela" },
+    { type: "half-wall", label: "Meia" },
+    { type: "secret", label: "Secreta" },
+    { type: "portcullis", label: "Grade" },
+  ];
+
+  const EDITOR_WALL_STYLES: { style: WallStyle; label: string; color: string }[] = [
+    { style: "stone", label: "Pedra", color: "#777780" },
+    { style: "wood", label: "Madeira", color: "#8B6040" },
+    { style: "metal", label: "Metal", color: "#A0A0B0" },
+    { style: "magic", label: "Magica", color: "#8855DD" },
+    { style: "natural", label: "Natural", color: "#666660" },
+    { style: "brick", label: "Tijolo", color: "#995533" },
   ];
 
   const OBJ_CATEGORIES = [
@@ -735,7 +844,7 @@ export default function MapEditorPage() {
       {/* Top bar */}
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-brand-border bg-[#0D0D12] px-3">
         <Link
-          href="/dashboard/maps"
+          href="/maps"
           className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-brand-muted transition-colors hover:text-brand-text"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -773,16 +882,20 @@ export default function MapEditorPage() {
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
 
+          <button
+            onClick={() => setState((s) => ({ ...s, activeTool: s.activeTool === "hand" ? "terrain" : "hand" }))}
+            title="Mover canvas (H)"
+            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+              state.activeTool === "hand"
+                ? "bg-brand-accent text-white"
+                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+            }`}
+          >
+            <Hand className="h-3.5 w-3.5" />
+          </button>
+
           <div className="mx-1 h-5 w-px bg-brand-border" />
 
-          <button
-            onClick={() => { setSavedMaps(listSavedMaps()); setShowSaved(true); }}
-            title="Carregar mapa"
-            className="flex h-7 items-center gap-1 rounded px-2 text-[10px] text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-          >
-            <Upload className="h-3 w-3" />
-            Carregar
-          </button>
           <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImportImage} />
           <button
             onClick={() => bgInputRef.current?.click()}
@@ -795,10 +908,17 @@ export default function MapEditorPage() {
           <button
             onClick={handleSave}
             title="Salvar mapa (Ctrl+S)"
-            className="flex h-7 items-center gap-1 rounded bg-brand-accent px-3 text-[10px] font-medium text-white transition-colors hover:bg-brand-accent/80"
+            className={`flex h-7 items-center gap-1 rounded px-3 text-[10px] font-medium transition-colors ${
+              saveIndicator === "saved"
+                ? "bg-brand-success text-white"
+                : "bg-brand-accent text-white hover:bg-brand-accent/80"
+            }`}
           >
-            <Save className="h-3 w-3" />
-            Salvar
+            {saveIndicator === "saved" ? (
+              <><Check className="h-3 w-3" /> Salvo</>
+            ) : (
+              <><Save className="h-3 w-3" /> Salvar</>
+            )}
           </button>
         </div>
       </div>
@@ -899,7 +1019,6 @@ export default function MapEditorPage() {
               <div className="mb-2 grid max-h-[240px] grid-cols-3 gap-1 overflow-y-auto">
                 {terrains.map((t) => {
                   const isActive = state.activeTerrainType === t.type;
-                  const pattern = t.pattern ? getTerrainCSSPattern(t.pattern.type, t.pattern.color, t.pattern.opacity, 24) : null;
                   return (
                     <button
                       key={t.type}
@@ -909,13 +1028,7 @@ export default function MapEditorPage() {
                         isActive ? "border-brand-accent bg-brand-accent/10" : "border-transparent hover:border-brand-border"
                       }`}
                     >
-                      <div
-                        className="h-6 w-6 rounded"
-                        style={{
-                          backgroundColor: t.color,
-                          ...(pattern && { backgroundImage: pattern.backgroundImage, backgroundSize: pattern.backgroundSize }),
-                        }}
-                      />
+                      <EditorTerrainSwatch terrainType={t.type} fallbackColor={t.color} />
                       <span className="w-full truncate text-center text-[8px] text-brand-muted">{t.label}</span>
                     </button>
                   );
@@ -979,29 +1092,57 @@ export default function MapEditorPage() {
           {/* ── Wall palette ── */}
           {state.activeTool === "wall" && (
             <>
-              <div className="mb-2 text-[9px] text-brand-muted">Tipo de parede:</div>
-              <div className="mb-3 flex flex-col gap-1">
-                {WALL_TYPES.map(({ type, label, color }) => (
+              <div className="mb-2 text-[9px] text-brand-muted">Tipo:</div>
+              <div className="mb-2 flex flex-wrap gap-1">
+                {EDITOR_WALL_TYPES.map(({ type, label }) => (
                   <button
                     key={type}
-                    onClick={() => setState((s) => ({ ...s, activeWallType: type }))}
-                    className={`flex items-center gap-2 rounded px-2 py-1.5 text-[10px] transition-colors ${
-                      state.activeWallType === type ? "bg-white/10 font-semibold text-brand-text" : "text-brand-muted hover:bg-white/[0.04]"
+                    onClick={() => setState((s) => ({ ...s, activeWallEdgeType: type }))}
+                    className={`rounded px-2 py-1 text-[9px] transition-colors ${
+                      state.activeWallEdgeType === type ? "bg-brand-accent text-white font-semibold" : "text-brand-muted hover:bg-white/[0.06]"
                     }`}
                   >
-                    <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="mb-2 text-[9px] text-brand-muted">Estilo:</div>
+              <div className="mb-2 flex gap-1">
+                {EDITOR_WALL_STYLES.map(({ style, label, color }) => (
+                  <button
+                    key={style}
+                    title={label}
+                    onClick={() => setState((s) => ({ ...s, activeWallStyle: style }))}
+                    className={`flex h-6 w-6 items-center justify-center rounded-sm transition-colors ${
+                      state.activeWallStyle === style ? "ring-1 ring-brand-accent ring-offset-1 ring-offset-[#111116]" : "hover:ring-1 hover:ring-brand-border"
+                    }`}
+                  >
+                    <span className="block h-4 w-4 rounded-sm" style={{ backgroundColor: color }} />
+                  </button>
+                ))}
+              </div>
+              <div className="mb-2 text-[9px] text-brand-muted">Modo:</div>
+              <div className="mb-3 flex gap-1">
+                {([["line", "Linha"], ["rectangle", "Retangulo"], ["erase", "Apagar"]] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setState((s) => ({ ...s, wallDrawMode: mode }))}
+                    className={`flex-1 rounded px-1 py-1 text-[9px] transition-colors ${
+                      state.wallDrawMode === mode ? "bg-brand-accent text-white" : "text-brand-muted hover:bg-white/[0.06]"
+                    }`}
+                  >
                     {label}
                   </button>
                 ))}
               </div>
               <div className="mb-2 h-px bg-brand-border" />
-              <div className="flex flex-col gap-1 text-[9px] text-brand-muted">
-                <span>Click: adicionar/remover parede</span>
-                <span>Shift+Click: criar/alternar porta</span>
+              <div className="flex flex-col gap-1 text-[8px] text-brand-muted">
+                <span>Click: colocar | Click em existente: remover</span>
+                <span>Shift+Click: criar porta | Dbl-click porta: toggle</span>
               </div>
               <div className="mt-3 h-px bg-brand-border" />
               <button
-                onClick={() => { pushSnapshot(); setState((s) => ({ ...s, walls: [] })); }}
+                onClick={() => { pushSnapshot(); setState((s) => ({ ...s, wallEdges: {} })); }}
                 className="mt-2 flex items-center justify-center gap-1 rounded py-1 text-[10px] text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
               >
                 <Trash2 className="h-3 w-3" />
@@ -1080,19 +1221,26 @@ export default function MapEditorPage() {
 
         {/* Canvas area */}
         <div
-          className={`relative flex-1 bg-[#0A0A0F] ${isPanning || spaceHeld ? "cursor-grabbing" : "cursor-crosshair"}`}
+          ref={containerRef}
+          className={`relative flex-1 bg-[#0A0A0F] ${isPanning ? "cursor-grabbing" : spaceHeld || state.activeTool === "hand" ? "cursor-grab" : "cursor-crosshair"}`}
           style={{ overflow: "hidden" }}
           onWheel={handleWheel}
+          onMouseDown={(e) => {
+            // Middle-click anywhere in the container pans
+            if (e.button === 1) {
+              e.preventDefault();
+              handlePanStart(e);
+            }
+          }}
         >
-          <div ref={scrollRef} className="scrollbar-hidden h-full w-full overflow-auto" onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}>
-            <div
-              ref={canvasRef}
-              className="relative"
-              style={{ width: canvasW, height: canvasH }}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => { setHoverCell(null); setHoverWall(null); }}
-            >
+          <div
+            ref={canvasRef}
+            className="relative"
+            style={{ width: canvasW, height: canvasH, transform: `translate(${panX}px, ${panY}px)` }}
+            onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleCanvasMouseMove}
+            onMouseLeave={() => { setHoverCell(null); setHoverEdge(null); }}
+          >
               {/* Background image */}
               {state.backgroundImage && (
                 <img
@@ -1119,94 +1267,103 @@ export default function MapEditorPage() {
                 ))}
               </svg>
 
-              {/* Terrain cells */}
-              {state.terrainCells.map((cell) => {
-                const info = TERRAIN_CATALOG[cell.type];
-                const color = info?.color ?? "rgba(255,255,255,0.05)";
-                const borderColor = info?.borderColor ?? "transparent";
-                const pattern = info?.pattern ? getTerrainCSSPattern(info.pattern.type, info.pattern.color, info.pattern.opacity, scaledCell) : null;
-                return (
-                  <div
-                    key={`t_${cell.x}_${cell.y}`}
-                    className="pointer-events-none absolute"
-                    style={{
-                      left: cell.x * scaledCell,
-                      top: cell.y * scaledCell,
-                      width: scaledCell,
-                      height: scaledCell,
-                      backgroundColor: color,
-                      borderRight: `1px solid ${borderColor}`,
-                      borderBottom: `1px solid ${borderColor}`,
-                      ...(pattern && { backgroundImage: pattern.backgroundImage, backgroundSize: pattern.backgroundSize }),
-                    }}
-                  >
-                    {info?.icon && scaledCell >= 28 && (
-                      <span
-                        className="pointer-events-none flex h-full w-full select-none items-center justify-center opacity-40"
-                        style={{ fontSize: Math.max(8, scaledCell * 0.3) }}
-                      >
-                        {info.icon}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Walls */}
-              {state.walls.length > 0 && (
-                <svg className="pointer-events-none absolute left-0 top-0" width={canvasW} height={canvasH} style={{ zIndex: 5 }}>
-                  {state.walls.map((wall, i) => {
-                    const line = getWallLine(wall, scaledCell);
-                    const color = wall.isDoor
-                      ? (wall.doorState === "open" ? "#6A8B4D" : wall.doorState === "locked" ? "#CC4444" : wall.doorState === "secret" ? "#888888" : "#C0A060")
-                      : WALL_COLORS[wall.wallType ?? "stone"];
-                    const width = wall.isDoor && wall.doorState === "open" ? 1.5 : wall.wallType === "iron" ? 4 : 3;
-                    const dash = wall.isDoor
-                      ? (wall.doorState === "secret" ? "2,4" : wall.doorState === "locked" ? "6,3" : "6,4")
-                      : wall.wallType === "magic" ? "4,4" : undefined;
-                    return (
-                      <line
-                        key={`w-${i}`}
-                        x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-                        stroke={color}
-                        strokeWidth={width}
-                        strokeDasharray={dash}
-                        strokeLinecap="round"
-                        opacity={wall.isDoor && wall.doorOpen ? 0.5 : 1}
-                      />
-                    );
-                  })}
-                  {/* Wall hover preview */}
-                  {hoverWall && state.activeTool === "wall" && (() => {
-                    const line = getWallLine(hoverWall, scaledCell);
-                    return (
-                      <line
-                        x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-                        stroke={WALL_COLORS[state.activeWallType]}
-                        strokeWidth={3}
-                        strokeLinecap="round"
-                        opacity={0.5}
-                      />
-                    );
-                  })()}
-                </svg>
+              {/* Terrain cells — procedural (Pixi.js) + CSS fallback */}
+              {state.terrainCells.length > 0 && (
+                <>
+                  <PixiTerrainLayer
+                    cells={state.terrainCells.filter((c) => hasProceduralTexture(c.type))}
+                    scaledCell={scaledCell}
+                    gridCols={state.gridCols}
+                    gridRows={state.gridRows}
+                  />
+                  {state.terrainCells
+                    .filter((c) => !hasProceduralTexture(c.type))
+                    .map((cell) => {
+                      const info = TERRAIN_CATALOG[cell.type];
+                      const color = info?.color ?? "rgba(255,255,255,0.05)";
+                      const borderColor = info?.borderColor ?? "transparent";
+                      const pattern = info?.pattern ? getTerrainCSSPattern(info.pattern.type, info.pattern.color, info.pattern.opacity, scaledCell) : null;
+                      return (
+                        <div
+                          key={`t_${cell.x}_${cell.y}`}
+                          className="pointer-events-none absolute"
+                          style={{
+                            left: cell.x * scaledCell,
+                            top: cell.y * scaledCell,
+                            width: scaledCell,
+                            height: scaledCell,
+                            backgroundColor: color,
+                            borderRight: `1px solid ${borderColor}`,
+                            borderBottom: `1px solid ${borderColor}`,
+                            ...(pattern && { backgroundImage: pattern.backgroundImage, backgroundSize: pattern.backgroundSize }),
+                          }}
+                        >
+                          {info?.icon && scaledCell >= 28 && (
+                            <span
+                              className="pointer-events-none flex h-full w-full select-none items-center justify-center opacity-40"
+                              style={{ fontSize: Math.max(8, scaledCell * 0.3) }}
+                            >
+                              {info.icon}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </>
               )}
 
-              {/* Wall hover when no walls yet */}
-              {state.walls.length === 0 && hoverWall && state.activeTool === "wall" && (
+              {/* Walls (edge-based) */}
+              {(Object.keys(state.wallEdges).length > 0 || (hoverEdge && state.activeTool === "wall")) && (
                 <svg className="pointer-events-none absolute left-0 top-0" width={canvasW} height={canvasH} style={{ zIndex: 5 }}>
-                  {(() => {
-                    const line = getWallLine(hoverWall, scaledCell);
+                  {Object.entries(state.wallEdges).map(([key, data]) => {
+                    const line = getWallRenderLine(key, scaledCell);
+                    const visual = WALL_TYPE_VISUALS[data.type];
+                    const color = getEdgeColor(data);
+                    const midX = (line.x1 + line.x2) / 2;
+                    const midY = (line.y1 + line.y2) / 2;
                     return (
-                      <line
-                        x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-                        stroke={WALL_COLORS[state.activeWallType]}
-                        strokeWidth={3}
-                        strokeLinecap="round"
-                        opacity={0.5}
-                      />
+                      <g key={key}>
+                        <line
+                          x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
+                          stroke={color}
+                          strokeWidth={visual.thickness}
+                          strokeDasharray={visual.dash}
+                          strokeLinecap="round"
+                          opacity={visual.alpha}
+                        />
+                        {visual.thickness >= 3 && (
+                          <>
+                            <circle cx={line.x1} cy={line.y1} r={visual.thickness / 2} fill={color} opacity={visual.alpha} />
+                            <circle cx={line.x2} cy={line.y2} r={visual.thickness / 2} fill={color} opacity={visual.alpha} />
+                          </>
+                        )}
+                        {visual.doorIcon && scaledCell >= 20 && (
+                          <>
+                            <circle cx={midX} cy={midY} r={scaledCell * 0.15} fill="#1A1A24" opacity={0.9} />
+                            <text x={midX} y={midY} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={Math.max(8, scaledCell * 0.22)} opacity={0.8}>
+                              {visual.doorIcon}
+                            </text>
+                          </>
+                        )}
+                      </g>
                     );
-                  })()}
+                  })}
+                  {/* Hover preview */}
+                  {hoverEdge && state.activeTool === "wall" && (
+                    <line
+                      x1={hoverEdge.renderX} y1={hoverEdge.renderY}
+                      x2={hoverEdge.renderEndX} y2={hoverEdge.renderEndY}
+                      stroke={state.wallDrawMode === "erase" ? "#FF4444" : (
+                        state.activeWallEdgeType === "wall" || state.activeWallEdgeType === "half-wall"
+                          ? WALL_STYLE_COLORS[state.activeWallStyle]
+                          : WALL_TYPE_VISUALS[state.activeWallEdgeType].color
+                      )}
+                      strokeWidth={state.wallDrawMode === "erase" ? 2 : 4}
+                      strokeLinecap="round"
+                      strokeDasharray={state.wallDrawMode === "erase" ? "4,4" : undefined}
+                      opacity={0.6}
+                    />
+                  )}
                 </svg>
               )}
 
@@ -1247,7 +1404,6 @@ export default function MapEditorPage() {
                 />
               )}
             </div>
-          </div>
 
           {/* Background image controls */}
           {state.backgroundImage && (
@@ -1288,59 +1444,35 @@ export default function MapEditorPage() {
               {hoverCell ? `(${hoverCell.x}, ${hoverCell.y})` : `${state.gridCols}x${state.gridRows}`}
             </span>
             <span className="text-[10px] text-brand-muted">
-              T:{state.terrainCells.length} W:{state.walls.length} O:{state.mapObjects.length}
+              T:{state.terrainCells.length} W:{Object.keys(state.wallEdges).length} O:{state.mapObjects.length}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Load modal */}
-      {showSaved && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowSaved(false)}>
-          <div className="w-[420px] rounded-xl border border-brand-border bg-[#111116] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-sm font-semibold text-brand-text">Mapas Salvos</h3>
-            {savedMaps.length === 0 ? (
-              <p className="py-6 text-center text-xs text-brand-muted">Nenhum mapa salvo ainda.</p>
-            ) : (
-              <div className="flex max-h-[300px] flex-col gap-2 overflow-y-auto">
-                {savedMaps.map((map) => (
-                  <div key={map.id} className="flex items-center justify-between rounded-lg border border-brand-border bg-white/[0.02] px-3 py-2">
-                    <div>
-                      <div className="text-xs font-medium text-brand-text">{map.name}</div>
-                      <div className="text-[10px] text-brand-muted">
-                        {map.gridCols}x{map.gridRows} — {new Date(map.savedAt).toLocaleString("pt-BR")}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleLoad(map)}
-                        className="rounded bg-brand-accent px-2 py-1 text-[10px] text-white hover:bg-brand-accent/80"
-                      >
-                        Carregar
-                      </button>
-                      <button
-                        onClick={() => {
-                          deleteMap(map.id);
-                          setSavedMaps(listSavedMaps());
-                        }}
-                        className="rounded px-2 py-1 text-[10px] text-brand-muted hover:bg-white/[0.06] hover:text-brand-danger"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => setShowSaved(false)}
-              className="mt-4 w-full rounded-lg py-2 text-xs text-brand-muted transition-colors hover:bg-white/[0.06]"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
+}
+
+// ── Terrain swatch with procedural texture preview ──
+
+function EditorTerrainSwatch({ terrainType, fallbackColor }: { terrainType: string; fallbackColor: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hasTexture = hasProceduralTexture(terrainType);
+
+  useEffect(() => {
+    if (!hasTexture) return;
+    const src = getTerrainCanvas(terrainType);
+    const dst = canvasRef.current;
+    if (!src || !dst) return;
+    const ctx = dst.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(src, 0, 0, 256, 256, 0, 0, 24, 24);
+  }, [terrainType, hasTexture]);
+
+  if (!hasTexture) {
+    return <div className="h-6 w-6 rounded" style={{ backgroundColor: fallbackColor }} />;
+  }
+
+  return <canvas ref={canvasRef} width={24} height={24} className="h-6 w-6 rounded" />;
 }

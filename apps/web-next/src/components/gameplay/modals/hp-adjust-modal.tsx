@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Heart, Minus, Plus, Shield } from "lucide-react";
 import { getAlignmentColor, getHpPercent, getHpColor } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { playSFX } from "@/lib/audio/sfx-triggers";
 import { ModalShell } from "./modal-shell";
 
 interface HpAdjustModalProps {
@@ -35,6 +36,12 @@ export function HpAdjustModal({ onClose }: HpAdjustModalProps) {
     if (num <= 0) { onClose(); return; }
     updateTokenHp(token!.id, previewHp);
     addDamageFloat(token!.id, num, mode === "heal", false);
+    if (mode === "heal") {
+      playSFX("combat:heal");
+    } else {
+      playSFX("combat:take_damage");
+      if (previewHp <= 0) playSFX("combat:creature_death");
+    }
     onClose();
   }
 

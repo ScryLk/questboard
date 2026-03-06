@@ -14,6 +14,7 @@ function TopBarInner() {
   const sessionStatus = useGameplayStore((s) => s.sessionStatus);
   const onlinePlayers = useGameplayStore((s) => s.onlinePlayers);
   const isGM = useGameplayStore((s) => s.isGM);
+  const openSettingsModal = useGameplayStore((s) => s.openSettingsModal);
 
   const onlineCount = onlinePlayers.filter((p) => p.isOnline).length;
 
@@ -107,17 +108,16 @@ function TopBarInner() {
           </Text>
         </XStack>
 
-        {isGM && (
-          <Stack
-            width={36}
-            height={36}
-            alignItems="center"
-            justifyContent="center"
-            pressStyle={{ opacity: 0.6 }}
-          >
-            <Settings size={16} color="#5A5A6E" />
-          </Stack>
-        )}
+        <Stack
+          width={36}
+          height={36}
+          alignItems="center"
+          justifyContent="center"
+          pressStyle={{ opacity: 0.6 }}
+          onPress={openSettingsModal}
+        >
+          <Settings size={16} color="#5A5A6E" />
+        </Stack>
       </XStack>
     </XStack>
   );

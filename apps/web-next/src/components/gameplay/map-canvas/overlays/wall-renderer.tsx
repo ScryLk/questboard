@@ -1,108 +1,81 @@
 "use client";
 
 import { useGameplayStore } from "@/lib/gameplay-store";
-import type { WallSegment, WallSide, WallMaterial, DoorState } from "@/lib/gameplay-mock-data";
+import type { WallType, WallStyle, WallData } from "@/lib/gameplay-mock-data";
+import { getWallRenderLine, type NearestEdge } from "@/lib/wall-helpers";
 
 interface WallRendererProps {
   scaledCell: number;
   canvasW: number;
   canvasH: number;
-  hoverWall: { x: number; y: number; side: WallSide } | null;
+  hoverEdge: NearestEdge | null;
 }
 
-function getWallLine(
-  w: { x: number; y: number; side: WallSide },
-  cell: number,
-): { x1: number; y1: number; x2: number; y2: number } {
-  const left = w.x * cell;
-  const top = w.y * cell;
-  const right = left + cell;
-  const bottom = top + cell;
+// ── Visual config per wall type ──
 
-  switch (w.side) {
-    case "top":
-      return { x1: left, y1: top, x2: right, y2: top };
-    case "bottom":
-      return { x1: left, y1: bottom, x2: right, y2: bottom };
-    case "left":
-      return { x1: left, y1: top, x2: left, y2: bottom };
-    case "right":
-      return { x1: right, y1: top, x2: right, y2: bottom };
-  }
+interface WallVisual {
+  color: string;
+  thickness: number;
+  dash?: string;
+  alpha: number;
+  doorIcon?: string;
 }
 
-const WALL_COLORS: Record<WallMaterial, string> = {
-  stone: "#8B7355",
-  wood: "#A0764D",
-  iron: "#7A8B99",
-  magic: "#9B6CE7",
+const WALL_TYPE_VISUALS: Record<WallType, WallVisual> = {
+  "wall":        { color: "#888888", thickness: 4, alpha: 1.0 },
+  "door-closed": { color: "#C8A050", thickness: 4, alpha: 1.0, doorIcon: "▯" },
+  "door-open":   { color: "#C8A050", thickness: 2, dash: "4,4", alpha: 0.5, doorIcon: "○" },
+  "door-locked": { color: "#C8A050", thickness: 4, alpha: 1.0, doorIcon: "🔒" },
+  "window":      { color: "#6BB8E0", thickness: 3, dash: "6,3", alpha: 0.8 },
+  "half-wall":   { color: "#888888", thickness: 3, dash: "8,2", alpha: 0.8 },
+  "secret":      { color: "#AA55CC", thickness: 2, dash: "3,5", alpha: 0.4 },
+  "illusory":    { color: "#CC55AA", thickness: 2, dash: "2,4", alpha: 0.3 },
+  "portcullis":  { color: "#999999", thickness: 3, dash: "2,2", alpha: 0.9 },
 };
 
-const DOOR_COLORS: Record<DoorState, string> = {
-  none: "#8B7355",
-  open: "#6A8B4D",
-  closed: "#C0A060",
-  locked: "#CC4444",
-  secret: "#888888",
+// ── Style colors (material) ──
+
+const WALL_STYLE_COLORS: Record<WallStyle, string> = {
+  stone:   "#777780",
+  wood:    "#8B6040",
+  metal:   "#A0A0B0",
+  magic:   "#8855DD",
+  natural: "#666660",
+  brick:   "#995533",
 };
 
-function getWallColor(wall: WallSegment): string {
-  if (wall.isDoor) {
-    const state = wall.doorState ?? (wall.doorOpen ? "open" : "closed");
-    return DOOR_COLORS[state] ?? DOOR_COLORS.closed;
+function getEdgeColor(data: WallData): string {
+  // Wall and half-wall use the style color; others use the type-specific color
+  if (data.type === "wall" || data.type === "half-wall") {
+    return WALL_STYLE_COLORS[data.style];
   }
-  return WALL_COLORS[wall.wallType ?? "stone"];
+  return WALL_TYPE_VISUALS[data.type].color;
 }
 
-function getWallWidth(wall: WallSegment): number {
-  if (wall.isDoor) {
-    const state = wall.doorState ?? (wall.doorOpen ? "open" : "closed");
-    if (state === "open") return 1.5;
-    return 3;
-  }
-  if (wall.wallType === "iron") return 4;
-  return 3;
-}
-
-function getWallDash(wall: WallSegment): string | undefined {
-  if (wall.isDoor) {
-    const state = wall.doorState ?? (wall.doorOpen ? "open" : "closed");
-    if (state === "secret") return "2,4";
-    if (state === "locked") return "6,3";
-    return "6,4";
-  }
-  if (wall.wallType === "magic") return "4,4";
-  return undefined;
-}
-
-function getDoorIcon(wall: WallSegment, cell: number): { cx: number; cy: number; text: string } | null {
-  if (!wall.isDoor) return null;
-  const state = wall.doorState ?? (wall.doorOpen ? "open" : "closed");
-  const line = getWallLine(wall, cell);
-  const cx = (line.x1 + line.x2) / 2;
-  const cy = (line.y1 + line.y2) / 2;
-
-  switch (state) {
-    case "open": return { cx, cy, text: "○" };
-    case "locked": return { cx, cy, text: "🔒" };
-    case "secret": return { cx, cy, text: "?" };
-    default: return null;
-  }
+function getEdgeVisual(data: WallData): WallVisual {
+  const visual = WALL_TYPE_VISUALS[data.type];
+  return { ...visual, color: getEdgeColor(data) };
 }
 
 export function WallRenderer({
   scaledCell,
   canvasW,
   canvasH,
-  hoverWall,
+  hoverEdge,
 }: WallRendererProps) {
-  const walls = useGameplayStore((s) => s.walls);
+  const wallEdges = useGameplayStore((s) => s.wallEdges);
   const activeTool = useGameplayStore((s) => s.activeTool);
-  const activeWallType = useGameplayStore((s) => s.activeWallType);
+  const activeWallEdgeType = useGameplayStore((s) => s.activeWallEdgeType);
+  const activeWallStyle = useGameplayStore((s) => s.activeWallStyle);
+  const wallDrawMode = useGameplayStore((s) => s.wallDrawMode);
 
-  if (walls.length === 0 && !hoverWall) return null;
+  const entries = Object.entries(wallEdges);
 
-  const hoverColor = WALL_COLORS[activeWallType] ?? "#FDCB6E";
+  if (entries.length === 0 && !hoverEdge) return null;
+
+  const hoverColor = activeWallEdgeType === "wall" || activeWallEdgeType === "half-wall"
+    ? WALL_STYLE_COLORS[activeWallStyle]
+    : WALL_TYPE_VISUALS[activeWallEdgeType].color;
 
   return (
     <svg
@@ -111,46 +84,64 @@ export function WallRenderer({
       height={canvasH}
       style={{ zIndex: 5 }}
     >
-      {walls.map((wall, i) => {
-        const line = getWallLine(wall, scaledCell);
-        const icon = getDoorIcon(wall, scaledCell);
+      {entries.map(([key, data]) => {
+        const line = getWallRenderLine(key, scaledCell);
+        const visual = getEdgeVisual(data);
+        const midX = (line.x1 + line.x2) / 2;
+        const midY = (line.y1 + line.y2) / 2;
+
         return (
-          <g key={`wall-${i}`}>
+          <g key={key}>
             <line
               x1={line.x1}
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={getWallColor(wall)}
-              strokeWidth={getWallWidth(wall)}
-              strokeDasharray={getWallDash(wall)}
+              stroke={visual.color}
+              strokeWidth={visual.thickness}
+              strokeDasharray={visual.dash}
               strokeLinecap="round"
-              opacity={wall.isDoor && wall.doorOpen ? 0.5 : 1}
+              opacity={visual.alpha}
             />
-            {icon && scaledCell >= 20 && (
-              <text
-                x={icon.cx}
-                y={icon.cy}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="white"
-                fontSize={Math.max(8, scaledCell * 0.25)}
-                opacity={0.7}
-              >
-                {icon.text}
-              </text>
+            {/* Junction dots at endpoints for thick walls */}
+            {visual.thickness >= 3 && (
+              <>
+                <circle cx={line.x1} cy={line.y1} r={visual.thickness / 2} fill={visual.color} opacity={visual.alpha} />
+                <circle cx={line.x2} cy={line.y2} r={visual.thickness / 2} fill={visual.color} opacity={visual.alpha} />
+              </>
+            )}
+            {/* Door icon */}
+            {visual.doorIcon && scaledCell >= 20 && (
+              <>
+                <circle cx={midX} cy={midY} r={scaledCell * 0.15} fill="#1A1A24" opacity={0.9} />
+                <text
+                  x={midX}
+                  y={midY}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="white"
+                  fontSize={Math.max(8, scaledCell * 0.22)}
+                  opacity={0.8}
+                >
+                  {visual.doorIcon}
+                </text>
+              </>
             )}
           </g>
         );
       })}
 
-      {/* Hover preview when wall tool is active */}
-      {hoverWall && activeTool === "wall" && (
+      {/* Hover preview */}
+      {hoverEdge && activeTool === "wall" && (
         <line
-          {...getWallLine(hoverWall, scaledCell)}
-          stroke={hoverColor}
-          strokeWidth={3}
+          x1={hoverEdge.renderX}
+          y1={hoverEdge.renderY}
+          x2={hoverEdge.renderEndX}
+          y2={hoverEdge.renderEndY}
+          stroke={wallDrawMode === "erase" ? "#FF4444" : hoverColor}
+          strokeWidth={wallDrawMode === "erase" ? 2 : 4}
           strokeLinecap="round"
+          strokeDasharray={wallDrawMode === "erase" ? "4,4" : undefined}
           opacity={0.6}
         />
       )}

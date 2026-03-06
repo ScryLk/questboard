@@ -108,11 +108,14 @@ export default function GameplayPage() {
         })}
       </div>
 
-      {/* New session button */}
-      <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-border py-4 text-sm font-medium text-brand-muted transition-colors hover:border-brand-accent/30 hover:text-brand-text">
+      {/* New session button → goes to lobby */}
+      <Link
+        href="/lobby/sess_new"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-border py-4 text-sm font-medium text-brand-muted transition-colors hover:border-brand-accent/30 hover:text-brand-text"
+      >
         <Play className="h-4 w-4" />
         Iniciar Nova Sessao
-      </button>
+      </Link>
     </div>
   );
 }

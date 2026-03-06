@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eraser, PaintBucket, Paintbrush, Square, Trash2, Stamp } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { TerrainEditorTool, TerrainType } from "@/lib/gameplay-mock-data";
@@ -11,6 +11,7 @@ import {
   type TerrainCategoryId,
 } from "@/lib/terrain-catalog";
 import { getTerrainCSSPattern } from "@/components/gameplay/map-canvas/terrain-patterns";
+import { getTerrainCanvas, hasProceduralTexture } from "@/lib/terrain-texture-generator";
 import { ROOM_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/room-templates";
 
 const EDITOR_TOOLS: {
@@ -117,9 +118,7 @@ export function TerrainToolPicker() {
       <div className="grid max-h-[200px] grid-cols-4 gap-1 overflow-y-auto">
         {terrains.map((t) => {
           const isActive = activeTerrainType === t.type;
-          const pattern = t.pattern
-            ? getTerrainCSSPattern(t.pattern.type, t.pattern.color, t.pattern.opacity, 28)
-            : null;
+          const hasProcedural = hasProceduralTexture(t.type);
 
           return (
             <button
@@ -132,18 +131,11 @@ export function TerrainToolPicker() {
                   : "border-transparent hover:border-brand-border hover:bg-white/[0.04]"
               }`}
             >
-              <div
-                className="h-7 w-7 rounded"
-                style={{
-                  backgroundColor: t.color,
-                  borderRight: `1px solid ${t.borderColor}`,
-                  borderBottom: `1px solid ${t.borderColor}`,
-                  ...(pattern && {
-                    backgroundImage: pattern.backgroundImage,
-                    backgroundSize: pattern.backgroundSize,
-                  }),
-                }}
-              />
+              {hasProcedural ? (
+                <TerrainSwatch terrainType={t.type} />
+              ) : (
+                <CSSTerrainSwatch terrain={t} />
+              )}
               <span className="w-full truncate text-center text-[9px] leading-tight text-brand-muted">
                 {t.label}
               </span>
@@ -222,5 +214,57 @@ export function TerrainToolPicker() {
         Limpar Terreno
       </button>
     </div>
+  );
+}
+
+// ── Procedural texture swatch (renders canvas thumbnail) ──
+
+function TerrainSwatch({ terrainType }: { terrainType: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const src = getTerrainCanvas(terrainType);
+    const dst = canvasRef.current;
+    if (!src || !dst) return;
+    const ctx = dst.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(src, 0, 0, 256, 256, 0, 0, 28, 28);
+  }, [terrainType]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={28}
+      height={28}
+      className="h-7 w-7 rounded"
+    />
+  );
+}
+
+// ── CSS fallback swatch for types without procedural texture ──
+
+function CSSTerrainSwatch({ terrain }: { terrain: { color: string; borderColor: string; pattern: { type: string; color: string; opacity: number } | null } }) {
+  const pattern = terrain.pattern
+    ? getTerrainCSSPattern(
+        terrain.pattern.type as Parameters<typeof getTerrainCSSPattern>[0],
+        terrain.pattern.color,
+        terrain.pattern.opacity,
+        28,
+      )
+    : null;
+
+  return (
+    <div
+      className="h-7 w-7 rounded"
+      style={{
+        backgroundColor: terrain.color,
+        borderRight: `1px solid ${terrain.borderColor}`,
+        borderBottom: `1px solid ${terrain.borderColor}`,
+        ...(pattern && {
+          backgroundImage: pattern.backgroundImage,
+          backgroundSize: pattern.backgroundSize,
+        }),
+      }}
+    />
   );
 }

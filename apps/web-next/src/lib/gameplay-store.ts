@@ -28,6 +28,10 @@ import type {
   WallSegment,
   WallSide,
   WallMaterial,
+  WallType,
+  WallStyle,
+  WallData,
+  WallDrawMode,
   LightSourceFixed,
   MapObjectCell,
   MapObjectType,
@@ -42,7 +46,65 @@ import {
 } from "./gameplay-mock-data";
 import type { TerrainCategoryId } from "./terrain-catalog";
 import type { RoomTemplate } from "./room-templates";
+import { wallSideToEdgeKey } from "./wall-helpers";
+import { playSFXSync } from "./audio/sfx-triggers";
 
+
+// ── Path Planning Types ──
+
+export interface PathCell {
+  x: number;
+  y: number;
+  ftCost: number;
+  totalFt: number;
+  isDiagonal: boolean;
+  isDifficultTerrain: boolean;
+  events: PathCellEvent[];
+}
+
+export interface PathCellEvent {
+  type: PathEventType;
+  severity: "info" | "warning" | "danger";
+  icon: string;
+  iconColor: string;
+  title: string;
+  description: string;
+  relatedTokenId?: string;
+}
+
+export type PathEventType =
+  | "opportunity_attack"
+  | "enters_enemy_vision"
+  | "enters_enemy_reach"
+  | "difficult_terrain"
+  | "hazardous_terrain"
+  | "door_closed"
+  | "door_locked"
+  | "over_speed_limit";
+
+// ── Turn Actions (combat action economy) ──
+
+export interface TurnActions {
+  actionUsed: boolean;
+  bonusActionUsed: boolean;
+  reactionUsed: boolean;
+  isDodging: boolean;
+  isDisengaging: boolean;
+  isDashing: boolean;
+  attackedThisTurn: boolean;
+  castBonusSpell: boolean;
+}
+
+export const DEFAULT_TURN_ACTIONS: TurnActions = {
+  actionUsed: false,
+  bonusActionUsed: false,
+  reactionUsed: false,
+  isDodging: false,
+  isDisengaging: false,
+  isDashing: false,
+  attackedThisTurn: false,
+  castBonusSpell: false,
+};
 
 export type ModalName =
   | "createScene"
@@ -54,6 +116,9 @@ export type ModalName =
   | "hpAdjust"
   | "characterSheet"
   | "creatureCompendium"
+  | "npcEditor"
+  | "tokenEditor"
+  | "encounterGroupEditor"
   | null;
 
 export interface ContextMenuState {
@@ -120,6 +185,30 @@ interface GameplayState {
   resetMovement: () => void;
   addMovementFt: (ft: number) => void;
 
+  // Turn actions
+  turnActions: TurnActions;
+  useAction: () => void;
+  useBonusAction: () => void;
+  useReaction: () => void;
+  setDodging: (v: boolean) => void;
+  setDashing: (v: boolean) => void;
+  setDisengaging: (v: boolean) => void;
+  setAttackedThisTurn: (v: boolean) => void;
+  setCastBonusSpell: (v: boolean) => void;
+  resetTurnActions: () => void;
+  addCombatLogMessage: (content: string) => void;
+
+  // Reactions (per-combatant tracking)
+  reactionUsedMap: Record<string, boolean>;
+  useReactionFor: (tokenId: string) => void;
+  pendingReaction: import("./reactions").PendingReaction | null;
+  setPendingReaction: (r: import("./reactions").PendingReaction | null) => void;
+
+  // Token ↔ Creature mapping (for AI features)
+  tokenCreatureMap: Record<string, string>;
+  linkTokenToCreature: (tokenId: string, creatureId: string) => void;
+  unlinkTokenCreature: (tokenId: string) => void;
+
   // Tokens
   tokens: GameToken[];
   selectedTokenIds: string[];
@@ -176,6 +265,18 @@ interface GameplayState {
   // Character sheet target
   characterSheetTargetId: string | null;
   setCharacterSheetTarget: (tokenId: string | null) => void;
+
+  // NPC editor target
+  npcEditorTargetId: string | null;
+  setNpcEditorTarget: (id: string | null) => void;
+
+  // Token editor target
+  tokenEditorTargetId: string | null;
+  setTokenEditorTarget: (id: string | null) => void;
+
+  // Encounter group editor target
+  encounterGroupEditorTargetId: string | null;
+  setEncounterGroupEditorTarget: (id: string | null) => void;
 
   // Creature compendium favorites
   compendiumFavorites: Set<string>;
@@ -313,6 +414,7 @@ interface GameplayState {
 
   // Add token to map
   addToken: (t: {
+    id?: string;
     name: string;
     x: number;
     y: number;
@@ -321,6 +423,8 @@ interface GameplayState {
     maxHp?: number;
     ac?: number;
     size?: number;
+    speed?: number;
+    icon?: string;
   }) => void;
 
   // Clear cell contents
@@ -328,17 +432,34 @@ interface GameplayState {
 
   // Vision system (config only — rendering is on-demand per selected token)
   tokenVision: Record<string, VisionConfig>;
-  walls: WallSegment[];
+  walls: WallSegment[]; // legacy (room templates)
   lightSources: LightSourceFixed[];
 
   setTokenVision: (tokenId: string, config: Partial<VisionConfig>) => void;
   toggleTokenVision: (tokenId: string) => void;
+
+  // Legacy wall API (kept for room template stamping)
   activeWallType: WallMaterial;
   setActiveWallType: (type: WallMaterial) => void;
   addWall: (w: WallSegment) => void;
   removeWall: (x: number, y: number, side: WallSide) => void;
   toggleDoor: (x: number, y: number, side: WallSide) => void;
   clearWalls: () => void;
+
+  // Edge-based wall system
+  wallEdges: Record<string, WallData>;
+  activeWallEdgeType: WallType;
+  activeWallStyle: WallStyle;
+  wallDrawMode: WallDrawMode;
+  setActiveWallEdgeType: (type: WallType) => void;
+  setActiveWallStyle: (style: WallStyle) => void;
+  setWallDrawMode: (mode: WallDrawMode) => void;
+  addWallEdge: (key: string, data: WallData) => void;
+  removeWallEdge: (key: string) => void;
+  updateWallEdge: (key: string, updates: Partial<WallData>) => void;
+  toggleDoorEdge: (key: string) => void;
+  clearWallEdges: () => void;
+
   addLightSource: (l: LightSourceFixed) => void;
   removeLightSource: (id: string) => void;
 
@@ -360,6 +481,18 @@ interface GameplayState {
 
   // Room template stamp
   stampTemplate: (template: RoomTemplate, originX: number, originY: number) => void;
+
+  // Path planning (combat movement)
+  pathPlanningActive: boolean;
+  pathPlanningTokenId: string | null;
+  plannedPath: PathCell[];
+  pathUndoStack: PathCell[][];
+  enterPathPlanning: (tokenId: string) => void;
+  exitPathPlanning: () => void;
+  addPathCell: (cell: PathCell) => void;
+  setPlannedPath: (path: PathCell[]) => void;
+  undoPathStep: () => void;
+  clearPath: () => void;
 }
 
 const DEFAULT_CONTEXT_MENU: ContextMenuState = {
@@ -403,11 +536,19 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       }
       const newRound =
         next <= s.combat.turnIndex ? s.combat.round + 1 : s.combat.round;
+      // Reset reaction only for the combatant whose turn is starting
+      const nextTokenId = order[next].tokenId;
+      const newReactionMap = { ...s.reactionUsedMap };
+      delete newReactionMap[nextTokenId];
+
       return {
         combat: { ...s.combat, turnIndex: next, round: newRound },
         movementUsedFt: 0,
+        turnActions: { ...DEFAULT_TURN_ACTIONS },
+        reactionUsedMap: newReactionMap,
       };
     });
+    playSFXSync("combat:turn_change");
   },
   prevTurn: () => {
     set((s) => {
@@ -430,6 +571,49 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   movementUsedFt: 0,
   resetMovement: () => set({ movementUsedFt: 0 }),
   addMovementFt: (ft) => set((s) => ({ movementUsedFt: s.movementUsedFt + ft })),
+
+  // Turn actions
+  turnActions: { ...DEFAULT_TURN_ACTIONS },
+  useAction: () => set((s) => ({ turnActions: { ...s.turnActions, actionUsed: true } })),
+  useBonusAction: () => set((s) => ({ turnActions: { ...s.turnActions, bonusActionUsed: true } })),
+  useReaction: () => set((s) => ({ turnActions: { ...s.turnActions, reactionUsed: true } })),
+  setDodging: (v) => set((s) => ({ turnActions: { ...s.turnActions, isDodging: v } })),
+  setDashing: (v) => set((s) => ({ turnActions: { ...s.turnActions, isDashing: v } })),
+  setDisengaging: (v) => set((s) => ({ turnActions: { ...s.turnActions, isDisengaging: v } })),
+  setAttackedThisTurn: (v) => set((s) => ({ turnActions: { ...s.turnActions, attackedThisTurn: v } })),
+  setCastBonusSpell: (v) => set((s) => ({ turnActions: { ...s.turnActions, castBonusSpell: v } })),
+  resetTurnActions: () => set({ turnActions: { ...DEFAULT_TURN_ACTIONS } }),
+  addCombatLogMessage: (content) => {
+    const msg: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      channel: "geral",
+      type: "system",
+      sender: "Sistema",
+      senderInitials: "S",
+      isGM: false,
+      content,
+      timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
+    set((s) => ({ messages: [...s.messages, msg] }));
+  },
+
+  // Reactions (per-combatant)
+  reactionUsedMap: {},
+  useReactionFor: (tokenId) =>
+    set((s) => ({ reactionUsedMap: { ...s.reactionUsedMap, [tokenId]: true } })),
+  pendingReaction: null,
+  setPendingReaction: (r) => set({ pendingReaction: r }),
+
+  // Token ↔ Creature mapping
+  tokenCreatureMap: {},
+  linkTokenToCreature: (tokenId, creatureId) =>
+    set((s) => ({ tokenCreatureMap: { ...s.tokenCreatureMap, [tokenId]: creatureId } })),
+  unlinkTokenCreature: (tokenId) =>
+    set((s) => {
+      const next = { ...s.tokenCreatureMap };
+      delete next[tokenId];
+      return { tokenCreatureMap: next };
+    }),
 
   tokens: MOCK_TOKENS,
   selectedTokenIds: [],
@@ -652,6 +836,15 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
 
   characterSheetTargetId: null,
   setCharacterSheetTarget: (tokenId) => set({ characterSheetTargetId: tokenId }),
+
+  npcEditorTargetId: null,
+  setNpcEditorTarget: (id) => set({ npcEditorTargetId: id }),
+
+  tokenEditorTargetId: null,
+  setTokenEditorTarget: (id) => set({ tokenEditorTargetId: id }),
+
+  encounterGroupEditorTargetId: null,
+  setEncounterGroupEditorTarget: (id) => set({ encounterGroupEditorTargetId: id }),
 
   compendiumFavorites: new Set<string>(),
   toggleCompendiumFavorite: (id) =>
@@ -918,7 +1111,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     return { x: centerX, y: centerY };
   },
 
-  collapsedSections: { tokens: true, quicknpc: true },
+  collapsedSections: { tokens: true, npcs: true, audio: true },
   toggleSection: (key) =>
     set((s) => ({
       collapsedSections: {
@@ -955,7 +1148,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       tokens: [
         ...s.tokens,
         {
-          id: `token_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          id: t.id ?? `token_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           name: t.name,
           alignment: t.alignment ?? "hostile",
           hp: t.hp ?? 10,
@@ -968,7 +1161,8 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
           onMap: true,
           conditions: [],
           visibility: "visible",
-          speed: 30,
+          speed: t.speed ?? 30,
+          icon: t.icon,
         },
       ],
     })),
@@ -1039,6 +1233,53 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     }));
   },
   clearWalls: () => set({ walls: [] }),
+
+  // ── Edge-based wall system ──
+  wallEdges: {} as Record<string, WallData>,
+  activeWallEdgeType: "wall" as WallType,
+  activeWallStyle: "stone" as WallStyle,
+  wallDrawMode: "line" as WallDrawMode,
+  setActiveWallEdgeType: (type) => set({ activeWallEdgeType: type }),
+  setActiveWallStyle: (style) => set({ activeWallStyle: style }),
+  setWallDrawMode: (mode) => set({ wallDrawMode: mode }),
+  addWallEdge: (key, data) => {
+    set((s) => ({
+      wallEdges: { ...s.wallEdges, [key]: data },
+    }));
+  },
+  removeWallEdge: (key) => {
+    set((s) => {
+      const next = { ...s.wallEdges };
+      delete next[key];
+      return { wallEdges: next };
+    });
+  },
+  updateWallEdge: (key, updates) => {
+    set((s) => {
+      const existing = s.wallEdges[key];
+      if (!existing) return s;
+      return {
+        wallEdges: { ...s.wallEdges, [key]: { ...existing, ...updates } },
+      };
+    });
+  },
+  toggleDoorEdge: (key) => {
+    set((s) => {
+      const wall = s.wallEdges[key];
+      if (!wall) return s;
+      let nextType: WallType;
+      if (wall.type === "door-closed") nextType = "door-open";
+      else if (wall.type === "door-open") nextType = "door-closed";
+      else if (wall.type === "door-locked") nextType = "door-locked"; // stays locked
+      else return s; // not a door
+      return {
+        wallEdges: { ...s.wallEdges, [key]: { ...wall, type: nextType } },
+      };
+    });
+    playSFXSync("map:door_open");
+  },
+  clearWallEdges: () => set({ wallEdges: {} }),
+
   addLightSource: (l) => {
     set((s) => ({ lightSources: [...s.lightSources, l] }));
   },
@@ -1133,7 +1374,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
         }
       }
 
-      // Add walls
+      // Add walls (legacy format)
       const newWalls = [...s.walls];
       for (const w of template.walls) {
         const x = originX + w.dx;
@@ -1150,6 +1391,24 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
             wallType: s.activeWallType,
             doorState: w.doorState ?? (w.isDoor ? "closed" : undefined),
           });
+        }
+      }
+
+      // Also add to edge-based wall system
+      const newEdges = { ...s.wallEdges };
+      for (const w of template.walls) {
+        const x = originX + w.dx;
+        const y = originY + w.dy;
+        if (x < 0 || y < 0 || x >= MOCK_MAP.gridCols || y >= MOCK_MAP.gridRows) continue;
+        const edgeKey = wallSideToEdgeKey(x, y, w.side);
+        if (!newEdges[edgeKey]) {
+          let wallType: import("./gameplay-mock-data").WallType = "wall";
+          if (w.isDoor) {
+            wallType = w.doorState === "open" ? "door-open"
+              : w.doorState === "locked" ? "door-locked"
+              : "door-closed";
+          }
+          newEdges[edgeKey] = { type: wallType, style: s.activeWallStyle };
         }
       }
 
@@ -1176,7 +1435,58 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
         terrainHistory: [...s.terrainHistory.slice(-49), [...s.terrainCells]],
         terrainFuture: [],
         walls: newWalls,
+        wallEdges: newEdges,
         mapObjects: newObjects,
       };
     }),
+
+  // ── Path Planning ──
+  pathPlanningActive: false,
+  pathPlanningTokenId: null,
+  plannedPath: [],
+  pathUndoStack: [],
+
+  enterPathPlanning: (tokenId) =>
+    set({
+      pathPlanningActive: true,
+      pathPlanningTokenId: tokenId,
+      plannedPath: [],
+      pathUndoStack: [],
+    }),
+
+  exitPathPlanning: () =>
+    set({
+      pathPlanningActive: false,
+      pathPlanningTokenId: null,
+      plannedPath: [],
+      pathUndoStack: [],
+    }),
+
+  addPathCell: (cell) =>
+    set((s) => ({
+      pathUndoStack: [...s.pathUndoStack, [...s.plannedPath]],
+      plannedPath: [...s.plannedPath, cell],
+    })),
+
+  setPlannedPath: (path) =>
+    set((s) => ({
+      pathUndoStack: [...s.pathUndoStack, [...s.plannedPath]],
+      plannedPath: path,
+    })),
+
+  undoPathStep: () =>
+    set((s) => {
+      if (s.pathUndoStack.length === 0) return s;
+      const prev = s.pathUndoStack[s.pathUndoStack.length - 1];
+      return {
+        pathUndoStack: s.pathUndoStack.slice(0, -1),
+        plannedPath: prev,
+      };
+    }),
+
+  clearPath: () =>
+    set((s) => ({
+      pathUndoStack: [...s.pathUndoStack, [...s.plannedPath]],
+      plannedPath: [],
+    })),
 }));

@@ -371,6 +371,13 @@ export interface GameplayStore {
   // Map image
   setMapImage: (image: GameplayStore["mapImage"]) => void;
 
+  // Settings modal
+  settingsModalOpen: boolean;
+  openSettingsModal: () => void;
+  closeSettingsModal: () => void;
+  setGridSize: (size: number) => void;
+  setGridType: (type: GameplayStore["gridType"]) => void;
+
   // Init
   loadMockData: () => void;
 }
@@ -793,6 +800,13 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
     }),
 
   setMapImage: (image) => set({ mapImage: image }),
+
+  // Settings modal
+  settingsModalOpen: false,
+  openSettingsModal: () => set({ settingsModalOpen: true }),
+  closeSettingsModal: () => set({ settingsModalOpen: false }),
+  setGridSize: (size) => set({ gridSize: Math.max(20, Math.min(100, size)) }),
+  setGridType: (type) => set({ gridType: type }),
 
   loadMockData: () => {
     // Populated by gameplay-mock-data.ts

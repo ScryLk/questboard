@@ -252,7 +252,17 @@ export type TerrainType =
   | "stairs_up"
   | "stairs_down"
   | "portal"
-  | "altar";
+  | "altar"
+  // Extended
+  | "cave_floor"
+  | "tiles_white"
+  | "acid"
+  | "blood"
+  | "wood_wall"
+  | "dungeon_wall"
+  | "brick_wall"
+  | "dense_trees"
+  | "light_trees";
 
 export type TerrainEditorTool = "brush" | "rectangle" | "fill" | "eraser";
 
@@ -314,6 +324,28 @@ export type FogMode = "manual" | "dynamic" | "hybrid";
 export type WallSide = "top" | "right" | "bottom" | "left";
 export type WallMaterial = "stone" | "wood" | "iron" | "magic";
 export type DoorState = "none" | "open" | "closed" | "locked" | "secret";
+
+// ── Edge-based Wall System ──
+
+export type WallType =
+  | "wall"
+  | "door-closed"
+  | "door-open"
+  | "door-locked"
+  | "window"
+  | "half-wall"
+  | "secret"
+  | "illusory"
+  | "portcullis";
+
+export type WallStyle = "stone" | "wood" | "metal" | "magic" | "natural" | "brick";
+
+export interface WallData {
+  type: WallType;
+  style: WallStyle;
+}
+
+export type WallDrawMode = "line" | "rectangle" | "erase";
 
 export interface VisionConfig {
   enabled: boolean;
