@@ -13,6 +13,7 @@ import {
   parseCellKey,
 } from "@/lib/fog-utils";
 import type { FogParticle } from "@/lib/fog-utils";
+import { CELL_SIZE } from "@/lib/gameplay/constants";
 
 interface FogOverlayProps {
   canvasW: number;
@@ -45,6 +46,10 @@ export function FogOverlay({
   const fpsHistoryRef = useRef<number[]>([]);
   const fallbackStyleRef = useRef<"fog" | "shadows" | "solid">("fog");
 
+  // Viewport values stored as refs — loop reads latest without restarting
+  const viewportRef = useRef({ scrollLeft, scrollTop, viewportW, viewportH, scaledCell });
+  viewportRef.current = { scrollLeft, scrollTop, viewportW, viewportH, scaledCell };
+
   // Generate noise texture on mount
   useEffect(() => {
     const state = useGameplayStore.getState();
@@ -57,7 +62,7 @@ export function FogOverlay({
     });
   }, []);
 
-  // Main animation loop
+  // Main animation loop — runs ONCE, never restarts on scroll/viewport changes
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -121,9 +126,13 @@ export function FogOverlay({
       const fallbackIdx = styleOrder.indexOf(fallbackStyleRef.current);
       const effectiveStyle = styleOrder[Math.max(requestedIdx, fallbackIdx)];
 
+      // Read viewport from ref (always latest, no effect restart)
+      const vp = viewportRef.current;
+      const sc = vp.scaledCell;
+
       // Viewport culling
       const visibleKeys = getVisibleCells(
-        effectiveFog, scrollLeft, scrollTop, viewportW, viewportH, scaledCell,
+        effectiveFog, vp.scrollLeft, vp.scrollTop, vp.viewportW, vp.viewportH, sc,
       );
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -134,12 +143,12 @@ export function FogOverlay({
       // ── Pass 1: Base fog fill ────────────────────────────
       for (const key of visibleKeys) {
         const { x, y } = parseCellKey(key);
-        const px = x * scaledCell;
-        const py = y * scaledCell;
+        const px = x * sc;
+        const py = y * sc;
 
         if (effectiveStyle === "solid") {
           ctx.fillStyle = `rgba(${r},${g},${b},${density})`;
-          ctx.fillRect(px, py, scaledCell, scaledCell);
+          ctx.fillRect(px, py, sc, sc);
           continue;
         }
 
@@ -149,43 +158,43 @@ export function FogOverlay({
         if (edge.isCenter) {
           const a = Math.min(1, density * 0.92 * breathe);
           ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
-          ctx.fillRect(px, py, scaledCell, scaledCell);
+          ctx.fillRect(px, py, sc, sc);
         } else {
           // Border cells: slightly lower base
           const a = Math.min(1, density * 0.78 * breathe);
           ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
-          ctx.fillRect(px, py, scaledCell, scaledCell);
+          ctx.fillRect(px, py, sc, sc);
 
           // Soft edge gradients — fade into neighboring empty cells
           if (fogSettings.softEdges) {
-            const pad = scaledCell * 0.6;
+            const pad = sc * 0.6;
             if (edge.exposedTop) {
-              const grad = ctx.createLinearGradient(px, py + scaledCell * 0.3, px, py - pad);
+              const grad = ctx.createLinearGradient(px, py + sc * 0.3, px, py - pad);
               grad.addColorStop(0, `rgba(${r},${g},${b},${a * 0.5})`);
               grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
               ctx.fillStyle = grad;
-              ctx.fillRect(px - pad * 0.3, py - pad, scaledCell + pad * 0.6, scaledCell + pad);
+              ctx.fillRect(px - pad * 0.3, py - pad, sc + pad * 0.6, sc + pad);
             }
             if (edge.exposedBottom) {
-              const grad = ctx.createLinearGradient(px, py + scaledCell * 0.7, px, py + scaledCell + pad);
+              const grad = ctx.createLinearGradient(px, py + sc * 0.7, px, py + sc + pad);
               grad.addColorStop(0, `rgba(${r},${g},${b},${a * 0.5})`);
               grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
               ctx.fillStyle = grad;
-              ctx.fillRect(px - pad * 0.3, py, scaledCell + pad * 0.6, scaledCell + pad);
+              ctx.fillRect(px - pad * 0.3, py, sc + pad * 0.6, sc + pad);
             }
             if (edge.exposedLeft) {
-              const grad = ctx.createLinearGradient(px + scaledCell * 0.3, py, px - pad, py);
+              const grad = ctx.createLinearGradient(px + sc * 0.3, py, px - pad, py);
               grad.addColorStop(0, `rgba(${r},${g},${b},${a * 0.5})`);
               grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
               ctx.fillStyle = grad;
-              ctx.fillRect(px - pad, py - pad * 0.3, scaledCell + pad, scaledCell + pad * 0.6);
+              ctx.fillRect(px - pad, py - pad * 0.3, sc + pad, sc + pad * 0.6);
             }
             if (edge.exposedRight) {
-              const grad = ctx.createLinearGradient(px + scaledCell * 0.7, py, px + scaledCell + pad, py);
+              const grad = ctx.createLinearGradient(px + sc * 0.7, py, px + sc + pad, py);
               grad.addColorStop(0, `rgba(${r},${g},${b},${a * 0.5})`);
               grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
               ctx.fillStyle = grad;
-              ctx.fillRect(px, py - pad * 0.3, scaledCell + pad, scaledCell + pad * 0.6);
+              ctx.fillRect(px, py - pad * 0.3, sc + pad, sc + pad * 0.6);
             }
           }
         }
@@ -236,13 +245,13 @@ export function FogOverlay({
           const { x, y } = parseCellKey(key);
           const edge = getCellEdgeInfo(x, y, effectiveFog);
           if (!edge.isCenter) {
-            const cx2 = x * scaledCell + scaledCell / 2;
-            const cy2 = y * scaledCell + scaledCell / 2;
-            const grad = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, scaledCell * 0.8);
+            const cx2 = x * sc + sc / 2;
+            const cy2 = y * sc + sc / 2;
+            const grad = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, sc * 0.8);
             grad.addColorStop(0, `rgba(${theme.sr},${theme.sg},${theme.sb},0.4)`);
             grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
             ctx.fillStyle = grad;
-            ctx.fillRect(x * scaledCell, y * scaledCell, scaledCell, scaledCell);
+            ctx.fillRect(x * sc, y * sc, sc, sc);
           }
         }
         ctx.restore();
@@ -252,11 +261,11 @@ export function FogOverlay({
       if (fogSettings.revealAnimation) {
         for (const key of recentlyRevealedCells) {
           const { x, y } = parseCellKey(key);
-          particlesRef.current = spawnParticles(x, y, scaledCell, particlesRef.current, "reveal");
+          particlesRef.current = spawnParticles(x, y, sc, particlesRef.current, "reveal");
         }
         for (const key of recentlyCoveredCells) {
           const { x, y } = parseCellKey(key);
-          particlesRef.current = spawnParticles(x, y, scaledCell, particlesRef.current, "cover");
+          particlesRef.current = spawnParticles(x, y, sc, particlesRef.current, "cover");
         }
         if (recentlyRevealedCells.size > 0) {
           state.clearRecentlyRevealed(Array.from(recentlyRevealedCells));
@@ -286,7 +295,10 @@ export function FogOverlay({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [canvasW, canvasH, scaledCell, scrollLeft, scrollTop, viewportW, viewportH]);
+    // Only restart loop if canvas dimensions change (they shouldn't with fixed CELL_SIZE)
+    // Viewport scroll/size changes are read from viewportRef inside the loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasW, canvasH]);
 
   return (
     <canvas

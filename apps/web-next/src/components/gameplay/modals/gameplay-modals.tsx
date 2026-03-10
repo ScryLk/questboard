@@ -2,11 +2,13 @@
 
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { CreateSceneModal } from "./create-scene-modal";
+import { SceneCardBuilderModal } from "./scene-card-builder-modal";
 import { SoundtrackModal } from "./soundtrack-modal";
 import { CreateTokenModal } from "./create-token-modal";
 import { StartCombatModal } from "./start-combat-modal";
 import { EndSessionModal } from "./end-session-modal";
 import { ShareSessionModal } from "./share-session-modal";
+import { InvitePlayersModal } from "./invite-players-modal";
 import { HpAdjustModal } from "./hp-adjust-modal";
 import { CharacterSheetModal } from "./character-sheet-modal";
 import { CreatureCompendiumModal } from "./creature-compendium-modal";
@@ -23,6 +25,8 @@ export function GameplayModals() {
   switch (activeModal) {
     case "createScene":
       return <CreateSceneModal onClose={closeModal} />;
+    case "sceneCard":
+      return <SceneCardBuilderModal onClose={closeModal} />;
     case "soundtrack":
       return <SoundtrackModal onClose={closeModal} />;
     case "createToken":
@@ -33,6 +37,8 @@ export function GameplayModals() {
       return <EndSessionModal onClose={closeModal} />;
     case "shareSession":
       return <ShareSessionModal onClose={closeModal} />;
+    case "invitePlayers":
+      return <InvitePlayersModal onClose={closeModal} />;
     case "hpAdjust":
       return <HpAdjustModal onClose={closeModal} />;
     case "characterSheet":

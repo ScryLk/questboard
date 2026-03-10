@@ -17,7 +17,8 @@ export type MapTool =
   | "wall"
   | "vision"
   | "terrain"
-  | "objects";
+  | "objects"
+  | "ai";
 export type RightPanelTab = "chat" | "dice" | "sheet";
 export type DieType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100";
 export type TokenVisibility = "visible" | "hidden" | "invisible";
@@ -314,6 +315,10 @@ export interface Toast {
   id: string;
   text: string;
   timestamp: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 // ── Vision System ────────────────────────────────────
@@ -480,286 +485,35 @@ export interface LightSourceFixed {
   color: string;
 }
 
-// ── Mock Data ────────────────────────────────────────
+// ── Empty data (previously mock) ─────────────────────
 
 export const MOCK_SESSION: SessionInfo = {
-  id: "sess_s04",
-  number: 13,
-  name: "A Torre de Ravenloft",
-  campaign: "A Maldicao de Strahd",
-  startedAt: new Date(Date.now() - 92 * 60 * 1000),
+  id: "",
+  number: 0,
+  name: "",
+  campaign: "",
+  startedAt: new Date(),
   status: "live",
 };
 
-export const MOCK_PLAYERS: GamePlayer[] = [
-  {
-    id: "p1",
-    name: "Maria Santos",
-    character: "Eldrin",
-    class: "Mago",
-    level: 5,
-    hp: 25,
-    maxHp: 32,
-    ac: 14,
-    status: "online",
-    avatarInitials: "MS",
-    color: "#6C5CE7",
-  },
-  {
-    id: "p2",
-    name: "Pedro Costa",
-    character: "Kira Ironfist",
-    class: "Ladina",
-    level: 5,
-    hp: 12,
-    maxHp: 28,
-    ac: 16,
-    status: "online",
-    avatarInitials: "PC",
-    color: "#00CEC9",
-  },
-  {
-    id: "p3",
-    name: "Ana Costa",
-    character: "Zael",
-    class: "Ranger",
-    level: 5,
-    hp: 35,
-    maxHp: 35,
-    ac: 15,
-    status: "offline",
-    avatarInitials: "AC",
-    color: "#FDCB6E",
-  },
-  {
-    id: "p4",
-    name: "Joao Oliveira",
-    character: "Theron",
-    class: "Clerigo",
-    level: 5,
-    hp: 38,
-    maxHp: 42,
-    ac: 18,
-    status: "online",
-    avatarInitials: "JO",
-    color: "#FF6B6B",
-  },
-];
+export const MOCK_PLAYERS: GamePlayer[] = [];
 
-export const MOCK_TOKENS: GameToken[] = [
-  {
-    id: "tok_eldrin",
-    name: "Eldrin",
-    alignment: "player",
-    hp: 25,
-    maxHp: 32,
-    ac: 14,
-    initiative: 18,
-    size: 1,
-    x: 8,
-    y: 10,
-    onMap: true,
-    conditions: ["concentrating"],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p1",
-  },
-  {
-    id: "tok_kira",
-    name: "Kira",
-    alignment: "player",
-    hp: 12,
-    maxHp: 28,
-    ac: 16,
-    initiative: 22,
-    size: 1,
-    x: 10,
-    y: 11,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p2",
-  },
-  {
-    id: "tok_zael",
-    name: "Zael",
-    alignment: "player",
-    hp: 35,
-    maxHp: 35,
-    ac: 15,
-    initiative: 15,
-    size: 1,
-    x: 7,
-    y: 12,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 35,
-    playerId: "p3",
-  },
-  {
-    id: "tok_theron",
-    name: "Theron",
-    alignment: "player",
-    hp: 38,
-    maxHp: 42,
-    ac: 18,
-    initiative: 12,
-    size: 1,
-    x: 9,
-    y: 13,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p4",
-  },
-  {
-    id: "tok_skel1",
-    name: "Esqueleto 1",
-    alignment: "hostile",
-    hp: 8,
-    maxHp: 13,
-    ac: 13,
-    initiative: 16,
-    size: 1,
-    x: 12,
-    y: 9,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-  },
-  {
-    id: "tok_skel2",
-    name: "Esqueleto 2",
-    alignment: "hostile",
-    hp: 0,
-    maxHp: 13,
-    ac: 13,
-    initiative: 14,
-    size: 1,
-    x: 13,
-    y: 10,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-  },
-  {
-    id: "tok_wolf",
-    name: "Lobo Sombrio",
-    alignment: "hostile",
-    hp: 22,
-    maxHp: 22,
-    ac: 13,
-    initiative: 0,
-    size: 1,
-    x: 0,
-    y: 0,
-    onMap: false,
-    conditions: [],
-    visibility: "visible",
-    speed: 40,
-  },
-  {
-    id: "tok_chest",
-    name: "Bau Misterioso",
-    alignment: "neutral",
-    hp: 10,
-    maxHp: 10,
-    ac: 15,
-    initiative: 0,
-    size: 1,
-    x: 0,
-    y: 0,
-    onMap: false,
-    conditions: [],
-    visibility: "visible",
-    speed: 0,
-  },
-];
+export const MOCK_TOKENS: GameToken[] = [];
 
 export const MOCK_COMBAT: CombatState = {
-  active: true,
-  round: 3,
+  active: false,
+  round: 0,
   turnIndex: 0,
-  order: [
-    { tokenId: "tok_kira", initiative: 22, status: "active" },
-    { tokenId: "tok_eldrin", initiative: 18, status: "active" },
-    { tokenId: "tok_skel1", initiative: 16, status: "active" },
-    { tokenId: "tok_zael", initiative: 15, status: "active" },
-    { tokenId: "tok_skel2", initiative: 14, status: "dead" },
-    { tokenId: "tok_theron", initiative: 12, status: "active" },
-  ],
+  order: [],
 };
 
-export const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: "msg1",
-    channel: "geral",
-    type: "system",
-    sender: "Sistema",
-    senderInitials: "S",
-    isGM: false,
-    content: "Combate iniciado — Rodada 1",
-    timestamp: "19:45",
-  },
-  {
-    id: "msg2",
-    channel: "geral",
-    type: "roll",
-    sender: "Maria Santos",
-    senderInitials: "MS",
-    isGM: false,
-    content: "Eldrin ataca com Bola de Fogo!",
-    timestamp: "19:48",
-    rollFormula: "8d6",
-    rollResult: 34,
-    rollDetails: "4+6+5+3+6+2+5+3",
-  },
-  {
-    id: "msg3",
-    channel: "geral",
-    type: "roll",
-    sender: "Pedro Costa",
-    senderInitials: "PC",
-    isGM: false,
-    content: "Kira tenta ataque furtivo",
-    timestamp: "19:52",
-    rollFormula: "1d20+7",
-    rollResult: 27,
-    rollDetails: "20+7",
-    isNat20: true,
-  },
-  {
-    id: "msg4",
-    channel: "mesa-gm",
-    type: "normal",
-    sender: "GM",
-    senderInitials: "GM",
-    isGM: true,
-    content: "O esqueleto 2 cai em pedacos. Faltam 1 esqueleto na sala.",
-    timestamp: "19:53",
-  },
-  {
-    id: "msg5",
-    channel: "geral",
-    type: "normal",
-    sender: "Joao Oliveira",
-    senderInitials: "JO",
-    isGM: false,
-    content: "Theron se posiciona para curar Kira no proximo turno",
-    timestamp: "19:55",
-  },
-];
+export const MOCK_MESSAGES: ChatMessage[] = [];
 
 export const MOCK_MAP: MapConfig = {
-  name: "Torre de Ravenloft — Andar 3",
+  name: "",
   gridCols: 25,
   gridRows: 25,
-  cellSize: 40,
+  cellSize: 64,
   cellSizeFt: 5,
 };
 
@@ -770,14 +524,6 @@ export function getElapsedTime(startedAt: Date): string {
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return `${h}h${m.toString().padStart(2, "0")}m`;
-}
-
-export function getTokenById(id: string): GameToken | undefined {
-  return MOCK_TOKENS.find((t) => t.id === id);
-}
-
-export function getPlayerById(id: string): GamePlayer | undefined {
-  return MOCK_PLAYERS.find((p) => p.id === id);
 }
 
 export function getAlignmentColor(alignment: TokenAlignment): string {

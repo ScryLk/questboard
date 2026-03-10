@@ -8,7 +8,61 @@ import {
   Plus,
   Save,
   Search,
+  User,
+  Swords,
+  Eye,
+  Shield,
+  Footprints,
+  Sword,
+  Bone,
+  Skull,
+  PawPrint,
+  Axe,
+  ShieldAlert,
+  EyeOff,
+  Ghost,
+  Bug,
+  Crown,
+  Hammer,
+  Box,
+  Bird,
+  Target,
+  ShieldCheck,
+  HeartPulse,
+  Sparkles,
+  Brain,
+  Crosshair,
+  Flame,
+  type LucideIcon,
 } from "lucide-react";
+
+const CREATURE_ICONS: Record<string, LucideIcon> = {
+  user: User,
+  swords: Swords,
+  eye: Eye,
+  shield: Shield,
+  footprints: Footprints,
+  sword: Sword,
+  bone: Bone,
+  skull: Skull,
+  "paw-print": PawPrint,
+  axe: Axe,
+  "shield-alert": ShieldAlert,
+  "eye-off": EyeOff,
+  ghost: Ghost,
+  bug: Bug,
+  crown: Crown,
+  hammer: Hammer,
+  box: Box,
+  bird: Bird,
+  target: Target,
+  "shield-check": ShieldCheck,
+  "heart-pulse": HeartPulse,
+  sparkles: Sparkles,
+  brain: Brain,
+  crosshair: Crosshair,
+  flame: Flame,
+};
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useTokenLibraryStore } from "@/lib/token-library-store";
 import { useCustomCreaturesStore } from "@/lib/custom-creatures-store";
@@ -178,6 +232,8 @@ function CompendiumCreatureRow({
     linkTokenToCreature(tokenId, creature.id);
   }
 
+  const IconComponent = CREATURE_ICONS[creature.icon] ?? Sword;
+
   return (
     <div className="mb-0.5 rounded-md border border-brand-border/50 transition-colors hover:border-brand-border">
       {/* Row header */}
@@ -192,7 +248,12 @@ function CompendiumCreatureRow({
         }}
         className="flex cursor-grab items-center gap-1.5 px-2 py-1 active:cursor-grabbing"
       >
-        <span className="text-sm">{creature.icon}</span>
+        <span
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded"
+          style={{ backgroundColor: creature.color + "18" }}
+        >
+          <IconComponent className="h-3.5 w-3.5" style={{ color: creature.color }} />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-medium text-brand-text">
             {creature.name}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useLobbyStore, MOCK_LOBBY_SESSION, MOCK_LOBBY_PLAYERS, MOCK_LOBBY_MESSAGES } from "@/lib/lobby-store";
+import { useLobbyStore } from "@/lib/lobby-store";
 import { LobbyHeader } from "./lobby-header";
 import { LobbyPlayerList } from "./lobby-player-list";
 import { LobbyChat } from "./lobby-chat";
@@ -24,17 +24,10 @@ export function LobbyLayout({ sessionId }: { sessionId: string }) {
   const sessionInfo = useLobbyStore((s) => s.sessionInfo);
   const countdownActive = useLobbyStore((s) => s.countdownActive);
 
-  // Initialize mock data on mount
+  // TODO: load real session data via API/socket
   useEffect(() => {
-    setSessionInfo(MOCK_LOBBY_SESSION);
-    setIsGM(true);
-    setMyPlayerId("gm-1");
     setLobbyActive(true);
-    setPlayers(MOCK_LOBBY_PLAYERS);
-    for (const msg of MOCK_LOBBY_MESSAGES) {
-      addChatMessage(msg);
-    }
-  }, [setSessionInfo, setIsGM, setMyPlayerId, setLobbyActive, setPlayers, addChatMessage]);
+  }, [setLobbyActive]);
 
   const handleStart = useCallback(() => {
     startCountdown(3);

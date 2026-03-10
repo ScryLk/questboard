@@ -70,9 +70,9 @@ export async function executePath(
           cellSizeFt,
         );
 
-        if (pendingOAs.length > 0) {
-          // Trigger OA reaction
-          state.setPendingReaction(pendingOAs[0]);
+        // Process ALL OAs sequentially (multiple reactors can OA the same move)
+        for (const oa of pendingOAs) {
+          store.getState().setPendingReaction(oa);
 
           // Sound + shake
           const audioSettings = useSettingsStore.getState().audio;

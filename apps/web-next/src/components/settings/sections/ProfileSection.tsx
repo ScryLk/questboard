@@ -1,15 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useSettingsStore } from "@/lib/settings-store";
+import { useProfileStore } from "@/stores/profileStore";
 import {
   SettingsSection,
   SettingsInput,
   SettingsRadio,
 } from "../controls";
-import { Camera, ChevronRight, LogOut, Trash2 } from "lucide-react";
+import { Camera, ChevronRight, ExternalLink, LogOut, Palette, Trash2 } from "lucide-react";
+import { CosmeticPreview } from "@/components/profile/cosmetic-preview";
+import { CosmeticSelectorModal } from "@/components/profile/cosmetic-selector-modal";
 
 export function ProfileSection() {
   const { profile, updateProfile } = useSettingsStore();
+  const publicProfile = useProfileStore((s) => s.profile);
+  const openCosmeticSelector = useProfileStore((s) => s.openCosmeticSelector);
 
   return (
     <div className="space-y-6">
@@ -94,6 +100,32 @@ export function ProfileSection() {
           ]}
         />
       </SettingsSection>
+
+      <SettingsSection title="Cosméticos do Perfil">
+        <CosmeticPreview
+          equipped={publicProfile.equipped}
+          displayName={publicProfile.displayName}
+          avatarUrl={publicProfile.avatarUrl}
+        />
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={() => openCosmeticSelector("frame")}
+            className="flex items-center gap-2 rounded-lg bg-brand-accent/10 px-3 py-1.5 text-sm text-brand-accent hover:bg-brand-accent/20"
+          >
+            <Palette className="h-4 w-4" />
+            Personalizar
+          </button>
+          <Link
+            href={`/u/${publicProfile.username}`}
+            className="flex items-center gap-1.5 text-xs text-brand-muted transition-colors hover:text-brand-text"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Ver Perfil Público
+          </Link>
+        </div>
+      </SettingsSection>
+
+      <CosmeticSelectorModal />
 
       <SettingsSection title="Segurança">
         <ActionRow label="Alterar Senha" />

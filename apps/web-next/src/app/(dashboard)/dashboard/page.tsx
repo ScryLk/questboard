@@ -1,4 +1,9 @@
-import { Calendar, Clock, TrendingUp, Users } from "lucide-react";
+"use client";
+
+import Link from "next/link";
+import { BookOpen, Calendar, Clock, TrendingUp, Users } from "lucide-react";
+import { useStoryProgress } from "@/stores/storyStore";
+import { ProfileWidget } from "@/components/profile/profile-widget";
 
 const KPI_CARDS = [
   { label: "Sessoes", value: "12", icon: Calendar, color: "text-brand-accent" },
@@ -57,6 +62,8 @@ function statusBadge(status: "Completa" | "Agendada" | "Ao Vivo") {
 }
 
 export default function DashboardPage() {
+  const story = useStoryProgress();
+
   return (
     <div className="space-y-8">
       {/* KPI Cards */}
@@ -78,6 +85,49 @@ export default function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Profile Widget */}
+      <ProfileWidget />
+
+      {/* Story Progress Widget */}
+      <div className="rounded-xl border border-brand-border bg-brand-surface p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-brand-accent" />
+            <h2 className="text-sm font-semibold text-brand-text">
+              Progressão da História
+            </h2>
+          </div>
+          <Link
+            href="/story"
+            className="text-xs text-brand-accent hover:underline"
+          >
+            Ver Roadmap Completo
+          </Link>
+        </div>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-brand-text">
+            {story.percent}%
+          </span>
+          <span className="text-sm text-brand-muted">
+            {story.completedEvents}/{story.totalEvents} eventos
+          </span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5">
+          <div
+            className="h-full rounded-full bg-brand-accent transition-all"
+            style={{ width: `${story.percent}%` }}
+          />
+        </div>
+        {story.nextEvent && (
+          <p className="mt-2 text-xs text-brand-muted">
+            Próximo:{" "}
+            <span className="font-medium text-brand-text">
+              {story.nextEvent.title}
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Sessions Table */}

@@ -62,12 +62,23 @@ export interface PlayerCombatState {
 
 // ── Scene card ────────────────────────────────────────────────
 
+export type SceneCardStyle =
+  | "cinematic"
+  | "chapter"
+  | "location"
+  | "mystery"
+  | "danger"
+  | "flashback"
+  | "weather";
+
 export interface SceneCard {
-  style: "cinematic" | "chapter" | "location";
+  style: SceneCardStyle;
   title: string;
   subtitle?: string;
   description?: string;
   duration: number; // ms
+  tags?: string[];
+  chapter?: string;
 }
 
 // ── GM settings that affect player view ───────────────────────

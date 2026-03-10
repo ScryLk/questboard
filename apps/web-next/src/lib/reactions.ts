@@ -1,6 +1,9 @@
 import type { GameToken, TokenAlignment } from "./gameplay-mock-data";
 import { TOKEN_TO_CHARACTER_MAP, MOCK_FULL_CHARACTERS } from "./character-mock-data";
 import { rollD20, parseDiceFormula } from "./dice";
+import { CREATURE_COMPENDIUM } from "./creature-data";
+import { useGameplayStore } from "./gameplay-store";
+import { useCustomCreaturesStore } from "./custom-creatures-store";
 
 // ── Types ──
 
@@ -58,45 +61,116 @@ export function isWithinReach(
 
 // ── Melee Weapons ──
 
+/**
+ * Parse a creature action description to extract melee attack data.
+ * Matches: "Ataque Corpo a Corpo com Arma: +N para acertar ... Acerto: N (DICE) de dano de TYPE"
+ */
+function parseCreatureMeleeAction(
+  action: { name: string; desc: string },
+): OAWeaponOption | null {
+  const desc = action.desc;
+  // Must be a melee attack (not ranged-only)
+  if (!desc.includes("Corpo a Corpo")) return null;
+
+  // Extract attack bonus: "+N para acertar"
+  const atkMatch = desc.match(/[+](\d+)\s*para acertar/);
+  const attackBonus = atkMatch ? parseInt(atkMatch[1], 10) : 0;
+
+  // Extract damage dice: "(NdN+N)" and damage type: "de dano de TYPE" or "de dano TYPE"
+  const dmgMatch = desc.match(/\((\d+d\d+(?:[+-]\d+)?)\)\s*de dano\s+(?:de\s+)?(\w+)/);
+  const damage = dmgMatch
+    ? `${dmgMatch[1]} ${dmgMatch[2]}`
+    : "1d4";
+
+  return {
+    weaponId: `creature_${action.name.toLowerCase().replace(/\s+/g, "_")}`,
+    weaponName: action.name,
+    attackBonus,
+    damage,
+  };
+}
+
 export function getMeleeWeaponsForToken(tokenId: string): OAWeaponOption[] {
+  // 1. Check player character map first
   const characterId = TOKEN_TO_CHARACTER_MAP[tokenId];
-  if (!characterId) return [];
+  if (characterId) {
+    const character = MOCK_FULL_CHARACTERS[characterId];
+    if (character) {
+      const weapons: OAWeaponOption[] = [];
 
-  const character = MOCK_FULL_CHARACTERS[characterId];
-  if (!character) return [];
+      for (const item of character.inventory) {
+        if (item.category !== "weapon" || !item.equipped) continue;
+        // Skip ranged-only weapons (they have Munição/Ammunition but NOT melee properties)
+        const isRangedOnly = item.properties?.some(
+          (p) =>
+            (p.toLowerCase().includes("munição") || p.toLowerCase().includes("ammunition")) &&
+            p.toLowerCase().includes("duas mãos"),
+        );
+        if (isRangedOnly) continue;
 
-  const weapons: OAWeaponOption[] = [];
+        weapons.push({
+          weaponId: item.id,
+          weaponName: item.name,
+          attackBonus: item.attackBonus ?? 0,
+          damage: item.damage ?? "1d4",
+        });
+      }
 
-  for (const item of character.inventory) {
-    if (item.category !== "weapon" || !item.equipped) continue;
-    // Skip ranged-only weapons (they have Munição/Ammunition but NOT melee properties)
-    const isRangedOnly = item.properties?.some(
-      (p) =>
-        (p.toLowerCase().includes("munição") || p.toLowerCase().includes("ammunition")) &&
-        p.toLowerCase().includes("duas mãos"),
-    );
-    if (isRangedOnly) continue;
+      // Fallback: unarmed strike
+      if (weapons.length === 0) {
+        const strMod = character.abilities.str.modifier;
+        weapons.push({
+          weaponId: "unarmed",
+          weaponName: "Ataque Desarmado",
+          attackBonus: strMod + character.proficiencyBonus,
+          damage: `1+${strMod} concussão`,
+        });
+      }
 
-    weapons.push({
-      weaponId: item.id,
-      weaponName: item.name,
-      attackBonus: item.attackBonus ?? 0,
-      damage: item.damage ?? "1d4",
-    });
+      return weapons;
+    }
   }
 
-  // Fallback: unarmed strike
-  if (weapons.length === 0) {
-    const strMod = character.abilities.str.modifier;
-    weapons.push({
-      weaponId: "unarmed",
-      weaponName: "Ataque Desarmado",
-      attackBonus: strMod + character.proficiencyBonus,
-      damage: `1+${strMod} concussão`,
-    });
+  // 2. Check creature data (NPC tokens linked to creatures)
+  const gameState = useGameplayStore.getState();
+  const creatureId = gameState.tokenCreatureMap[tokenId];
+
+  // Try linked creature first, then name-match fallback
+  const creature = creatureId
+    ? (useCustomCreaturesStore.getState().creatures.find((c) => c.id === creatureId) ??
+       CREATURE_COMPENDIUM.find((c) => c.id === creatureId))
+    : null;
+
+  // 3. Name-based fallback: match token name to compendium (e.g. "Esqueleto 1" → "Esqueleto")
+  const resolvedCreature = creature ?? (() => {
+    const token = gameState.tokens.find((t) => t.id === tokenId);
+    if (!token) return null;
+    // Strip trailing number/index (e.g. "Esqueleto 1" → "Esqueleto")
+    const baseName = token.name.replace(/\s*\d+$/, "").trim().toLowerCase();
+    return CREATURE_COMPENDIUM.find(
+      (c) => c.name.toLowerCase() === baseName || c.nameEn.toLowerCase() === baseName,
+    ) ?? null;
+  })();
+
+  if (resolvedCreature) {
+    const weapons: OAWeaponOption[] = [];
+    for (const action of resolvedCreature.actions) {
+      const parsed = parseCreatureMeleeAction(action);
+      if (parsed) weapons.push(parsed);
+    }
+    if (weapons.length > 0) return weapons;
+
+    // Fallback: generic melee attack based on STR
+    const strMod = Math.floor((resolvedCreature.str - 10) / 2);
+    return [{
+      weaponId: "creature_unarmed",
+      weaponName: "Ataque Corpo a Corpo",
+      attackBonus: strMod + 2, // Assume +2 proficiency
+      damage: `1d4+${Math.max(0, strMod)} concussão`,
+    }];
   }
 
-  return weapons;
+  return [];
 }
 
 // ── Detection ──

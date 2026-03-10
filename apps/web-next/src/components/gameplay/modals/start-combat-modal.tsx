@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { GripVertical, Swords, Trash2 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { usePhaseStore } from "@/stores/phaseStore";
 import { getAlignmentColor } from "@/lib/gameplay-mock-data";
 import { ModalShell } from "./modal-shell";
 
@@ -114,7 +115,10 @@ export function StartCombatModal({ onClose }: StartCombatModalProps) {
           Cancelar
         </button>
         <button
-          onClick={onClose}
+          onClick={() => {
+            usePhaseStore.getState().transitionTo("combat", "Combate");
+            onClose();
+          }}
           className="h-9 rounded-lg bg-brand-accent px-4 text-xs font-medium text-white transition-colors hover:bg-brand-accent/90"
         >
           Iniciar Combate

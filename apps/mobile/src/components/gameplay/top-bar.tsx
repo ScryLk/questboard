@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Menu, Settings, Users } from "lucide-react-native";
 import { Stack, Text, XStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { PhaseBadge } from "./phase-badge";
 
 function TopBarInner() {
   const router = useRouter();
@@ -97,6 +98,8 @@ function TopBarInner() {
             </Text>
           </XStack>
         )}
+
+        <PhaseBadge />
       </XStack>
 
       {/* Right: Player count + GM settings */}

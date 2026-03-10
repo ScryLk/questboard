@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Map, Settings } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useMapSidebarStore } from "@/lib/map-sidebar-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { ActiveSceneCard } from "./active-scene-card";
 import { SceneList } from "./scene-list";
 import { LayerPanel } from "./layer-panel";
@@ -49,13 +50,14 @@ export function MapSidebarSection() {
             </span>
           )}
         </button>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-          title="Configurações"
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+        <GameTooltip label="Configurações" side="bottom">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        </GameTooltip>
 
         {showSettings && (
           <MapSidebarSettings onClose={() => setShowSettings(false)} />

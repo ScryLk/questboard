@@ -8,25 +8,40 @@ export function SFXProvider({ children }: { children: React.ReactNode }) {
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
   const [ready, setReady] = useState(false);
 
+  // Defer SFX loading until first user interaction (respects browser autoplay policy
+  // and avoids unnecessary network requests on initial page load)
   useEffect(() => {
     let cancelled = false;
 
-    freesoundEngine
-      .loadAllSFX(SFX_DEFINITIONS, (loaded, total) => {
-        if (!cancelled) setProgress({ loaded, total });
-      })
-      .then(() => {
-        if (!cancelled) {
-          setReady(true);
-          console.log(`[SFX] ${SFX_DEFINITIONS.length} sons carregados via Freesound`);
-        }
-      })
-      .catch((err) => {
-        console.error("[SFX] Failed to load sounds:", err);
-      });
+    function startLoading() {
+      freesoundEngine
+        .loadAllSFX(SFX_DEFINITIONS, (loaded, total) => {
+          if (!cancelled) setProgress({ loaded, total });
+        })
+        .then(() => {
+          if (!cancelled) {
+            setReady(true);
+            console.log(`[SFX] ${SFX_DEFINITIONS.length} sons carregados via Freesound`);
+          }
+        })
+        .catch((err) => {
+          console.error("[SFX] Failed to load sounds:", err);
+        });
+    }
+
+    function handleFirstInteraction() {
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("keydown", handleFirstInteraction);
+      startLoading();
+    }
+
+    window.addEventListener("click", handleFirstInteraction, { once: true });
+    window.addEventListener("keydown", handleFirstInteraction, { once: true });
 
     return () => {
       cancelled = true;
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("keydown", handleFirstInteraction);
     };
   }, []);
 

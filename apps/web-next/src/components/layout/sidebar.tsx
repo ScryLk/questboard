@@ -13,6 +13,7 @@ import {
   ScrollText,
   Castle,
   Plus,
+  ShieldAlert,
 } from "lucide-react";
 
 const CAMPAIGN_NAV = [
@@ -110,6 +111,22 @@ export function Sidebar() {
             <span>Nova Campanha</span>
           </button>
         </div>
+      </div>
+
+      {/* Admin Link */}
+      <div className="px-3 pb-2">
+        <div className="h-px bg-brand-border mb-2" />
+        <Link
+          href="/admin"
+          className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+            pathname.startsWith("/admin")
+              ? "bg-brand-danger/15 text-brand-danger"
+              : "text-brand-muted hover:bg-white/5 hover:text-brand-danger"
+          }`}
+        >
+          <ShieldAlert className="h-[18px] w-[18px]" />
+          <span>Painel Admin</span>
+        </Link>
       </div>
 
       {/* User */}

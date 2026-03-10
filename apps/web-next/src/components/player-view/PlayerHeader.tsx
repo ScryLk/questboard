@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Volume2,
   VolumeX,
@@ -21,11 +21,11 @@ export function PlayerHeader() {
   const connected = usePlayerViewStore((s) => s.connected);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const elapsed = useMemo(
-    () => getElapsedTime(MOCK_SESSION.startedAt),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Math.floor(Date.now() / 60000)],
-  );
+  const [elapsed, setElapsed] = useState(() => getElapsedTime(MOCK_SESSION.startedAt));
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(getElapsedTime(MOCK_SESSION.startedAt)), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const characterName = myToken?.name ?? playerName ?? "Jogador";
 

@@ -14,7 +14,9 @@
     "@questboard/db": "workspace:*",
     "@questboard/shared": "workspace:*",
     "bullmq": "^5.38.1",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "firebase-admin": "^13.7.0",
+    "ioredis": "^5.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

@@ -59,9 +59,28 @@ async function main() {
     ],
   });
 
+  // Create Super Admin user
+  const superAdminClerkId = process.env.SUPER_ADMIN_CLERK_ID || "clerk_super_admin_dev";
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || "admin@questboard.app";
+
+  const superAdmin = await prisma.user.upsert({
+    where: { externalId: superAdminClerkId },
+    update: { role: "SUPER_ADMIN" },
+    create: {
+      externalId: superAdminClerkId,
+      email: superAdminEmail,
+      username: "admin",
+      displayName: "Super Admin",
+      role: "SUPER_ADMIN",
+      emailVerified: true,
+      stats: { create: {} },
+    },
+  });
+
   console.log("Seed completed.");
   console.log(`  - D&D 5e template: ${dnd5eTemplate.id}`);
   console.log(`  - Generic template: ${genericTemplate.id}`);
+  console.log(`  - Super Admin: ${superAdmin.id} (${superAdmin.email})`);
 }
 
 main()

@@ -48,6 +48,8 @@ import type { TerrainCategoryId } from "./terrain-catalog";
 import type { RoomTemplate } from "./room-templates";
 import { wallSideToEdgeKey } from "./wall-helpers";
 import { playSFXSync } from "./audio/sfx-triggers";
+import { broadcastSend } from "./broadcast-sync";
+import type { SceneCard as PlayerSceneCard } from "./player-view-store";
 
 
 // ── Path Planning Types ──
@@ -108,11 +110,13 @@ export const DEFAULT_TURN_ACTIONS: TurnActions = {
 
 export type ModalName =
   | "createScene"
+  | "sceneCard"
   | "soundtrack"
   | "createToken"
   | "startCombat"
   | "endSession"
   | "shareSession"
+  | "invitePlayers"
   | "hpAdjust"
   | "characterSheet"
   | "creatureCompendium"
@@ -145,6 +149,27 @@ export interface RegionSelection {
   y2: number;
   finalized: boolean;
 }
+
+export interface AISelection {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  finalized: boolean;
+}
+
+export interface AIGeneratedLayer {
+  id: string;
+  imageDataUrl: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  name: string;
+  timestamp: number;
+}
+
+export type AIGenerationStatus = "idle" | "generating" | "error";
 
 export interface MovementHistoryEntry {
   tokenId: string;
@@ -225,6 +250,7 @@ interface GameplayState {
   updateTokenAc: (id: string, ac: number) => void;
   toggleTokenCondition: (id: string, cond: ConditionType) => void;
   setTokenVisibility: (id: string, vis: TokenVisibility) => void;
+  setTokenAlignment: (id: string, alignment: TokenAlignment) => void;
   setTokenSize: (id: string, size: number) => void;
 
   // Movement history (undo)
@@ -286,6 +312,12 @@ interface GameplayState {
   activeModal: ModalName;
   openModal: (name: ModalName) => void;
   closeModal: () => void;
+
+  // Scene card (narrative overlay for players)
+  activeSceneCard: PlayerSceneCard | null;
+  sceneCardFiredAt: number | null;
+  fireSceneCard: (card: PlayerSceneCard) => void;
+  dismissSceneCard: () => void;
 
   // Ruler
   rulerPoints: RulerPoint[];
@@ -409,7 +441,7 @@ interface GameplayState {
 
   // Toasts
   toasts: Toast[];
-  addToast: (text: string) => void;
+  addToast: (text: string, action?: { label: string; onClick: () => void }) => void;
   removeToast: (id: string) => void;
 
   // Add token to map
@@ -482,6 +514,20 @@ interface GameplayState {
   // Room template stamp
   stampTemplate: (template: RoomTemplate, originX: number, originY: number) => void;
 
+  // AI Map Generation
+  aiSelection: AISelection | null;
+  setAISelection: (sel: AISelection | null) => void;
+  finalizeAISelection: () => void;
+  clearAISelection: () => void;
+  aiLayers: AIGeneratedLayer[];
+  addAILayer: (layer: AIGeneratedLayer) => void;
+  removeAILayer: (id: string) => void;
+  undoLastAILayer: () => void;
+  aiGenerationStatus: AIGenerationStatus;
+  setAIGenerationStatus: (status: AIGenerationStatus) => void;
+  aiPanelOpen: boolean;
+  setAIPanelOpen: (open: boolean) => void;
+
   // Path planning (combat movement)
   pathPlanningActive: boolean;
   pathPlanningTokenId: string | null;
@@ -507,7 +553,13 @@ const DEFAULT_CONTEXT_MENU: ContextMenuState = {
 
 export const useGameplayStore = create<GameplayState>((set, get) => ({
   activeTool: "pointer",
-  setActiveTool: (tool) => set({ activeTool: tool }),
+  setActiveTool: (tool) => {
+    const prev = get().activeTool;
+    if (prev === "ai" && tool !== "ai") {
+      set({ aiSelection: null, aiPanelOpen: false });
+    }
+    set({ activeTool: tool });
+  },
 
   leftPanelOpen: true,
   rightPanelOpen: true,
@@ -567,7 +619,17 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       };
     });
   },
-  endCombat: () => set((s) => ({ combat: { ...s.combat, active: false } })),
+  endCombat: () => {
+    set((s) => ({ combat: { ...s.combat, active: false } }));
+    // Lazy-import phase store to avoid circular deps
+    import("@/stores/phaseStore").then(({ usePhaseStore }) => {
+      const ps = usePhaseStore.getState();
+      if (ps.current.type === "combat") {
+        ps.openModal();
+      }
+    });
+    get().addToast("Combate encerrado. Clique na fase para alterar.");
+  },
   movementUsedFt: 0,
   resetMovement: () => set({ movementUsedFt: 0 }),
   addMovementFt: (ft) => set((s) => ({ movementUsedFt: s.movementUsedFt + ft })),
@@ -605,7 +667,10 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setPendingReaction: (r) => set({ pendingReaction: r }),
 
   // Token ↔ Creature mapping
-  tokenCreatureMap: {},
+  tokenCreatureMap: {
+    tok_skel1: "skeleton",
+    tok_skel2: "skeleton",
+  },
   linkTokenToCreature: (tokenId, creatureId) =>
     set((s) => ({ tokenCreatureMap: { ...s.tokenCreatureMap, [tokenId]: creatureId } })),
   unlinkTokenCreature: (tokenId) =>
@@ -689,6 +754,12 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, visibility: vis } : t)),
     })),
+  setTokenAlignment: (id, alignment) => {
+    set((s) => ({
+      tokens: s.tokens.map((t) => (t.id === id ? { ...t, alignment } : t)),
+    }));
+    broadcastSend("gm:token-alignment", { tokenId: id, alignment }, "gm");
+  },
   setTokenSize: (id, size) =>
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, size } : t)),
@@ -858,6 +929,25 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   activeModal: null,
   openModal: (name) => set({ activeModal: name }),
   closeModal: () => set({ activeModal: null }),
+
+  activeSceneCard: null,
+  sceneCardFiredAt: null,
+  fireSceneCard: (card) => {
+    set({ activeSceneCard: card, sceneCardFiredAt: Date.now() });
+    broadcastSend("gm:scene-show", card, "gm");
+    // Auto-clear after duration
+    const duration = card.duration || 6000;
+    setTimeout(() => {
+      const current = get().activeSceneCard;
+      if (current && current.title === card.title) {
+        set({ activeSceneCard: null, sceneCardFiredAt: null });
+      }
+    }, duration);
+  },
+  dismissSceneCard: () => {
+    set({ activeSceneCard: null, sceneCardFiredAt: null });
+    broadcastSend("gm:scene-dismiss", null, "gm");
+  },
 
   rulerPoints: [],
   rulerActive: false,
@@ -1102,7 +1192,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setMapBackgroundOpacity: (opacity) => set({ mapBackgroundOpacity: Math.max(0, Math.min(1, opacity)) }),
   setMapGridOffset: (x, y) => set({ mapGridOffsetX: x, mapGridOffsetY: y }),
 
-  mapViewport: { scrollLeft: 0, scrollTop: 0, viewportW: 800, viewportH: 600, cellSize: 40 },
+  mapViewport: { scrollLeft: 0, scrollTop: 0, viewportW: 800, viewportH: 600, cellSize: 64 },
   setMapViewport: (v) => set({ mapViewport: v }),
   getViewportCenter: () => {
     const { mapViewport: v } = get();
@@ -1132,13 +1222,13 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
 
   // Toasts
   toasts: [],
-  addToast: (text) => {
+  addToast: (text, action?) => {
     const id = `toast_${Date.now()}`;
-    const toast: Toast = { id, text, timestamp: Date.now() };
+    const toast: Toast = { id, text, timestamp: Date.now(), action };
     set((s) => ({ toasts: [...s.toasts, toast] }));
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-    }, 3000);
+    }, action ? 8000 : 3000);
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
@@ -1489,4 +1579,39 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       pathUndoStack: [...s.pathUndoStack, [...s.plannedPath]],
       plannedPath: [],
     })),
+
+  // ── AI Map Generation ──
+
+  aiSelection: null,
+  setAISelection: (sel) => set({ aiSelection: sel }),
+  finalizeAISelection: () =>
+    set((s) => {
+      if (!s.aiSelection) return s;
+      const { x1, y1, x2, y2 } = s.aiSelection;
+      return {
+        aiSelection: {
+          x1: Math.min(x1, x2),
+          y1: Math.min(y1, y2),
+          x2: Math.max(x1, x2),
+          y2: Math.max(y1, y2),
+          finalized: true,
+        },
+        aiPanelOpen: true,
+      };
+    }),
+  clearAISelection: () => set({ aiSelection: null, aiPanelOpen: false, aiGenerationStatus: "idle" }),
+
+  aiLayers: [],
+  addAILayer: (layer) => set((s) => ({ aiLayers: [...s.aiLayers, layer] })),
+  removeAILayer: (id) => set((s) => ({ aiLayers: s.aiLayers.filter((l) => l.id !== id) })),
+  undoLastAILayer: () =>
+    set((s) => {
+      if (s.aiLayers.length === 0) return s;
+      return { aiLayers: s.aiLayers.slice(0, -1) };
+    }),
+
+  aiGenerationStatus: "idle" as AIGenerationStatus,
+  setAIGenerationStatus: (status) => set({ aiGenerationStatus: status }),
+  aiPanelOpen: false,
+  setAIPanelOpen: (open) => set({ aiPanelOpen: open }),
 }));

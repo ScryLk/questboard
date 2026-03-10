@@ -1,4 +1,10 @@
 import { create } from "zustand";
+import type {
+  SceneCard,
+  SceneCardDraft,
+  SceneReaction,
+  SceneReactionEmoji,
+} from "../types/scene";
 
 // ─── State Interfaces ────────────────────────────────────
 
@@ -83,13 +89,8 @@ export interface DiceResultData {
   isNat1: boolean;
 }
 
-export interface SceneCardData {
-  variant: "cinematic" | "title" | "location";
-  title: string;
-  subtitle?: string;
-  chapter?: string;
-  details?: string[];
-}
+// SceneCard types are imported from ../types/scene
+export type { SceneCard, SceneCardDraft } from "../types/scene";
 
 export interface OnlinePlayer {
   id: string;
@@ -100,7 +101,16 @@ export interface OnlinePlayer {
   isOnline: boolean;
 }
 
-export type PanelType = "chat" | "dice" | "sheet" | "gmtools" | null;
+export interface PathCell {
+  x: number;
+  y: number;
+  ftCost: number;
+  totalFt: number;
+  isDiagonal: boolean;
+  isDifficultTerrain: boolean;
+}
+
+export type PanelType = "chat" | "dice" | "sheet" | "gmtools" | "actions" | "more" | null;
 
 // ─── GM Tool Sub-Modal Types ────────────────────────────
 
@@ -123,11 +133,7 @@ export type SoundtrackCategory =
   | "dramatic"
   | "rest";
 
-export interface SceneCardDraft {
-  id: string;
-  label: string;
-  card: SceneCardData;
-}
+// SceneCardDraft is re-exported from ../types/scene above
 
 export interface SoundtrackTrack {
   id: string;
@@ -259,8 +265,9 @@ export interface GameplayStore {
   diceResultVisible: boolean;
 
   // Scene Card
-  sceneCard: SceneCardData | null;
+  sceneCard: SceneCard | null;
   sceneCardVisible: boolean;
+  sceneHistory: SceneCard[];
 
   // Panels
   activePanel: PanelType;
@@ -275,6 +282,13 @@ export interface GameplayStore {
   // Players
   onlinePlayers: OnlinePlayer[];
 
+  // Path Planning
+  pathPlanningActive: boolean;
+  pathPlanningTokenId: string | null;
+  plannedPath: PathCell[];
+  movementUsedFt: number;
+  movementMaxFt: number;
+
   // Context menu
   contextMenuTokenId: string | null;
   contextMenuPosition: { x: number; y: number } | null;
@@ -284,6 +298,9 @@ export interface GameplayStore {
   viewingTokenId: string | null;
   viewingType: "player" | "npc" | null;
   gmNotes: Record<string, string>;
+
+  // Player Notes
+  playerNotes: string;
 
   // ─── Actions ───────────────────────────────────────
 
@@ -317,8 +334,10 @@ export interface GameplayStore {
   hideDiceResult: () => void;
 
   // Scene Card
-  showSceneCard: (card: SceneCardData) => void;
+  showSceneCard: (card: SceneCard) => void;
   hideSceneCard: () => void;
+  addSceneReaction: (emoji: SceneReactionEmoji) => void;
+  reshowScene: (sceneId: string) => void;
 
   // Panels
   setActivePanel: (panel: PanelType) => void;
@@ -368,8 +387,23 @@ export interface GameplayStore {
   updateGMNote: (characterId: string, note: string) => void;
   updateTokenConditions: (tokenId: string, conditions: string[]) => void;
 
+  // Player Notes
+  setPlayerNotes: (notes: string) => void;
+
+  // Path Planning
+  startPathPlanning: (tokenId: string) => void;
+  addPathCell: (cell: PathCell) => void;
+  undoPathCell: () => void;
+  clearPath: () => void;
+  confirmPath: () => void;
+  cancelPathPlanning: () => void;
+
   // Map image
   setMapImage: (image: GameplayStore["mapImage"]) => void;
+
+  // Drag overlay (combat movement range)
+  draggingTokenId: string | null;
+  setDraggingTokenId: (id: string | null) => void;
 
   // Settings modal
   settingsModalOpen: boolean;
@@ -428,6 +462,7 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   // Scene Card
   sceneCard: null,
   sceneCardVisible: false,
+  sceneHistory: [],
 
   // Panels
   activePanel: null,
@@ -449,6 +484,13 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   // Players
   onlinePlayers: [],
 
+  // Path Planning
+  pathPlanningActive: false,
+  pathPlanningTokenId: null,
+  plannedPath: [],
+  movementUsedFt: 0,
+  movementMaxFt: 30,
+
   // Context Menu
   contextMenuTokenId: null,
   contextMenuPosition: null,
@@ -458,6 +500,9 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   viewingTokenId: null,
   viewingType: null,
   gmNotes: {},
+
+  // Player Notes
+  playerNotes: "",
 
   // ─── Actions ───────────────────────────────────────
 
@@ -517,7 +562,7 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   setFogBrush: (active, mode) =>
     set({ fogBrushActive: active, fogBrushMode: mode ?? "reveal" }),
 
-  startCombat: (participants) =>
+  startCombat: (participants) => {
     set({
       combatActive: true,
       combatRound: 1,
@@ -525,15 +570,19 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
         (a, b) => b.initiative - a.initiative,
       ),
       currentTurnIndex: 0,
-    }),
+    });
+    // Phase transition handled by combat store
+  },
 
-  endCombat: () =>
+  endCombat: () => {
     set({
       combatActive: false,
       combatRound: 1,
       combatParticipants: [],
       currentTurnIndex: 0,
-    }),
+    });
+    // Phase transition handled by combat store
+  },
 
   nextTurn: () =>
     set((s) => {
@@ -563,7 +612,40 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
   showSceneCard: (card) =>
     set({ sceneCard: card, sceneCardVisible: true }),
 
-  hideSceneCard: () => set({ sceneCardVisible: false }),
+  hideSceneCard: () =>
+    set((s) => {
+      const history = s.sceneCard
+        ? [...s.sceneHistory, s.sceneCard]
+        : s.sceneHistory;
+      return { sceneCardVisible: false, sceneHistory: history };
+    }),
+
+  addSceneReaction: (emoji) =>
+    set((s) => {
+      if (!s.sceneCard) return s;
+      const reaction: SceneReaction = {
+        userId: s.myPlayerId,
+        characterName: "",
+        emoji,
+        timestamp: new Date(),
+      };
+      return {
+        sceneCard: {
+          ...s.sceneCard,
+          reactions: [...s.sceneCard.reactions, reaction],
+        },
+      };
+    }),
+
+  reshowScene: (sceneId) =>
+    set((s) => {
+      const scene = s.sceneHistory.find((sc) => sc.id === sceneId);
+      if (!scene) return s;
+      return {
+        sceneCard: { ...scene, reactions: [] },
+        sceneCardVisible: true,
+      };
+    }),
 
   setActivePanel: (panel) => {
     set({ activePanel: panel });
@@ -799,7 +881,69 @@ export const useGameplayStore = create<GameplayStore>((set, get) => ({
       };
     }),
 
+  // ─── Player Notes ──────────────────────────────────────
+
+  setPlayerNotes: (notes) => set({ playerNotes: notes }),
+
+  // ─── Path Planning ──────────────────────────────────────
+
+  startPathPlanning: (tokenId) => {
+    const token = get().tokens[tokenId];
+    if (!token) return;
+    set({
+      pathPlanningActive: true,
+      pathPlanningTokenId: tokenId,
+      plannedPath: [],
+      movementUsedFt: 0,
+      selectedTokenId: tokenId,
+    });
+  },
+
+  addPathCell: (cell) =>
+    set((s) => ({
+      plannedPath: [...s.plannedPath, cell],
+      movementUsedFt: cell.totalFt,
+    })),
+
+  undoPathCell: () =>
+    set((s) => {
+      if (s.plannedPath.length === 0) return s;
+      const newPath = s.plannedPath.slice(0, -1);
+      return {
+        plannedPath: newPath,
+        movementUsedFt: newPath.length > 0 ? newPath[newPath.length - 1].totalFt : 0,
+      };
+    }),
+
+  clearPath: () =>
+    set({ plannedPath: [], movementUsedFt: 0 }),
+
+  confirmPath: () => {
+    const { plannedPath, pathPlanningTokenId } = get();
+    if (!pathPlanningTokenId || plannedPath.length === 0) return;
+    const lastCell = plannedPath[plannedPath.length - 1];
+    get().moveToken(pathPlanningTokenId, lastCell.x, lastCell.y);
+    set({
+      pathPlanningActive: false,
+      pathPlanningTokenId: null,
+      plannedPath: [],
+      movementUsedFt: 0,
+    });
+  },
+
+  cancelPathPlanning: () =>
+    set({
+      pathPlanningActive: false,
+      pathPlanningTokenId: null,
+      plannedPath: [],
+      movementUsedFt: 0,
+    }),
+
   setMapImage: (image) => set({ mapImage: image }),
+
+  // Drag overlay
+  draggingTokenId: null,
+  setDraggingTokenId: (id) => set({ draggingTokenId: id }),
 
   // Settings modal
   settingsModalOpen: false,

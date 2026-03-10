@@ -8,6 +8,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { useAudioStore } from "@/lib/audio-store";
 import { VolumeSlider } from "./volume-slider";
 import { AmbienceSelector } from "./ambience-selector";
@@ -46,21 +47,22 @@ export function AudioPanel() {
             Áudio
           </span>
         </button>
-        <button
-          onClick={() => setMuteAll(!muteAll)}
-          title={muteAll ? "Ativar som" : "Silenciar tudo"}
-          className={`mr-2 flex h-5 w-5 items-center justify-center rounded transition-colors ${
-            muteAll
-              ? "text-red-400 hover:text-red-300"
-              : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
-          }`}
-        >
-          {muteAll ? (
-            <VolumeX className="h-3.5 w-3.5" />
-          ) : (
-            <Volume2 className="h-3.5 w-3.5" />
-          )}
-        </button>
+        <GameTooltip label={muteAll ? "Ativar Som" : "Silenciar Tudo"} side="bottom">
+          <button
+            onClick={() => setMuteAll(!muteAll)}
+            className={`mr-2 flex h-5 w-5 items-center justify-center rounded transition-colors ${
+              muteAll
+                ? "text-red-400 hover:text-red-300"
+                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+            }`}
+          >
+            {muteAll ? (
+              <VolumeX className="h-3.5 w-3.5" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </GameTooltip>
       </div>
 
       {!collapsed && (

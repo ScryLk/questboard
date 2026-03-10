@@ -268,117 +268,19 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
   resetLobby: () => set(initialState),
 }));
 
-// ── Mock data for development ──
+// ── Empty data (previously mock) ──
 
 export const MOCK_LOBBY_SESSION: LobbySessionInfo = {
-  id: "sess-14",
-  name: "A Maldição de Strahd",
-  campaignName: "Curse of Strahd",
-  inviteCode: "B7M2X4",
-  mapName: "Castelo de Ravenloft — Andar 3",
-  maxPlayers: 6,
+  id: "",
+  name: "",
+  campaignName: "",
+  inviteCode: "",
+  mapName: null,
+  maxPlayers: 0,
   status: "waiting",
-  date: new Date().toISOString(),
+  date: "",
 };
 
-export const MOCK_LOBBY_PLAYERS: LobbyPlayer[] = [
-  {
-    id: "gm-1",
-    name: "Lucas",
-    avatar: null,
-    status: "ready",
-    characterId: null,
-    characterName: null,
-    characterClass: null,
-    characterLevel: null,
-    role: "GM",
-    joinedAt: new Date().toISOString(),
-    lastActivity: new Date().toISOString(),
-    isReconnecting: false,
-  },
-  {
-    id: "p-1",
-    name: "Maria Santos",
-    avatar: null,
-    status: "ready",
-    characterId: "c1",
-    characterName: "Eldrin Ventoalto",
-    characterClass: "Mago",
-    characterLevel: 5,
-    role: "PLAYER",
-    joinedAt: new Date().toISOString(),
-    lastActivity: new Date().toISOString(),
-    isReconnecting: false,
-  },
-  {
-    id: "p-2",
-    name: "Pedro Almeida",
-    avatar: null,
-    status: "ready",
-    characterId: "c2",
-    characterName: "Kira Shadowblade",
-    characterClass: "Ladina",
-    characterLevel: 5,
-    role: "PLAYER",
-    joinedAt: new Date().toISOString(),
-    lastActivity: new Date().toISOString(),
-    isReconnecting: false,
-  },
-  {
-    id: "p-3",
-    name: "Ana Rodrigues",
-    avatar: null,
-    status: "choosing_character",
-    characterId: null,
-    characterName: null,
-    characterClass: null,
-    characterLevel: null,
-    role: "PLAYER",
-    joinedAt: new Date().toISOString(),
-    lastActivity: new Date().toISOString(),
-    isReconnecting: false,
-  },
-];
+export const MOCK_LOBBY_PLAYERS: LobbyPlayer[] = [];
 
-export const MOCK_LOBBY_MESSAGES: LobbyMessage[] = [
-  {
-    id: "sys-1",
-    senderId: "system",
-    senderName: "Sistema",
-    text: "Maria entrou na sala",
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-    type: "system",
-  },
-  {
-    id: "msg-1",
-    senderId: "p-1",
-    senderName: "Maria Santos",
-    text: "bora jogar!",
-    timestamp: new Date(Date.now() - 240000).toISOString(),
-    type: "message",
-  },
-  {
-    id: "msg-2",
-    senderId: "p-2",
-    senderName: "Pedro Almeida",
-    text: "to pronto",
-    timestamp: new Date(Date.now() - 180000).toISOString(),
-    type: "message",
-  },
-  {
-    id: "sys-2",
-    senderId: "system",
-    senderName: "Sistema",
-    text: "Ana entrou na sala",
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    type: "system",
-  },
-  {
-    id: "msg-3",
-    senderId: "gm-1",
-    senderName: "Lucas",
-    text: "Começamos em 5 minutos, revisem as fichas!",
-    timestamp: new Date(Date.now() - 30000).toISOString(),
-    type: "gm_announcement",
-  },
-];
+export const MOCK_LOBBY_MESSAGES: LobbyMessage[] = [];

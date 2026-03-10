@@ -1,9 +1,9 @@
 import { Stack, Text, XStack } from "tamagui";
 
-export type TabId = "novidades" | "sessoes" | "forum";
+export type TabId = "feed" | "sessoes" | "forum";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "novidades", label: "Novidades" },
+  { id: "feed", label: "Feed" },
   { id: "sessoes", label: "Sessões" },
   { id: "forum", label: "Fórum" },
 ];

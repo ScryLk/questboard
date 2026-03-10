@@ -14,6 +14,7 @@ export type BroadcastMessageType =
   | "gm:token-move"          // Token moved
   | "gm:token-hp"            // Token HP changed
   | "gm:token-visibility"    // Token visibility changed
+  | "gm:token-alignment"     // Token alignment/disposition changed
   | "gm:token-add"           // Token added
   | "gm:token-remove"        // Token removed
   | "gm:token-condition"     // Token condition changed

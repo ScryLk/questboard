@@ -11,6 +11,7 @@ import { LoginTransitionProvider } from "../lib/login-transition-context";
 import { AuthSheet } from "../components/auth-sheet";
 import { CreateActionSheet } from "../components/create-action-sheet";
 import { WelcomeOverlay } from "../components/welcome-overlay";
+import { ProfileModal } from "../components/profile/profile-modal";
 import { ErrorBoundary } from "../components/error-boundary";
 import { ToastProvider } from "../lib/toast-context";
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
                         <AuthSheet />
                         <CreateActionSheet />
                         <WelcomeOverlay />
+                        <ProfileModal />
                       </CreateSheetProvider>
                     </AuthSheetProvider>
                   </LoginTransitionProvider>

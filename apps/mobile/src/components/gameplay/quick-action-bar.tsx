@@ -5,7 +5,8 @@ import {
   MessageSquare,
   Dices,
   BookOpen,
-  Swords,
+  ScrollText,
+  Sword,
   MoreHorizontal,
 } from "lucide-react-native";
 import { Stack, Text, XStack } from "tamagui";
@@ -17,14 +18,22 @@ interface ActionItem {
   label: string;
   Icon: typeof MessageSquare;
   badgeKey?: "chatUnreadCount";
-  activeKey?: "combatActive";
+  showTurnBadge?: boolean;
 }
 
-const ACTIONS: ActionItem[] = [
+const GM_ACTIONS: ActionItem[] = [
   { key: "chat", label: "Chat", Icon: MessageSquare, badgeKey: "chatUnreadCount" },
   { key: "dice", label: "Dados", Icon: Dices },
   { key: "sheet", label: "Ficha", Icon: BookOpen },
   { key: "gmtools", label: "Mais", Icon: MoreHorizontal },
+];
+
+const PLAYER_ACTIONS: ActionItem[] = [
+  { key: "chat", label: "Chat", Icon: MessageSquare, badgeKey: "chatUnreadCount" },
+  { key: "dice", label: "Dados", Icon: Dices },
+  { key: "sheet", label: "Ficha", Icon: ScrollText },
+  { key: "actions", label: "Ações", Icon: Sword, showTurnBadge: true },
+  { key: "more", label: "Mais", Icon: MoreHorizontal },
 ];
 
 function QuickActionBarInner() {
@@ -32,8 +41,18 @@ function QuickActionBarInner() {
   const activePanel = useGameplayStore((s) => s.activePanel);
   const chatUnreadCount = useGameplayStore((s) => s.chatUnreadCount);
   const combatActive = useGameplayStore((s) => s.combatActive);
+  const currentTurnIndex = useGameplayStore((s) => s.currentTurnIndex);
+  const participants = useGameplayStore((s) => s.combatParticipants);
+  const myTokenId = useGameplayStore((s) => s.myTokenId);
   const isGM = useGameplayStore((s) => s.isGM);
   const togglePanel = useGameplayStore((s) => s.togglePanel);
+
+  const isMyTurn =
+    combatActive &&
+    participants.length > 0 &&
+    participants[currentTurnIndex]?.tokenId === myTokenId;
+
+  const actions = isGM ? GM_ACTIONS : PLAYER_ACTIONS;
 
   return (
     <XStack
@@ -52,10 +71,7 @@ function QuickActionBarInner() {
       borderTopWidth={StyleSheet.hairlineWidth}
       borderTopColor="rgba(255,255,255,0.06)"
     >
-      {ACTIONS.map((action) => {
-        // Hide GM tools for non-GM
-        if (action.key === "gmtools" && !isGM) return null;
-
+      {actions.map((action) => {
         const isActive = activePanel === action.key;
         const badge =
           action.badgeKey === "chatUnreadCount" ? chatUnreadCount : 0;
@@ -73,6 +89,7 @@ function QuickActionBarInner() {
           >
             <Stack position="relative">
               <action.Icon size={22} color={iconColor} />
+              {/* Unread badge */}
               {badge > 0 && (
                 <Stack
                   position="absolute"
@@ -90,6 +107,18 @@ function QuickActionBarInner() {
                     {badge > 9 ? "9+" : badge}
                   </Text>
                 </Stack>
+              )}
+              {/* Turn badge on Actions button */}
+              {action.showTurnBadge && isMyTurn && (
+                <Stack
+                  position="absolute"
+                  top={-3}
+                  right={-5}
+                  width={8}
+                  height={8}
+                  borderRadius={4}
+                  backgroundColor="#FF6B6B"
+                />
               )}
             </Stack>
             <Text

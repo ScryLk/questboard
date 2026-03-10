@@ -28,6 +28,7 @@ import { TerrainOverlay } from "./overlays/terrain-overlay";
 import { AttackLineOverlay } from "./overlays/attack-line-overlay";
 import { FogOverlay } from "./overlays/fog-overlay";
 import { RegionSelectOverlay } from "./overlays/region-select-overlay";
+import { AISelectionOverlay } from "./overlays/ai-selection-overlay";
 import { MarkersOverlay } from "./overlays/markers-overlay";
 import { NotesOverlay } from "./overlays/notes-overlay";
 import { ToastOverlay } from "./overlays/toast-overlay";
@@ -40,12 +41,15 @@ import { ObjectOverlay } from "./overlays/object-overlay";
 import { MiniMap } from "./overlays/mini-map";
 import { OAPreviewOverlay } from "./overlays/oa-preview-overlay";
 import { ReactionPrompt } from "./overlays/reaction-prompt";
-import { detectOpportunityAttacks, executeOpportunityAttack } from "@/lib/reactions";
+import { detectOpportunityAttacks } from "@/lib/reactions";
 import { playOAAlertSound } from "@/lib/oa-alert-sound";
+import { PixiCombatLayer } from "./pixi-combat-layer";
+import { PixiGridLayer } from "./pixi-grid-layer";
+import { executeAttackWithAnimation } from "@/lib/animation/attack-with-animation";
 import { PathOverlay } from "./overlays/path-overlay";
 import { PathPreviewPanel } from "./overlays/path-preview-panel";
 import { findPath } from "@/lib/pathfinding";
-import { calculateStepCost } from "@/lib/movement-cost";
+import { calculateStepCost, getMaxMovementFt } from "@/lib/movement-cost";
 import { detectStepEvents } from "@/lib/path-event-detection";
 import type { PathCell } from "@/lib/gameplay-store";
 import { useSettingsStore } from "@/lib/settings-store";
@@ -54,13 +58,17 @@ import type { TokenAlignment } from "@/lib/gameplay-mock-data";
 import { CREATURE_COMPENDIUM } from "@/lib/creature-data";
 import { useCustomCreaturesStore } from "@/lib/custom-creatures-store";
 import { useTokenLibraryStore } from "@/lib/token-library-store";
+import { CreatureSpriteToken } from "./creature-sprite-token";
+import { CREATURE_SPRITES } from "@/constants/creature-sprites";
 import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import { AMBIENT_LIGHT_CONFIG } from "@/lib/map-sidebar-types";
 import type { LayerId } from "@/lib/map-sidebar-types";
+import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
 
 export function MapCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
   const tokens = useGameplayStore((s) => s.tokens);
+  const tokenCreatureMap = useGameplayStore((s) => s.tokenCreatureMap);
   const selectedTokenIds = useGameplayStore((s) => s.selectedTokenIds);
   const hoveredTokenId = useGameplayStore((s) => s.hoveredTokenId);
   const selectToken = useGameplayStore((s) => s.selectToken);
@@ -105,6 +113,8 @@ export function MapCanvas() {
   const fogCells = useGameplayStore((s) => s.fogCells);
   const regionSelection = useGameplayStore((s) => s.regionSelection);
   const clearRegion = useGameplayStore((s) => s.clearRegion);
+  const aiSelection = useGameplayStore((s) => s.aiSelection);
+  const aiLayers = useGameplayStore((s) => s.aiLayers);
   const markers = useGameplayStore((s) => s.markers);
   const notes = useGameplayStore((s) => s.notes);
   const mapBackgroundImage = useGameplayStore((s) => s.mapBackgroundImage);
@@ -134,10 +144,12 @@ export function MapCanvas() {
     [layers],
   );
 
-  const { gridCols, gridRows, cellSize, cellSizeFt, name } = MOCK_MAP;
-  const scaledCell = cellSize;
-  const canvasW = gridCols * scaledCell;
-  const canvasH = gridRows * scaledCell;
+  const { gridCols, gridRows, name } = MOCK_MAP;
+  // CELL_SIZE é FIXO (64px) e NUNCA muda — importado de gameplay/constants
+  const scaledCell = CELL_SIZE;
+  const cellSizeFt = CELL_SIZE_FT;
+  const canvasW = gridCols * CELL_SIZE;
+  const canvasH = gridRows * CELL_SIZE;
   const onMapTokens = tokens.filter((t) => t.onMap);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -187,10 +199,10 @@ export function MapCanvas() {
 
   const getGridCell = useCallback(
     (e: MouseEvent | React.MouseEvent) => {
-      if (!canvasRef.current) return null;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
+      if (!scrollRef.current) return null;
+      const rect = scrollRef.current.getBoundingClientRect();
+      const sLeft = scrollRef.current.scrollLeft;
+      const sTop = scrollRef.current.scrollTop;
       const px = e.clientX - rect.left + sLeft;
       const py = e.clientY - rect.top + sTop;
       return {
@@ -204,10 +216,10 @@ export function MapCanvas() {
   // Get nearest wall edge from mouse position (edge-based)
   const getMouseEdge = useCallback(
     (e: MouseEvent | React.MouseEvent): NearestEdge | null => {
-      if (!canvasRef.current) return null;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
+      if (!scrollRef.current) return null;
+      const rect = scrollRef.current.getBoundingClientRect();
+      const sLeft = scrollRef.current.scrollLeft;
+      const sTop = scrollRef.current.scrollTop;
       const px = e.clientX - rect.left + sLeft;
       const py = e.clientY - rect.top + sTop;
       return getNearestEdge(px, py, scaledCell, gridCols, gridRows);
@@ -260,6 +272,51 @@ export function MapCanvas() {
     [clearRegion, getGridCell],
   );
 
+  // AI drag (area selection for AI generation)
+  const startAIDrag = useCallback(
+    (startCell: { x: number; y: number }) => {
+      useGameplayStore.getState().clearAISelection();
+      useGameplayStore.getState().setAISelection({
+        x1: startCell.x,
+        y1: startCell.y,
+        x2: startCell.x,
+        y2: startCell.y,
+        finalized: false,
+      });
+
+      function onMove(ev: MouseEvent) {
+        const cell = getGridCell(ev);
+        if (!cell) return;
+        const current = useGameplayStore.getState().aiSelection;
+        if (!current) return;
+        if (cell.x !== current.x2 || cell.y !== current.y2) {
+          useGameplayStore.getState().setAISelection({
+            ...current,
+            x2: cell.x,
+            y2: cell.y,
+          });
+        }
+      }
+
+      function onUp() {
+        const current = useGameplayStore.getState().aiSelection;
+        if (current) {
+          if (current.x1 !== current.x2 || current.y1 !== current.y2) {
+            useGameplayStore.getState().finalizeAISelection();
+          } else {
+            useGameplayStore.getState().clearAISelection();
+          }
+        }
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      }
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [getGridCell],
+  );
+
   // Hover
   const handleTokenMouseEnter = useCallback(
     (e: React.MouseEvent, tokenId: string) => {
@@ -299,10 +356,10 @@ export function MapCanvas() {
       if (pathPlanningActive) return;
 
       const token = tokens.find((t) => t.id === tokenId);
-      if (!token || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
+      if (!token || !scrollRef.current) return;
+      const rect = scrollRef.current.getBoundingClientRect();
+      const sLeft = scrollRef.current.scrollLeft;
+      const sTop = scrollRef.current.scrollTop;
 
       dragRef.current = {
         tokenId,
@@ -319,10 +376,10 @@ export function MapCanvas() {
       let lastDragGridKey = `${token.x},${token.y}`;
 
       function onMove(ev: MouseEvent) {
-        if (!dragRef.current || !canvasRef.current) return;
-        const r = canvasRef.current.getBoundingClientRect();
-        const sl = scrollRef.current?.scrollLeft ?? 0;
-        const st = scrollRef.current?.scrollTop ?? 0;
+        if (!dragRef.current || !scrollRef.current) return;
+        const r = scrollRef.current.getBoundingClientRect();
+        const sl = scrollRef.current.scrollLeft;
+        const st = scrollRef.current.scrollTop;
         const gx = Math.max(0, Math.min(gridCols - 1, Math.round((ev.clientX - r.left + sl - dragRef.current.offsetX) / scaledCell)));
         const gy = Math.max(0, Math.min(gridRows - 1, Math.round((ev.clientY - r.top + st - dragRef.current.offsetY) / scaledCell)));
         setDragPos({ id: dragRef.current.tokenId, x: gx, y: gy });
@@ -345,15 +402,14 @@ export function MapCanvas() {
       }
 
       function commit(ev: MouseEvent) {
-        if (!dragRef.current || !canvasRef.current) { done(); return; }
-        const r = canvasRef.current.getBoundingClientRect();
-        const sl = scrollRef.current?.scrollLeft ?? 0;
-        const st = scrollRef.current?.scrollTop ?? 0;
+        if (!dragRef.current || !scrollRef.current) { done(); return; }
+        const r = scrollRef.current.getBoundingClientRect();
+        const sl = scrollRef.current.scrollLeft;
+        const st = scrollRef.current.scrollTop;
         const gx = Math.max(0, Math.min(gridCols - 1, Math.round((ev.clientX - r.left + sl - dragRef.current.offsetX) / scaledCell)));
         const gy = Math.max(0, Math.min(gridRows - 1, Math.round((ev.clientY - r.top + st - dragRef.current.offsetY) / scaledCell)));
         const orig = dragRef.current;
         if (gx !== orig.originX || gy !== orig.originY) {
-          pushMovementHistory(orig.tokenId, orig.originX, orig.originY);
           // Calculate total distance along waypoints
           const wps = useGameplayStore.getState().dragWaypoints;
           const allPts = [
@@ -365,12 +421,40 @@ export function MapCanvas() {
           for (let i = 1; i < allPts.length; i++) {
             totalDist += gridDistance(allPts[i - 1].x, allPts[i - 1].y, allPts[i].x, allPts[i].y, cellSizeFt);
           }
-          addMovementFt(totalDist);
+
+          // Determine if this is the current turn's token
+          const dragState = useGameplayStore.getState();
+          const dragCombatOrder = dragState.combat.order;
+          const dragCurrentTurnTokenId = dragState.combat.active && dragCombatOrder[dragState.combat.turnIndex]
+            ? dragCombatOrder[dragState.combat.turnIndex].tokenId
+            : null;
+          const isCurrentTurnToken = orig.tokenId === dragCurrentTurnTokenId;
+
+          // Enforce movement limit only for the current turn's token
+          if (dragState.combat.active && isCurrentTurnToken) {
+            const dragToken = dragState.tokens.find((t) => t.id === orig.tokenId);
+            if (dragToken) {
+              const maxFt = getMaxMovementFt(dragToken.speed, dragState.turnActions.isDashing, dragState.movementUsedFt);
+              if (totalDist > maxFt) {
+                dragState.addToast(`Movimento insuficiente (${maxFt}ft restante, necessário ${totalDist}ft)`);
+                dragRef.current = null;
+                setDragPos(null);
+                useGameplayStore.getState().clearDragWaypoints();
+                done();
+                return;
+              }
+            }
+          }
+
+          pushMovementHistory(orig.tokenId, orig.originX, orig.originY);
+          if (isCurrentTurnToken) addMovementFt(totalDist);
           moveToken(orig.tokenId, gx, gy);
 
           // Check for Opportunity Attacks
           const state = useGameplayStore.getState();
           if (state.combat.active) {
+            // isDisengaging only applies to the current turn's token
+            const movedIsDisengaging = isCurrentTurnToken && state.turnActions.isDisengaging;
             const pendingOAs = detectOpportunityAttacks(
               orig.tokenId,
               orig.originX,
@@ -379,20 +463,39 @@ export function MapCanvas() {
               gy,
               state.tokens,
               state.reactionUsedMap,
-              state.turnActions.isDisengaging,
+              movedIsDisengaging,
               cellSizeFt,
             );
             if (pendingOAs.length > 0) {
-              state.setPendingReaction(pendingOAs[0]);
+              // Process all OAs sequentially (async, fire-and-forget from mouseup)
+              const movedTokenId = orig.tokenId;
+              const canvas = canvasRef.current;
+              (async () => {
+                for (const oa of pendingOAs) {
+                  useGameplayStore.getState().setPendingReaction(oa);
 
-              // Dramatic alert: sound + screen shake
-              const audioSettings = useSettingsStore.getState().audio;
-              if (!audioSettings.muteAll) {
-                const vol = (audioSettings.effectsVolume * audioSettings.masterVolume) / 10000;
-                playOAAlertSound(vol);
-              }
-              canvasRef.current?.classList.add("animate-oa-shake");
-              setTimeout(() => canvasRef.current?.classList.remove("animate-oa-shake"), 150);
+                  // Dramatic alert: sound + screen shake
+                  const audioSettings = useSettingsStore.getState().audio;
+                  if (!audioSettings.muteAll) {
+                    const vol = (audioSettings.effectsVolume * audioSettings.masterVolume) / 10000;
+                    playOAAlertSound(vol);
+                  }
+                  canvas?.classList.add("animate-oa-shake");
+                  setTimeout(() => canvas?.classList.remove("animate-oa-shake"), 150);
+
+                  // Wait for this OA to resolve before showing the next
+                  const maxWait = 30_000;
+                  const start = Date.now();
+                  while (Date.now() - start < maxWait) {
+                    if (useGameplayStore.getState().pendingReaction === null) break;
+                    await new Promise((r) => setTimeout(r, 100));
+                  }
+
+                  // Check if token died
+                  const tokenAfter = useGameplayStore.getState().tokens.find((t) => t.id === movedTokenId);
+                  if (!tokenAfter || tokenAfter.hp <= 0) break;
+                }
+              })();
             }
           }
         }
@@ -440,6 +543,10 @@ export function MapCanvas() {
         // Don't add if clicking the same cell
         if (cell.x === lastCell.x && cell.y === lastCell.y) return;
 
+        // Movement limit for path planning
+        const maxFt = getMaxMovementFt(token.speed, state.turnActions.isDashing, state.movementUsedFt);
+        const prevTotalFt = currentPath.length > 0 ? currentPath[currentPath.length - 1].totalFt : 0;
+
         // Check if adjacent (Chebyshev distance = 1) or needs pathfinding
         const dist = Math.max(Math.abs(cell.x - lastCell.x), Math.abs(cell.y - lastCell.y));
 
@@ -447,7 +554,11 @@ export function MapCanvas() {
           // Adjacent: add single cell
           const step = calculateStepCost(lastCell.x, lastCell.y, cell.x, cell.y, state.terrainCells, cellSizeFt);
           if (step.isImpassable) return;
-          const prevTotalFt = currentPath.length > 0 ? currentPath[currentPath.length - 1].totalFt : 0;
+          // Block if exceeds movement limit
+          if (prevTotalFt + step.ftCost > maxFt) {
+            state.addToast(`Movimento insuficiente (${maxFt - prevTotalFt}ft restante)`);
+            return;
+          }
           const events = detectStepEvents(
             lastCell.x, lastCell.y, cell.x, cell.y,
             pathPlanningTokenId, state.tokens, state.reactionUsedMap,
@@ -469,10 +580,12 @@ export function MapCanvas() {
 
           let prevX = lastCell.x;
           let prevY = lastCell.y;
-          let runningFt = currentPath.length > 0 ? currentPath[currentPath.length - 1].totalFt : 0;
+          let runningFt = prevTotalFt;
 
           for (const p of result.path) {
             const step = calculateStepCost(prevX, prevY, p.x, p.y, state.terrainCells, cellSizeFt);
+            // Stop adding cells if exceeds movement limit
+            if (runningFt + step.ftCost > maxFt) break;
             runningFt += step.ftCost;
             const events = detectStepEvents(
               prevX, prevY, p.x, p.y,
@@ -613,6 +726,13 @@ export function MapCanvas() {
         return;
       }
 
+      // AI tool
+      if (activeTool === "ai") {
+        const cell = getGridCell(e);
+        if (cell) startAIDrag(cell);
+        return;
+      }
+
       // Shift+pointer = region select
       if (activeTool === "pointer" && e.shiftKey) {
         const cell = getGridCell(e);
@@ -697,10 +817,10 @@ export function MapCanvas() {
 
       // Draw
       if (activeTool === "draw") {
-        if (!canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const sLeft = scrollRef.current?.scrollLeft ?? 0;
-        const sTop = scrollRef.current?.scrollTop ?? 0;
+        if (!scrollRef.current) return;
+        const rect = scrollRef.current.getBoundingClientRect();
+        const sLeft = scrollRef.current.scrollLeft;
+        const sTop = scrollRef.current.scrollTop;
         const px = e.clientX - rect.left + sLeft;
         const py = e.clientY - rect.top + sTop;
 
@@ -721,10 +841,10 @@ export function MapCanvas() {
         useGameplayStore.getState().setActiveStroke(stroke);
 
         function onDrawMove(ev: MouseEvent) {
-          if (!canvasRef.current) return;
-          const r = canvasRef.current.getBoundingClientRect();
-          const sl = scrollRef.current?.scrollLeft ?? 0;
-          const st = scrollRef.current?.scrollTop ?? 0;
+          if (!scrollRef.current) return;
+          const r = scrollRef.current.getBoundingClientRect();
+          const sl = scrollRef.current.scrollLeft;
+          const st = scrollRef.current.scrollTop;
           const mx = ev.clientX - r.left + sl;
           const my = ev.clientY - r.top + st;
           const state = useGameplayStore.getState();
@@ -919,20 +1039,20 @@ export function MapCanvas() {
       }
 
       // Selection box (pointer)
-      if (activeTool === "pointer" && !canvasRef.current) return;
+      if (activeTool === "pointer" && !scrollRef.current) return;
       if (activeTool !== "pointer") return;
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const sLeft = scrollRef.current?.scrollLeft ?? 0;
-      const sTop = scrollRef.current?.scrollTop ?? 0;
+      const rect = scrollRef.current!.getBoundingClientRect();
+      const sLeft = scrollRef.current!.scrollLeft;
+      const sTop = scrollRef.current!.scrollTop;
       const px = e.clientX - rect.left + sLeft;
       const py = e.clientY - rect.top + sTop;
       selBoxRef.current = { startPxX: px, startPxY: py };
 
       function onMove(ev: MouseEvent) {
-        if (!selBoxRef.current || !canvasRef.current) return;
-        const r = canvasRef.current.getBoundingClientRect();
-        const sl = scrollRef.current?.scrollLeft ?? 0;
-        const st = scrollRef.current?.scrollTop ?? 0;
+        if (!selBoxRef.current || !scrollRef.current) return;
+        const r = scrollRef.current.getBoundingClientRect();
+        const sl = scrollRef.current.scrollLeft;
+        const st = scrollRef.current.scrollTop;
         setSelectionBox({
           startX: selBoxRef.current.startPxX,
           startY: selBoxRef.current.startPxY,
@@ -974,7 +1094,7 @@ export function MapCanvas() {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [activeTool, spaceHeld, scaledCell, onMapTokens, getGridCell, closeContextMenu, clearSelection, setSelectionBox, addRulerPoint, setRulerActive, clearRuler, addPing, aoeShape, aoeColor, setAoePlacing, addAoe, drawingTool, drawColor, drawWidth, regionSelection, clearRegion, startRegionDrag, pathPlanningActive, pathPlanningTokenId, addPathCell, cellSizeFt, gridCols, gridRows],
+    [activeTool, spaceHeld, scaledCell, onMapTokens, getGridCell, closeContextMenu, clearSelection, setSelectionBox, addRulerPoint, setRulerActive, clearRuler, addPing, aoeShape, aoeColor, setAoePlacing, addAoe, drawingTool, drawColor, drawWidth, regionSelection, clearRegion, startRegionDrag, startAIDrag, pathPlanningActive, pathPlanningTokenId, addPathCell, cellSizeFt, gridCols, gridRows],
   );
 
   // Canvas right-click
@@ -1086,6 +1206,7 @@ export function MapCanvas() {
         st.clearAttackLine();
         st.setActiveStroke(null);
         clearRegion();
+        st.clearAISelection();
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -1107,6 +1228,9 @@ export function MapCanvas() {
           st.undoTerrain();
         } else if (st.activeTool === "draw") {
           st.undoStroke();
+        } else if (st.activeTool === "ai" && st.aiLayers.length > 0) {
+          st.undoLastAILayer();
+          st.addToast("Textura IA removida");
         } else {
           const ids = st.selectedTokenIds;
           if (ids.length === 1) st.undoMovement(ids[0]);
@@ -1217,10 +1341,12 @@ export function MapCanvas() {
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     // Convert drop position to grid cell
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cellX = Math.floor((e.clientX - rect.left) / scaledCell);
-    const cellY = Math.floor((e.clientY - rect.top) / scaledCell);
+    if (!scrollRef.current) return;
+    const rect = scrollRef.current.getBoundingClientRect();
+    const sLeft = scrollRef.current.scrollLeft;
+    const sTop = scrollRef.current.scrollTop;
+    const cellX = Math.floor((e.clientX - rect.left + sLeft) / scaledCell);
+    const cellY = Math.floor((e.clientY - rect.top + sTop) / scaledCell);
 
     // ── NPC drop ──
     const npcId = e.dataTransfer.getData("application/questboard-npc");
@@ -1298,7 +1424,7 @@ export function MapCanvas() {
 
   const cursorClass =
     activeTool === "pan" || spaceHeld ? "cursor-grab"
-    : activeTool === "ruler" || activeTool === "aoe" || activeTool === "region" ? "cursor-crosshair"
+    : activeTool === "ruler" || activeTool === "aoe" || activeTool === "region" || activeTool === "ai" ? "cursor-crosshair"
     : activeTool === "draw" || activeTool === "wall" || activeTool === "terrain" || activeTool === "objects" ? "cursor-crosshair"
     : "cursor-default";
 
@@ -1333,16 +1459,39 @@ export function MapCanvas() {
             />
           )}
 
-          {/* Grid (layer: grid) */}
+          {/* AI generated layers (before grid so grid lines appear on top) */}
+          {aiLayers.map((layer) => {
+            const lx1 = Math.min(layer.x1, layer.x2);
+            const ly1 = Math.min(layer.y1, layer.y2);
+            const lx2 = Math.max(layer.x1, layer.x2);
+            const ly2 = Math.max(layer.y1, layer.y2);
+            const lw = (lx2 - lx1 + 1) * scaledCell;
+            const lh = (ly2 - ly1 + 1) * scaledCell;
+            return (
+              <img
+                key={layer.id}
+                src={layer.imageDataUrl}
+                alt={layer.name}
+                className="pointer-events-none absolute"
+                style={{
+                  left: lx1 * scaledCell,
+                  top: ly1 * scaledCell,
+                  width: lw,
+                  height: lh,
+                  imageRendering: "pixelated",
+                }}
+                draggable={false}
+              />
+            );
+          })}
+
+          {/* Grid (layer: grid) — Pixi.js: drawn ONCE, never redrawn */}
           {gridVisible && getLayer("grid")?.visible && (
-            <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH} style={{ opacity: (getLayer("grid")?.opacity ?? 100) / 100 }}>
-              {Array.from({ length: gridCols + 1 }).map((_, i) => (
-                <line key={`v${i}`} x1={i * scaledCell} y1={0} x2={i * scaledCell} y2={canvasH} stroke="#1E1E2A" strokeWidth={1} />
-              ))}
-              {Array.from({ length: gridRows + 1 }).map((_, i) => (
-                <line key={`h${i}`} x1={0} y1={i * scaledCell} x2={canvasW} y2={i * scaledCell} stroke="#1E1E2A" strokeWidth={1} />
-              ))}
-            </svg>
+            <PixiGridLayer
+              gridCols={gridCols}
+              gridRows={gridRows}
+              opacity={(getLayer("grid")?.opacity ?? 100) / 100}
+            />
           )}
 
           {/* Terrain (layer: terrain) */}
@@ -1445,10 +1594,21 @@ export function MapCanvas() {
           {/* Selection box */}
           {selectionBox && <SelectionBoxOverlay box={selectionBox} />}
 
+
           {/* Region selection */}
           {regionSelection && (
             <RegionSelectOverlay
               region={regionSelection}
+              scaledCell={scaledCell}
+              canvasRef={canvasRef}
+              scrollRef={scrollRef}
+            />
+          )}
+
+          {/* AI selection overlay */}
+          {aiSelection && (
+            <AISelectionOverlay
+              selection={aiSelection}
               scaledCell={scaledCell}
               canvasRef={canvasRef}
               scrollRef={scrollRef}
@@ -1472,6 +1632,9 @@ export function MapCanvas() {
 
           {/* Damage floats */}
           <DamageFloatOverlay floats={damageFloats} tokens={onMapTokens} scaledCell={scaledCell} />
+
+          {/* Combat animations (Pixi) */}
+          <PixiCombatLayer scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
 
           {/* Drawings */}
           <DrawOverlay strokes={drawStrokes} activeStroke={activeStroke} canvasW={canvasW} canvasH={canvasH} />
@@ -1499,7 +1662,7 @@ export function MapCanvas() {
                 reactorToken={reactorToken}
                 triggerToken={triggerToken}
                 scaledCell={scaledCell}
-                onUse={(weaponId) => {
+                onUse={async (weaponId) => {
                   const state = useGameplayStore.getState();
                   const pr = state.pendingReaction;
                   if (!pr) return;
@@ -1507,48 +1670,14 @@ export function MapCanvas() {
                   if (!weapon) return;
                   const target = state.tokens.find((t) => t.id === pr.triggerTokenId);
                   if (!target) return;
-                  const reactor = state.tokens.find((t) => t.id === pr.reactorTokenId);
 
-                  const result = executeOpportunityAttack(pr.reactorTokenId, pr.triggerTokenId, weapon, target.ac);
-
-                  if (result.isHit && result.damageTotal > 0) {
-                    state.updateTokenHp(target.id, target.hp - result.damageTotal);
-                    state.addDamageFloat(target.id, result.damageTotal, false, result.isCrit);
-                  }
-
-                  state.setAttackLine({
-                    attackerId: pr.reactorTokenId,
-                    targetId: pr.triggerTokenId,
-                    roll: result.attackRoll,
-                    damage: result.isHit ? result.damageTotal : null,
+                  await executeAttackWithAnimation({
+                    attackerTokenId: pr.reactorTokenId,
+                    targetTokenId: pr.triggerTokenId,
+                    weapon,
+                    targetAC: target.ac,
+                    context: "opportunity-attack",
                   });
-
-                  const reactorName = reactor?.name ?? "???";
-                  const hitLabel = result.isCrit ? "CRITICO!!" : result.isFumble ? "FALHA CRITICA!" : result.isHit ? "ACERTOU!" : "ERROU!";
-                  let chatContent = `${reactorName} faz Ataque de Oportunidade contra ${target.name}!\n`;
-                  chatContent += `Ataque: ${result.attackRoll} (${result.attackDetails}) vs CA ${target.ac} — ${hitLabel}`;
-                  if (result.isHit && result.damageTotal > 0) {
-                    chatContent += `\nDano: ${result.damageTotal} (${result.damageDetails}) ${result.damageType}`;
-                  }
-
-                  state.addMessage({
-                    id: `msg_${Date.now()}`,
-                    channel: "geral",
-                    type: "roll",
-                    sender: reactorName,
-                    senderInitials: reactorName.slice(0, 2).toUpperCase(),
-                    isGM: false,
-                    content: chatContent,
-                    timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                    rollFormula: `d20+${weapon.attackBonus}`,
-                    rollResult: result.attackRoll,
-                    rollDetails: result.attackDetails,
-                    isNat20: result.isCrit,
-                    isNat1: result.isFumble,
-                  });
-
-                  state.useReactionFor(pr.reactorTokenId);
-                  state.setPendingReaction(null);
                 }}
                 onSkip={() => {
                   useGameplayStore.getState().setPendingReaction(null);
@@ -1601,20 +1730,39 @@ export function MapCanvas() {
                 onMouseEnter={(e) => handleTokenMouseEnter(e, token.id)}
                 onMouseLeave={handleTokenMouseLeave}
               >
-                <div
-                  className="flex items-center justify-center rounded-full transition-shadow"
-                  style={{
-                    width: size * 0.8, height: size * 0.8,
-                    backgroundColor: isInvisible ? "transparent" : color + "25",
-                    border: isInvisible ? `2px dashed ${color}60` : `2px solid ${color}`,
-                    boxShadow: isSelected ? `0 0 12px ${color}60, 0 0 4px ${color}40` : isHovered ? `0 0 6px ${color}30` : undefined,
-                    outline: isHovered && !isSelected ? "1px solid rgba(255,255,255,0.3)" : undefined,
-                  }}
-                >
-                  <span className="font-bold" style={{ fontSize: Math.max(8, scaledCell * 0.3), color }}>
-                    {token.name.slice(0, 2).toUpperCase()}
-                  </span>
-                </div>
+                {(() => {
+                  const creatureId = tokenCreatureMap[token.id];
+                  const hasSprite = creatureId && CREATURE_SPRITES[creatureId];
+                  if (hasSprite) {
+                    return (
+                      <div
+                        className="flex items-center justify-center transition-all"
+                        style={{
+                          width: size, height: size,
+                          filter: isSelected ? `drop-shadow(0 0 6px ${color})` : isHovered ? `drop-shadow(0 0 3px ${color})` : undefined,
+                        }}
+                      >
+                        <CreatureSpriteToken creatureId={creatureId} alignment={token.alignment} size={size} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      className="flex items-center justify-center rounded-full transition-shadow"
+                      style={{
+                        width: size * 0.8, height: size * 0.8,
+                        backgroundColor: isInvisible ? "transparent" : color + "25",
+                        border: isInvisible ? `2px dashed ${color}60` : `2px solid ${color}`,
+                        boxShadow: isSelected ? `0 0 12px ${color}60, 0 0 4px ${color}40` : isHovered ? `0 0 6px ${color}30` : undefined,
+                        outline: isHovered && !isSelected ? "1px solid rgba(255,255,255,0.3)" : undefined,
+                      }}
+                    >
+                      <span className="font-bold" style={{ fontSize: Math.max(8, scaledCell * 0.3), color }}>
+                        {token.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {scaledCell >= 30 && (
                   <div className="mt-px flex flex-col items-center" style={{ width: size }}>

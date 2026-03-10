@@ -7,7 +7,7 @@ import { ScrollView, Text, XStack, YStack } from "tamagui";
 import type { Campaign } from "@questboard/types";
 import { CampaignListItem } from "../../../components/campaign/campaign-list-item";
 import { PendingInviteCard } from "../../../components/campaign/pending-invite-card";
-import { EmptyState } from "../../../components/empty-state";
+import { Button } from "../../../components/button";
 import { useCampaignStore } from "../../../lib/campaign-store";
 
 interface CampaignSection {
@@ -155,12 +155,39 @@ export default function CampaignsScreen() {
       </YStack>
 
       {isEmpty ? (
-        <EmptyState
-          icon={<Castle size={28} color="#6C5CE7" />}
-          title="Nenhuma campanha ainda"
-          message="Crie uma campanha ou entre com um codigo de convite para comecar."
-          actionLabel="Entrar com codigo"
-        />
+        <YStack flex={1} alignItems="center" justifyContent="center" gap={12} padding={32}>
+          <YStack
+            height={64}
+            width={64}
+            borderRadius={9999}
+            backgroundColor="$accentMuted"
+            alignItems="center"
+            justifyContent="center"
+            marginBottom={4}
+          >
+            <Castle size={28} color="#6C5CE7" />
+          </YStack>
+          <Text fontSize={18} fontWeight="600" color="$textPrimary" textAlign="center">
+            Nenhuma campanha ainda
+          </Text>
+          <Text
+            fontSize={14}
+            color="$textMuted"
+            textAlign="center"
+            lineHeight={20}
+            maxWidth={280}
+          >
+            Crie uma campanha ou entre com um codigo de convite para comecar.
+          </Text>
+          <YStack gap={10} width="100%" maxWidth={280} marginTop={8}>
+            <Button variant="primary" size="lg" onPress={() => router.push("/(app)/sessions/create")}>
+              Criar Campanha
+            </Button>
+            <Button variant="outline" size="lg" onPress={() => router.push("/(app)/join")}>
+              Entrar com Codigo
+            </Button>
+          </YStack>
+        </YStack>
       ) : (
         <SectionList<Campaign, CampaignSection>
           sections={sections}

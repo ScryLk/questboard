@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -21,6 +21,7 @@ import {
   Save,
   Share2,
   Volume2,
+  Sparkles,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -28,6 +29,8 @@ import type { MapTool, SessionInfo } from "@/lib/gameplay-mock-data";
 import { getElapsedTime } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { ModalName } from "@/lib/gameplay-store";
+import { PhaseBadge } from "../PhaseBadge";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 
 interface GameplayToolbarProps {
   session: SessionInfo;
@@ -51,6 +54,7 @@ const MAP_TOOLS: {
   { tool: "vision", icon: Eye, label: "Visao", shortcut: "W" },
   { tool: "terrain", icon: Mountain, label: "Terreno", shortcut: "T" },
   { tool: "objects", icon: Package, label: "Objetos", shortcut: "O" },
+  { tool: "ai", icon: Sparkles, label: "Gerar com IA", shortcut: "I" },
 ];
 
 const SESSION_ACTIONS: {
@@ -59,7 +63,7 @@ const SESSION_ACTIONS: {
   modal: ModalName;
 }[] = [
   { icon: BookOpen, label: "Compendio (K)", modal: "creatureCompendium" },
-  { icon: Clapperboard, label: "Cena", modal: "createScene" },
+  { icon: Clapperboard, label: "Cena", modal: "sceneCard" },
   { icon: Volume2, label: "Som", modal: "soundtrack" },
   { icon: Pause, label: "Pausar", modal: null },
   { icon: Save, label: "Salvar", modal: null },
@@ -73,11 +77,12 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
   const toggleGrid = useGameplayStore((s) => s.toggleGrid);
   const openModal = useGameplayStore((s) => s.openModal);
 
-  const elapsed = useMemo(
-    () => getElapsedTime(session.startedAt),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Math.floor(Date.now() / 60000)],
-  );
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    setElapsed(getElapsedTime(session.startedAt));
+    const id = setInterval(() => setElapsed(getElapsedTime(session.startedAt)), 60_000);
+    return () => clearInterval(id);
+  }, [session.startedAt]);
 
   const handleToolClick = useCallback(
     (tool: MapTool) => {
@@ -116,6 +121,7 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
         W: "vision",
         T: "terrain",
         O: "objects",
+        I: "ai",
       };
       if (toolMap[key]) {
         e.preventDefault();
@@ -135,12 +141,14 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
     <div className="flex h-12 shrink-0 items-center overflow-hidden border-b border-brand-border bg-[#0D0D12] px-3">
       {/* Left — Session info */}
       <div className="flex min-w-0 shrink items-center gap-3">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="rounded-lg p-1.5 text-brand-muted transition-colors hover:text-brand-text"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+        <GameTooltip label="Voltar ao Dashboard" side="bottom">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="rounded-lg p-1.5 text-brand-muted transition-colors hover:text-brand-text"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        </GameTooltip>
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-sm font-semibold text-brand-text">
             Sessao #{session.number} — {session.name}
@@ -160,42 +168,45 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
         {MAP_TOOLS.map(({ tool, icon: Icon, label, shortcut }) => {
           const isActive = tool !== "grid" && activeTool === tool;
           return (
-            <button
-              key={tool}
-              onClick={() => handleToolClick(tool)}
-              title={`${label} (${shortcut})`}
-              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
-                isActive
-                  ? "bg-brand-accent text-white"
-                  : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
+            <GameTooltip key={tool} label={label} shortcut={shortcut} side="bottom">
+              <button
+                onClick={() => handleToolClick(tool)}
+                className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                  isActive
+                    ? "bg-brand-accent text-white"
+                    : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            </GameTooltip>
           );
         })}
       </div>
 
       {/* Right — Session actions */}
       <div className="flex shrink-0 items-center gap-1">
+        <PhaseBadge />
+        <div className="mx-1 h-5 w-px bg-brand-border" />
         {SESSION_ACTIONS.map(({ icon: Icon, label, modal }) => (
-          <button
-            key={label}
-            title={label}
-            onClick={() => modal && openModal(modal)}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-          >
-            <Icon className="h-4 w-4" />
-          </button>
+          <GameTooltip key={label} label={label} side="bottom">
+            <button
+              onClick={() => modal && openModal(modal)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          </GameTooltip>
         ))}
         <div className="mx-1 h-5 w-px bg-brand-border" />
-        <button
-          title="Encerrar Sessao"
-          onClick={() => openModal("endSession")}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-brand-danger transition-colors hover:bg-brand-danger/10"
-        >
-          <XCircle className="h-4 w-4" />
-        </button>
+        <GameTooltip label="Encerrar Sessao" side="bottom">
+          <button
+            onClick={() => openModal("endSession")}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-brand-danger transition-colors hover:bg-brand-danger/10"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </GameTooltip>
       </div>
     </div>
   );

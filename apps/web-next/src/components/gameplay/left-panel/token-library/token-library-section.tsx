@@ -8,6 +8,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { useTokenLibraryStore } from "@/lib/token-library-store";
 import { TokenSubTabs, type TokenSubTab } from "./token-sub-tabs";
 import { MyTokensTab } from "./my-tokens-tab";
@@ -53,13 +54,14 @@ export function TokenLibrarySection() {
             </span>
           )}
         </button>
-        <button
-          onClick={handleCreate}
-          title="Criar Token"
-          className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        <GameTooltip label="Criar Token" side="bottom">
+          <button
+            onClick={handleCreate}
+            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </GameTooltip>
       </div>
 
       {!collapsed && (

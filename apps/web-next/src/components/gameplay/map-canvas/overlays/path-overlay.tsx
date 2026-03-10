@@ -65,6 +65,15 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
     );
   }, [token, pathPlanningActive, plannedPath, maxFt, wallEdges, terrainCells, cellSizeFt]);
 
+  // Max cost found (for distinguishing limit cells)
+  const maxCostInReachable = useMemo(() => {
+    let max = 0;
+    for (const cost of reachable.values()) {
+      if (cost > max) max = cost;
+    }
+    return max;
+  }, [reachable]);
+
   if (!pathPlanningActive || !token) return null;
 
   const half = scaledCell / 2;
@@ -92,12 +101,14 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
 
   return (
     <>
-      {/* Reachable cells (subtle highlight) */}
-      {Array.from(reachable.entries()).map(([key]) => {
+      {/* Reachable cells highlight (green = reachable, yellow = at limit) */}
+      {Array.from(reachable.entries()).map(([key, cost]) => {
         const [cx, cy] = key.split(",").map(Number);
         // Don't highlight cells already in the path or the token's own cell
         const isInPath = plannedPath.some((c) => c.x === cx && c.y === cy);
         if (isInPath || (cx === tokenOriginX && cy === tokenOriginY)) return null;
+        // Yellow for cells at max range, green for cells within range
+        const isLimit = maxCostInReachable > 0 && cost >= maxCostInReachable - cellSizeFt + 1;
         return (
           <div
             key={`reach_${key}`}
@@ -107,7 +118,11 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
               top: cy * scaledCell,
               width: scaledCell,
               height: scaledCell,
-              backgroundColor: "rgba(108, 92, 231, 0.05)",
+              backgroundColor: isLimit
+                ? "rgba(253, 203, 110, 0.12)"
+                : "rgba(0, 184, 148, 0.12)",
+              border: `1px solid ${isLimit ? "rgba(253, 203, 110, 0.25)" : "rgba(0, 184, 148, 0.2)"}`,
+              boxSizing: "border-box" as const,
             }}
           />
         );

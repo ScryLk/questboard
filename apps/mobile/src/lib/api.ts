@@ -40,6 +40,8 @@ export function createApiClient(
         body: JSON.stringify(input),
       }),
     getSession: (id: string) => request<Session>(`/sessions/${id}`),
+    findByCode: (code: string) =>
+      request<Session>(`/sessions/by-code/${encodeURIComponent(code)}`),
     joinSession: (id: string, inviteCode: string) =>
       request<unknown>(`/sessions/${id}/join`, {
         method: "POST",

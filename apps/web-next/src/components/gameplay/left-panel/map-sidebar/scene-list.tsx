@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, GripVertical, Trash2, Copy, Pencil } from "lucide-react";
 import { useMapSidebarStore } from "@/lib/map-sidebar-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { SCENE_TRANSITION_LABELS } from "@/lib/map-sidebar-types";
 import type { SceneTransition } from "@/lib/map-sidebar-types";
@@ -103,36 +104,39 @@ export function SceneList() {
           )}
           {/* Hover actions */}
           <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                startRename(scene.id, scene.name);
-              }}
-              className="rounded p-0.5 text-brand-muted hover:text-brand-text"
-              title="Renomear"
-            >
-              <Pencil className="h-2.5 w-2.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDuplicate(scene.id);
-              }}
-              className="rounded p-0.5 text-brand-muted hover:text-brand-text"
-              title="Duplicar"
-            >
-              <Copy className="h-2.5 w-2.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                removeScene(scene.id);
-              }}
-              className="rounded p-0.5 text-brand-muted hover:text-red-400"
-              title="Remover"
-            >
-              <Trash2 className="h-2.5 w-2.5" />
-            </button>
+            <GameTooltip label="Renomear" side="bottom">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startRename(scene.id, scene.name);
+                }}
+                className="rounded p-0.5 text-brand-muted hover:text-brand-text"
+              >
+                <Pencil className="h-2.5 w-2.5" />
+              </button>
+            </GameTooltip>
+            <GameTooltip label="Duplicar" side="bottom">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDuplicate(scene.id);
+                }}
+                className="rounded p-0.5 text-brand-muted hover:text-brand-text"
+              >
+                <Copy className="h-2.5 w-2.5" />
+              </button>
+            </GameTooltip>
+            <GameTooltip label="Remover" side="bottom">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeScene(scene.id);
+                }}
+                className="rounded p-0.5 text-brand-muted hover:text-red-400"
+              >
+                <Trash2 className="h-2.5 w-2.5" />
+              </button>
+            </GameTooltip>
           </div>
         </div>
       ))}

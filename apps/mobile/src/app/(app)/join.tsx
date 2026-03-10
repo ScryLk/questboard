@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { Button } from "../../components/button";
 import { QRScanner } from "../../components/qr/qr-scanner";
-import { useCampaignStore } from "../../lib/campaign-store";
+import { useApi } from "../../lib/api-context";
 import {
   normalizeCode,
   detectCodeType,
@@ -20,13 +20,12 @@ type JoinTab = "code" | "scan";
 export default function JoinScreen() {
   const router = useRouter();
   const { showToast } = useToast();
-  const resolveCode = useCampaignStore((s) => s.resolveCode);
-  const joinLoading = useCampaignStore((s) => s.joinLoading);
-  const joinError = useCampaignStore((s) => s.joinError);
-  const clearJoinError = useCampaignStore((s) => s.clearJoinError);
+  const api = useApi();
 
   const [activeTab, setActiveTab] = useState<JoinTab>("code");
   const [rawCode, setRawCode] = useState("");
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   const normalized = normalizeCode(rawCode);
@@ -34,41 +33,35 @@ export default function JoinScreen() {
   const displayCode = formatDisplayCode(rawCode);
   const isComplete = isCodeComplete(rawCode);
 
-  const handleChangeText = useCallback(
-    (text: string) => {
-      clearJoinError();
-      setRawCode(text);
-    },
-    [clearJoinError],
-  );
+  const handleChangeText = useCallback((text: string) => {
+    setJoinError(null);
+    setRawCode(text);
+  }, []);
 
   const submitCode = useCallback(
     async (code: string) => {
       Keyboard.dismiss();
-      const result = await resolveCode(code);
-      if (!result) return;
-
-      if (result.type === "campaign") {
-        router.push({
-          pathname: "/(app)/join-preview",
-          params: { campaignId: result.id },
-        });
-      } else if (result.type === "session") {
-        if (result.status === "LIVE" || result.status === "LOBBY") {
-          router.push(`/(app)/sessions/${result.id}/select-character`);
-        } else if (result.status === "SCHEDULED") {
-          showToast("info", "Sessao agendada. Voce sera notificado quando comecar.");
-          router.back();
-        } else if (result.status === "COMPLETED") {
-          useCampaignStore.setState({
-            joinError: "Esta sessao ja foi encerrada",
-          });
-        } else {
-          router.push(`/(app)/sessions/${result.id}/select-character`);
+      setJoinLoading(true);
+      setJoinError(null);
+      try {
+        const res = await api.findByCode(normalizeCode(code));
+        if (!res.success) {
+          setJoinError("Código não encontrado");
+          return;
         }
+        const session = res.data!;
+        if (session.status === "ENDED" || session.status === "CANCELLED") {
+          setJoinError("Esta sessão já foi encerrada");
+        } else {
+          router.push(`/(app)/sessions/${session.id}/lobby` as never);
+        }
+      } catch {
+        setJoinError("Código não encontrado");
+      } finally {
+        setJoinLoading(false);
       }
     },
-    [resolveCode, router, showToast],
+    [api, router],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -79,7 +72,6 @@ export default function JoinScreen() {
 
   const handleQRScanned = useCallback(
     async (code: string) => {
-      // Auto-format if needed
       const formatted = formatDisplayCode(code);
       await submitCode(formatted);
     },

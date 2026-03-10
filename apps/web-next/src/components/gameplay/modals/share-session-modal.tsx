@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Copy, Link, Mail } from "lucide-react";
 import { ModalShell } from "./modal-shell";
+
+// Deterministic pseudo-QR pattern (avoids hydration mismatch from Math.random in render)
+const QR_PATTERN = [1,0,1,1,0,1,1,0,0,1,0,1,1,1,0,1,0,0,1,1,1,1,0,1,0];
 
 interface ShareSessionModalProps {
   onClose: () => void;
@@ -67,10 +70,10 @@ export function ShareSessionModal({ onClose }: ShareSessionModalProps) {
       <div className="mb-4 flex justify-center">
         <div className="flex h-[148px] w-[148px] items-center justify-center rounded-lg border border-brand-border bg-white">
           <div className="grid grid-cols-5 gap-1 p-4">
-            {Array.from({ length: 25 }).map((_, i) => (
+            {QR_PATTERN.map((v, i) => (
               <div
                 key={i}
-                className={`h-4 w-4 ${Math.random() > 0.4 ? "bg-black" : "bg-white"}`}
+                className={`h-4 w-4 ${v ? "bg-black" : "bg-white"}`}
               />
             ))}
           </div>

@@ -16,6 +16,7 @@ import {
   Image,
 } from "lucide-react";
 import { useMapSidebarStore } from "@/lib/map-sidebar-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import type { LayerId } from "@/lib/map-sidebar-types";
 
 const LAYER_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,34 +58,36 @@ export function LayerPanel() {
               }`}
             >
               {/* Visible toggle */}
-              <button
-                onClick={() => toggleLayerVisible(layer.id)}
-                className="flex h-4 w-4 items-center justify-center rounded text-brand-muted hover:text-brand-text"
-                title={layer.visible ? "Ocultar" : "Mostrar"}
-              >
-                {layer.visible ? (
-                  <Eye className="h-2.5 w-2.5" />
-                ) : (
-                  <EyeOff className="h-2.5 w-2.5" />
-                )}
-              </button>
+              <GameTooltip label={layer.visible ? "Ocultar" : "Mostrar"} side="right">
+                <button
+                  onClick={() => toggleLayerVisible(layer.id)}
+                  className="flex h-4 w-4 items-center justify-center rounded text-brand-muted hover:text-brand-text"
+                >
+                  {layer.visible ? (
+                    <Eye className="h-2.5 w-2.5" />
+                  ) : (
+                    <EyeOff className="h-2.5 w-2.5" />
+                  )}
+                </button>
+              </GameTooltip>
 
               {/* Lock toggle */}
-              <button
-                onClick={() => toggleLayerLocked(layer.id)}
-                className={`flex h-4 w-4 items-center justify-center rounded ${
-                  layer.locked
-                    ? "text-yellow-500"
-                    : "text-brand-muted/30 hover:text-brand-muted"
-                }`}
-                title={layer.locked ? "Destravar" : "Travar"}
-              >
-                {layer.locked ? (
-                  <Lock className="h-2.5 w-2.5" />
-                ) : (
-                  <Unlock className="h-2.5 w-2.5" />
-                )}
-              </button>
+              <GameTooltip label={layer.locked ? "Destravar" : "Travar"} side="right">
+                <button
+                  onClick={() => toggleLayerLocked(layer.id)}
+                  className={`flex h-4 w-4 items-center justify-center rounded ${
+                    layer.locked
+                      ? "text-yellow-500"
+                      : "text-brand-muted/30 hover:text-brand-muted"
+                  }`}
+                >
+                  {layer.locked ? (
+                    <Lock className="h-2.5 w-2.5" />
+                  ) : (
+                    <Unlock className="h-2.5 w-2.5" />
+                  )}
+                </button>
+              </GameTooltip>
 
               {/* Icon + name */}
               <IconComp className="h-3 w-3 shrink-0 text-brand-muted" />
@@ -105,17 +108,18 @@ export function LayerPanel() {
               )}
 
               {/* Solo button */}
-              <button
-                onClick={() => soloLayer(layer.id)}
-                className={`rounded px-1 py-0.5 text-[7px] font-bold uppercase transition-colors ${
-                  soloLayerId === layer.id
-                    ? "bg-brand-accent/20 text-brand-accent"
-                    : "text-brand-muted/30 opacity-0 hover:text-brand-muted group-hover:opacity-100"
-                }`}
-                title="Isolar layer"
-              >
-                S
-              </button>
+              <GameTooltip label="Solo" description="Isola este layer" side="right">
+                <button
+                  onClick={() => soloLayer(layer.id)}
+                  className={`rounded px-1 py-0.5 text-[7px] font-bold uppercase transition-colors ${
+                    soloLayerId === layer.id
+                      ? "bg-brand-accent/20 text-brand-accent"
+                      : "text-brand-muted/30 opacity-0 hover:text-brand-muted group-hover:opacity-100"
+                  }`}
+                >
+                  S
+                </button>
+              </GameTooltip>
             </div>
 
             {/* Expanded: opacity slider */}

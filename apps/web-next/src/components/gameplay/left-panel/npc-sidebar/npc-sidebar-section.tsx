@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { useNPCStore } from "@/lib/npc-store";
 import type { NPCFilter } from "@/lib/npc-types";
 import { NPCSidebarFilters } from "./npc-sidebar-filters";
@@ -104,13 +105,14 @@ export function NPCSidebarSection() {
             </span>
           )}
         </button>
-        <button
-          onClick={handleCreate}
-          title="Criar NPC"
-          className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        <GameTooltip label="Criar NPC" side="bottom">
+          <button
+            onClick={handleCreate}
+            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </GameTooltip>
       </div>
 
       {!collapsed && (

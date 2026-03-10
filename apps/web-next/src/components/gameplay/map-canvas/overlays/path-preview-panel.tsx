@@ -69,6 +69,7 @@ export function PathPreviewPanel() {
 
   async function handleConfirm() {
     if (plannedPath.length === 0) return;
+    if (isOverSpeed) return; // Safety: don't execute if over movement limit
     await executePath(token!.id, plannedPath);
   }
 

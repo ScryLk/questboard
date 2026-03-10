@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { ChatChannel, ChatMessage } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { playSFX } from "@/lib/audio/sfx-triggers";
 import { NPCDialogueButton } from "./npc-dialogue-button";
 
@@ -122,13 +123,15 @@ export function ChatTab() {
             rows={1}
             className="flex-1 resize-none rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-xs text-brand-text outline-none placeholder:text-brand-muted/50 focus:border-brand-accent/40"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-accent text-white transition-colors hover:bg-brand-accent-hover disabled:opacity-30"
-          >
-            <Send className="h-3.5 w-3.5" />
-          </button>
+          <GameTooltip label="Enviar" shortcut="Enter" side="top">
+            <button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-accent text-white transition-colors hover:bg-brand-accent-hover disabled:opacity-30"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </GameTooltip>
         </div>
       </div>
     </div>
