@@ -1,25 +1,77 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, Share, StyleSheet } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  ScrollView,
+  Share,
+  StyleSheet,
+  TextInput,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
   CheckCircle,
   Circle,
-  Clock,
   Copy,
+  Edit3,
+  Heart,
+  MessageSquare,
   Play,
   QrCode,
+  RefreshCw,
+  Send,
   Share2,
+  Shield,
   Type,
   Users,
 } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, Text, XStack, YStack } from "tamagui";
+import { Stack, Text, XStack, YStack, Separator } from "tamagui";
 import { QRCodeDisplay } from "../../../../components/qr/qr-code-display";
-import { getMockCampaign, getMockLobby } from "../../../../lib/campaign-mock-data";
+import { useApi } from "../../../../lib/api-context";
 import type { LobbyPlayer } from "../../../../lib/campaign-mock-data";
 
-const CURRENT_USER_ID = "user_me";
+// ── Mock character for lobby ──
+
+interface MyCharacterInfo {
+  name: string;
+  race: string;
+  class: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  ac: number;
+  initials: string;
+}
+
+const MOCK_MY_CHARACTER: MyCharacterInfo = {
+  name: "Eldrin Ventoalto",
+  race: "Elfo",
+  class: "Mago",
+  level: 5,
+  hp: 32,
+  maxHp: 32,
+  ac: 15,
+  initials: "EL",
+};
+
+// ── Mock lobby chat ──
+
+interface LobbyMessage {
+  id: string;
+  sender: string;
+  isSystem: boolean;
+  content: string;
+  timestamp: string;
+}
+
+const MOCK_LOBBY_MESSAGES: LobbyMessage[] = [
+  { id: "lm1", sender: "Sistema", isSystem: true, content: "Maria entrou na sala", timestamp: "20:45" },
+  { id: "lm2", sender: "Maria", isSystem: false, content: "bora jogar!", timestamp: "20:46" },
+  { id: "lm3", sender: "Sistema", isSystem: true, content: "João entrou na sala", timestamp: "20:47" },
+  { id: "lm4", sender: "GM", isSystem: false, content: "Começamos em 5 min!", timestamp: "20:48" },
+];
 
 function getStatusColor(status: LobbyPlayer["status"]): string {
   switch (status) {
@@ -46,44 +98,61 @@ function getStatusLabel(status: LobbyPlayer["status"]): string {
 export default function SessionLobbyScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const router = useRouter();
+  const api = useApi();
 
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [codeView, setCodeView] = useState<"text" | "qr">("text");
-
-  // Determine session info from mock data
-  // In real app, this would come from API/socket
-  const sessionCode = useMemo(() => {
-    // Extract from lobby mock
-    if (sessionId === "sess_s04") return "B7M2X4";
-    return sessionId?.replace("sess_", "").toUpperCase().padEnd(6, "X") ?? "------";
-  }, [sessionId]);
-
-  const sessionName = useMemo(() => {
-    if (sessionId === "sess_s04") return "A Torre de Ravenloft";
-    return "Sessao";
-  }, [sessionId]);
-
-  const campaignName = useMemo(() => {
-    if (sessionId?.startsWith("sess_s")) {
-      return getMockCampaign("camp_strahd")?.name ?? "";
-    }
-    if (sessionId?.startsWith("sess_p")) {
-      return getMockCampaign("camp_phandelver")?.name ?? "";
-    }
-    return "";
-  }, [sessionId]);
+  const [chatMessages, setChatMessages] = useState<LobbyMessage[]>(MOCK_LOBBY_MESSAGES);
+  const [chatInput, setChatInput] = useState("");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [sessionCode, setSessionCode] = useState("------");
+  const [sessionName, setSessionName] = useState("Sessão");
+  const [campaignName, setCampaignName] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    if (sessionId) {
-      setLobbyPlayers(getMockLobby(sessionId));
+    if (!sessionId) return;
+    async function loadSession() {
+      try {
+        const res = await api.getSession(sessionId!);
+        if (res.success) {
+          const s = res.data as unknown as Record<string, unknown>;
+          setSessionCode((s.inviteCode as string) ?? "------");
+          setSessionName((s.name as string) ?? "Sessão");
+          setCurrentUserId((s.ownerId as string) ?? null);
+
+          // Map players from API response
+          const players = (s.players as Array<Record<string, unknown>>) ?? [];
+          setLobbyPlayers(
+            players.map((p) => {
+              const user = (p.user as Record<string, unknown>) ?? {};
+              const char = p.character as Record<string, unknown> | null;
+              return {
+                userId: (p.userId as string) ?? "",
+                displayName: (user.displayName as string) ?? "Player",
+                avatarUrl: (user.avatarUrl as string | null) ?? null,
+                role: (p.role as string) === "GM" ? "GM" as const : "PLAYER" as const,
+                characterName: char ? (char.name as string) : null,
+                characterClass: null,
+                characterLevel: null,
+                status: "ready" as const,
+              };
+            }),
+          );
+        }
+      } catch {
+        // fallback to empty
+      }
     }
-  }, [sessionId]);
+    loadSession();
+  }, [sessionId, api]);
 
   const isGM = useMemo(
-    () => lobbyPlayers.some((p) => p.userId === CURRENT_USER_ID && p.role === "GM"),
-    [lobbyPlayers],
+    () => currentUserId !== null && lobbyPlayers.some((p) => p.userId === currentUserId && p.role === "GM"),
+    [lobbyPlayers, currentUserId],
   );
 
   const readyCount = useMemo(
@@ -106,20 +175,50 @@ export default function SessionLobbyScreen() {
   }, [sessionCode]);
 
   const handleToggleReady = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsReady((prev) => !prev);
     setLobbyPlayers((prev) =>
       prev.map((p) =>
-        p.userId === CURRENT_USER_ID
+        p.userId === currentUserId
           ? { ...p, status: p.status === "ready" ? "joining" : "ready" }
           : p,
       ),
     );
   }, []);
 
+  const handleSendChat = useCallback(() => {
+    const text = chatInput.trim();
+    if (!text) return;
+    const msg: LobbyMessage = {
+      id: `lm_${Date.now()}`,
+      sender: "Você",
+      isSystem: false,
+      content: text,
+      timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
+    setChatMessages((prev) => [...prev, msg]);
+    setChatInput("");
+    setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, [chatInput]);
+
   const handleStartSession = useCallback(() => {
-    if (sessionId) {
-      router.replace(`/(app)/sessions/${sessionId}/gameplay`);
-    }
+    if (!sessionId) return;
+    // Start countdown
+    setCountdown(3);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    let count = 3;
+    const interval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        setCountdown(count);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        clearInterval(interval);
+        setCountdown(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.replace(`/(app)/sessions/${sessionId}/gameplay`);
+      }
+    }, 1000);
   }, [sessionId, router]);
 
   return (
@@ -304,7 +403,185 @@ export default function SessionLobbyScreen() {
             <LobbyPlayerRow key={player.userId} player={player} />
           ))}
         </YStack>
+
+        {/* My Character Card (Player only) */}
+        {!isGM && (
+          <>
+            <Separator marginVertical={16} marginHorizontal={16} borderColor="$border" />
+            <YStack paddingHorizontal={16} gap={8}>
+              <Text fontSize={13} fontWeight="600" color="$textMuted" textTransform="uppercase" letterSpacing={0.5}>
+                Meu Personagem
+              </Text>
+              <YStack
+                borderRadius={14}
+                borderWidth={1}
+                borderColor="rgba(108, 92, 231, 0.15)"
+                backgroundColor="$bgCard"
+                padding={16}
+                gap={12}
+              >
+                <XStack alignItems="center" gap={12}>
+                  {/* Avatar */}
+                  <Stack
+                    width={52}
+                    height={52}
+                    borderRadius={14}
+                    backgroundColor="rgba(108, 92, 231, 0.15)"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Text fontSize={18} fontWeight="800" color="$accent">
+                      {MOCK_MY_CHARACTER.initials}
+                    </Text>
+                  </Stack>
+                  {/* Info */}
+                  <YStack flex={1} gap={2}>
+                    <Text fontSize={16} fontWeight="700" color="$textPrimary">
+                      {MOCK_MY_CHARACTER.name}
+                    </Text>
+                    <Text fontSize={12} color="$textMuted">
+                      {MOCK_MY_CHARACTER.race} · {MOCK_MY_CHARACTER.class} · Nv.{MOCK_MY_CHARACTER.level}
+                    </Text>
+                  </YStack>
+                </XStack>
+
+                {/* Stats row */}
+                <XStack gap={12}>
+                  <XStack flex={1} alignItems="center" gap={6} backgroundColor="rgba(255,255,255,0.04)" padding={8} borderRadius={8}>
+                    <Heart size={14} color="#FF6B6B" />
+                    <Text fontSize={13} fontWeight="600" color="$textPrimary">
+                      {MOCK_MY_CHARACTER.hp}/{MOCK_MY_CHARACTER.maxHp}
+                    </Text>
+                  </XStack>
+                  <XStack flex={1} alignItems="center" gap={6} backgroundColor="rgba(255,255,255,0.04)" padding={8} borderRadius={8}>
+                    <Shield size={14} color="#4FC3F7" />
+                    <Text fontSize={13} fontWeight="600" color="$textPrimary">
+                      CA {MOCK_MY_CHARACTER.ac}
+                    </Text>
+                  </XStack>
+                </XStack>
+
+                {/* Action buttons */}
+                <XStack gap={8}>
+                  <Stack
+                    flex={1}
+                    height={36}
+                    borderRadius={8}
+                    backgroundColor="rgba(108, 92, 231, 0.1)"
+                    borderWidth={1}
+                    borderColor="rgba(108, 92, 231, 0.2)"
+                    alignItems="center"
+                    justifyContent="center"
+                    pressStyle={{ opacity: 0.7 }}
+                  >
+                    <XStack alignItems="center" gap={4}>
+                      <Edit3 size={13} color="#6C5CE7" />
+                      <Text fontSize={12} fontWeight="600" color="$accent">
+                        Editar
+                      </Text>
+                    </XStack>
+                  </Stack>
+                  <Stack
+                    flex={1}
+                    height={36}
+                    borderRadius={8}
+                    backgroundColor="rgba(255,255,255,0.04)"
+                    borderWidth={1}
+                    borderColor="$border"
+                    alignItems="center"
+                    justifyContent="center"
+                    pressStyle={{ opacity: 0.7 }}
+                  >
+                    <XStack alignItems="center" gap={4}>
+                      <RefreshCw size={13} color="#9090A0" />
+                      <Text fontSize={12} fontWeight="600" color="$textSecondary">
+                        Trocar
+                      </Text>
+                    </XStack>
+                  </Stack>
+                </XStack>
+              </YStack>
+            </YStack>
+          </>
+        )}
+
+        {/* Lobby Chat */}
+        <Separator marginVertical={16} marginHorizontal={16} borderColor="$border" />
+        <YStack paddingHorizontal={16} gap={8} paddingBottom={16}>
+          <XStack alignItems="center" gap={6}>
+            <MessageSquare size={14} color="#5A5A6E" />
+            <Text fontSize={13} fontWeight="600" color="$textMuted" textTransform="uppercase" letterSpacing={0.5}>
+              Chat da Sala
+            </Text>
+          </XStack>
+
+          <YStack
+            borderRadius={14}
+            borderWidth={1}
+            borderColor="$border"
+            backgroundColor="$bgCard"
+            height={160}
+          >
+            <ScrollView
+              ref={chatScrollRef}
+              style={{ flex: 1, padding: 12 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {chatMessages.map((msg) => (
+                <XStack key={msg.id} marginBottom={6}>
+                  {msg.isSystem ? (
+                    <Text fontSize={12} color="$textMuted" fontStyle="italic">
+                      {msg.content}
+                    </Text>
+                  ) : (
+                    <Text fontSize={13} color="$textPrimary">
+                      <Text fontWeight="600" color={msg.sender === "GM" ? "$accent" : "$textSecondary"}>
+                        {msg.sender}:
+                      </Text>{" "}
+                      {msg.content}
+                    </Text>
+                  )}
+                </XStack>
+              ))}
+            </ScrollView>
+
+            {/* Chat input */}
+            <XStack
+              borderTopWidth={1}
+              borderTopColor="$border"
+              paddingHorizontal={12}
+              paddingVertical={8}
+              alignItems="center"
+              gap={8}
+            >
+              <TextInput
+                value={chatInput}
+                onChangeText={setChatInput}
+                placeholder="Mensagem..."
+                placeholderTextColor="#5A5A6E"
+                style={styles.chatInput}
+                onSubmitEditing={handleSendChat}
+                returnKeyType="send"
+              />
+              <Stack
+                width={36}
+                height={36}
+                borderRadius={18}
+                backgroundColor={chatInput.trim() ? "$accent" : "rgba(255,255,255,0.06)"}
+                alignItems="center"
+                justifyContent="center"
+                pressStyle={{ opacity: 0.7 }}
+                onPress={handleSendChat}
+              >
+                <Send size={16} color={chatInput.trim() ? "white" : "#5A5A6E"} />
+              </Stack>
+            </XStack>
+          </YStack>
+        </YStack>
       </ScrollView>
+
+      {/* Countdown Overlay */}
+      {countdown !== null && <CountdownOverlay count={countdown} />}
 
       {/* Footer */}
       <YStack
@@ -440,6 +717,46 @@ function LobbyPlayerRow({ player }: { player: LobbyPlayer }) {
   );
 }
 
+// ── Countdown Overlay ──
+
+function CountdownOverlay({ count }: { count: number }) {
+  const scale = useRef(new Animated.Value(0.3)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    scale.setValue(0.3);
+    opacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 8, stiffness: 200 }),
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+    ]).start();
+  }, [count, scale, opacity]);
+
+  return (
+    <Animated.View style={styles.countdownOverlay}>
+      <Text fontSize={16} fontWeight="600" color="rgba(255,255,255,0.6)" marginBottom={16}>
+        A sessão vai começar em...
+      </Text>
+      <Animated.View style={{ transform: [{ scale }], opacity }}>
+        <Stack
+          width={100}
+          height={100}
+          borderRadius={50}
+          backgroundColor="rgba(108, 92, 231, 0.2)"
+          borderWidth={3}
+          borderColor="$accent"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Text fontSize={48} fontWeight="900" color="$accent">
+            {count}
+          </Text>
+        </Stack>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -451,5 +768,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 8,
     paddingBottom: 24,
+  },
+  chatInput: {
+    flex: 1,
+    height: 36,
+    fontSize: 14,
+    color: "#E8E8ED",
+    paddingHorizontal: 0,
+  },
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 10, 15, 0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
   },
 });

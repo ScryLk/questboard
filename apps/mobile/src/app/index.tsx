@@ -22,7 +22,7 @@ import {
 export default function DiscoveryScreen() {
   const { isSignedIn, isLoaded } = useAuth();
   const { openSignIn, openSignUp } = useAuthSheet();
-  const [activeTab, setActiveTab] = useState<TabId>("novidades");
+  const [activeTab, setActiveTab] = useState<TabId>("feed");
 
   const renderNewsItem = useCallback(
     ({ item }: { item: NewsItem }) => <ContentCard item={item} />,
@@ -42,7 +42,7 @@ export default function DiscoveryScreen() {
       <FeedHeader />
       <TabBar active={activeTab} onSelect={setActiveTab} />
 
-      {activeTab === "novidades" && (
+      {activeTab === "feed" && (
         <FlatList
           data={NEWS_ITEMS}
           renderItem={renderNewsItem}

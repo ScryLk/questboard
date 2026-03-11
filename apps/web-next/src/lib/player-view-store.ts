@@ -10,6 +10,7 @@ import type {
   FogSettings,
   TokenAlignment,
 } from "./gameplay-mock-data";
+import { MOCK_SESSION_MAPS } from "./gameplay-mock-data";
 
 // ── Player-visible token (filtered info) ──────────────────────
 
@@ -62,12 +63,26 @@ export interface PlayerCombatState {
 
 // ── Scene card ────────────────────────────────────────────────
 
+export type SceneCardStyle =
+  | "cinematic"
+  | "chapter"
+  | "location"
+  | "mystery"
+  | "danger"
+  | "flashback"
+  | "weather";
+
 export interface SceneCard {
-  style: "cinematic" | "chapter" | "location";
+  style: SceneCardStyle;
   title: string;
   subtitle?: string;
   description?: string;
   duration: number; // ms
+  tags?: string[];
+  chapter?: string;
+  linkedMapId?: string;
+  linkedMapName?: string;
+  autoSwitchMap?: boolean;
 }
 
 // ── Lobby types ──────────────────────────────────────────────
@@ -198,6 +213,10 @@ interface PlayerViewState {
   // Scene card
   activeScene: SceneCard | null;
 
+  // Active map
+  activeMapId: string | null;
+  activeMapName: string | null;
+
   // Session state
   sessionPaused: boolean;
   sessionEnded: boolean;
@@ -242,6 +261,9 @@ interface PlayerViewState {
 
   // Scene card
   setActiveScene: (scene: SceneCard | null) => void;
+
+  // Active map
+  setActiveMap: (mapId: string, mapName?: string) => void;
 
   // Effects
   triggerDamageVignette: () => void;
@@ -334,6 +356,8 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   soundtrack: { playing: false, track: "", volume: 80, muted: false },
 
   activeScene: null,
+  activeMapId: MOCK_SESSION_MAPS.find((m) => m.isActive)?.id ?? null,
+  activeMapName: MOCK_SESSION_MAPS.find((m) => m.isActive)?.name ?? null,
   sessionPaused: false,
   sessionEnded: false,
 
@@ -395,6 +419,7 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
     })),
 
   setActiveScene: (scene) => set({ activeScene: scene }),
+  setActiveMap: (mapId, mapName) => set({ activeMapId: mapId, activeMapName: mapName ?? null }),
 
   triggerDamageVignette: () => {
     set({ damageVignette: true, screenShake: true });

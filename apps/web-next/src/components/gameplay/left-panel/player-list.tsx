@@ -4,38 +4,51 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { MOCK_PLAYERS } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { HPBar } from "../shared/hp-bar";
+import { GameTooltip } from "@/components/ui/game-tooltip";
 import { StatusDot } from "../shared/status-dot";
 
 export function PlayerList() {
   const collapsed = useGameplayStore((s) => s.collapsedSections["players"]);
   const toggleSection = useGameplayStore((s) => s.toggleSection);
+  const openModal = useGameplayStore((s) => s.openModal);
 
   const onlineCount = MOCK_PLAYERS.filter((p) => p.status === "online").length;
 
   return (
     <div className="border-b border-brand-border">
       {/* Header */}
-      <button
-        onClick={() => toggleSection("players")}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
-      >
-        {collapsed ? (
-          <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 text-brand-muted" />
-        )}
-        <Users className="h-3.5 w-3.5 text-brand-accent" />
-        <span className="flex-1 text-xs font-semibold uppercase tracking-wider text-brand-text">
-          Jogadores
-        </span>
-        <span className="text-[11px] text-brand-muted">
-          {onlineCount}/{MOCK_PLAYERS.length} online
-        </span>
-      </button>
+      <div className="flex items-center">
+        <button
+          onClick={() => toggleSection("players")}
+          className="flex flex-1 items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-brand-muted" />
+          )}
+          <Users className="h-3.5 w-3.5 text-brand-accent" />
+          <span className="flex-1 text-xs font-semibold uppercase tracking-wider text-brand-text">
+            Jogadores
+          </span>
+          <span className="text-[11px] text-brand-muted">
+            {onlineCount}/{MOCK_PLAYERS.length} online
+          </span>
+        </button>
+        <GameTooltip label="Convidar Jogador" side="bottom">
+          <button
+            onClick={() => openModal("invitePlayers")}
+            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-accent transition-colors hover:bg-white/10"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+          </button>
+        </GameTooltip>
+      </div>
 
       {!collapsed && (
         <div className="px-1.5 pb-1.5">

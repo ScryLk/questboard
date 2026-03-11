@@ -15,7 +15,10 @@ export type MapTool =
   | "draw"
   | "region"
   | "wall"
-  | "vision";
+  | "vision"
+  | "terrain"
+  | "objects"
+  | "ai";
 export type RightPanelTab = "chat" | "dice" | "sheet";
 export type DieType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100";
 export type TokenVisibility = "visible" | "hidden" | "invisible";
@@ -216,7 +219,53 @@ export interface DamageFloat {
 }
 
 export type DrawingTool = "freehand" | "line" | "rect" | "eraser";
-export type TerrainType = "normal" | "difficult" | "water" | "lava" | "pit" | "ice";
+export type TerrainType =
+  // Legacy (kept for backward compat)
+  | "normal"
+  | "difficult"
+  | "water"
+  // Dungeon
+  | "stone_floor"
+  | "stone_wall"
+  | "dirt_floor"
+  | "wooden_floor"
+  | "cobblestone"
+  | "marble"
+  | "carpet"
+  // Natural
+  | "grass"
+  | "forest_floor"
+  | "sand"
+  | "mud"
+  | "snow"
+  | "rocky"
+  | "swamp"
+  | "water_shallow"
+  | "water_deep"
+  | "lava"
+  | "ice"
+  // Special
+  | "void"
+  | "magic_circle"
+  | "trap"
+  | "pit"
+  | "bridge"
+  | "stairs_up"
+  | "stairs_down"
+  | "portal"
+  | "altar"
+  // Extended
+  | "cave_floor"
+  | "tiles_white"
+  | "acid"
+  | "blood"
+  | "wood_wall"
+  | "dungeon_wall"
+  | "brick_wall"
+  | "dense_trees"
+  | "light_trees";
+
+export type TerrainEditorTool = "brush" | "rectangle" | "fill" | "eraser";
 
 export interface DrawStroke {
   id: string;
@@ -266,6 +315,10 @@ export interface Toast {
   id: string;
   text: string;
   timestamp: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 // ── Vision System ────────────────────────────────────
@@ -274,6 +327,30 @@ export type VisionType = "normal" | "darkvision" | "blindsight" | "truesight" | 
 export type LightType = "none" | "torch" | "lamp" | "light_cantrip" | "custom";
 export type FogMode = "manual" | "dynamic" | "hybrid";
 export type WallSide = "top" | "right" | "bottom" | "left";
+export type WallMaterial = "stone" | "wood" | "iron" | "magic";
+export type DoorState = "none" | "open" | "closed" | "locked" | "secret";
+
+// ── Edge-based Wall System ──
+
+export type WallType =
+  | "wall"
+  | "door-closed"
+  | "door-open"
+  | "door-locked"
+  | "window"
+  | "half-wall"
+  | "secret"
+  | "illusory"
+  | "portcullis";
+
+export type WallStyle = "stone" | "wood" | "metal" | "magic" | "natural" | "brick";
+
+export interface WallData {
+  type: WallType;
+  style: WallStyle;
+}
+
+export type WallDrawMode = "line" | "rectangle" | "erase";
 
 export interface VisionConfig {
   enabled: boolean;
@@ -315,7 +392,88 @@ export interface WallSegment {
   side: WallSide;
   isDoor: boolean;
   doorOpen: boolean;
+  wallType?: WallMaterial;
+  doorState?: DoorState;
 }
+
+// ── Map Objects ──
+
+export type MapObjectType =
+  | "table"
+  | "chair"
+  | "bed"
+  | "chest"
+  | "barrel"
+  | "bookshelf"
+  | "throne"
+  | "fountain"
+  | "statue"
+  | "pillar"
+  | "campfire"
+  | "tree"
+  | "bush"
+  | "rock_large"
+  | "rock_small"
+  | "torch_stand"
+  | "banner"
+  | "rug"
+  | "cage"
+  | "well"
+  | "cart"
+  | "crate"
+  | "sack"
+  | "weapon_rack"
+  | "anvil"
+  | "cauldron";
+
+export interface MapObjectCell {
+  id: string;
+  x: number;
+  y: number;
+  type: MapObjectType;
+  rotation: number;
+}
+
+export interface MapObjectInfo {
+  type: MapObjectType;
+  label: string;
+  icon: string;
+  category: "furniture" | "container" | "decoration" | "nature" | "light";
+}
+
+export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
+  // Furniture
+  { type: "table", label: "Mesa", icon: "🪑", category: "furniture" },
+  { type: "chair", label: "Cadeira", icon: "💺", category: "furniture" },
+  { type: "bed", label: "Cama", icon: "🛏️", category: "furniture" },
+  { type: "throne", label: "Trono", icon: "👑", category: "furniture" },
+  { type: "bookshelf", label: "Estante", icon: "📚", category: "furniture" },
+  { type: "weapon_rack", label: "Rack de Armas", icon: "⚔️", category: "furniture" },
+  // Containers
+  { type: "chest", label: "Bau", icon: "📦", category: "container" },
+  { type: "barrel", label: "Barril", icon: "🛢️", category: "container" },
+  { type: "crate", label: "Caixote", icon: "📥", category: "container" },
+  { type: "sack", label: "Saco", icon: "👝", category: "container" },
+  { type: "cage", label: "Jaula", icon: "🗑️", category: "container" },
+  { type: "cart", label: "Carrinho", icon: "🛒", category: "container" },
+  // Decoration
+  { type: "statue", label: "Estatua", icon: "🗿", category: "decoration" },
+  { type: "pillar", label: "Pilar", icon: "🏛️", category: "decoration" },
+  { type: "fountain", label: "Fonte", icon: "⛲", category: "decoration" },
+  { type: "banner", label: "Bandeira", icon: "🚩", category: "decoration" },
+  { type: "rug", label: "Tapete", icon: "🟫", category: "decoration" },
+  { type: "well", label: "Poco", icon: "🕳️", category: "decoration" },
+  { type: "anvil", label: "Bigorna", icon: "🔨", category: "decoration" },
+  { type: "cauldron", label: "Caldeirao", icon: "🫕", category: "decoration" },
+  // Nature
+  { type: "tree", label: "Arvore", icon: "🌳", category: "nature" },
+  { type: "bush", label: "Arbusto", icon: "🌿", category: "nature" },
+  { type: "rock_large", label: "Pedra Grande", icon: "🪨", category: "nature" },
+  { type: "rock_small", label: "Pedra Peq.", icon: "🪨", category: "nature" },
+  // Light
+  { type: "torch_stand", label: "Tocha", icon: "🔥", category: "light" },
+  { type: "campfire", label: "Fogueira", icon: "🏕️", category: "light" },
+];
 
 export interface LightSourceFixed {
   id: string;
@@ -327,288 +485,55 @@ export interface LightSourceFixed {
   color: string;
 }
 
-// ── Mock Data ────────────────────────────────────────
+// ── Empty data (previously mock) ─────────────────────
 
 export const MOCK_SESSION: SessionInfo = {
-  id: "sess_s04",
-  number: 13,
-  name: "A Torre de Ravenloft",
-  campaign: "A Maldicao de Strahd",
-  startedAt: new Date(Date.now() - 92 * 60 * 1000),
+  id: "",
+  number: 0,
+  name: "",
+  campaign: "",
+  startedAt: new Date(),
   status: "live",
 };
 
-export const MOCK_PLAYERS: GamePlayer[] = [
-  {
-    id: "p1",
-    name: "Maria Santos",
-    character: "Eldrin",
-    class: "Mago",
-    level: 5,
-    hp: 25,
-    maxHp: 32,
-    ac: 14,
-    status: "online",
-    avatarInitials: "MS",
-    color: "#6C5CE7",
-  },
-  {
-    id: "p2",
-    name: "Pedro Costa",
-    character: "Kira Ironfist",
-    class: "Ladina",
-    level: 5,
-    hp: 12,
-    maxHp: 28,
-    ac: 16,
-    status: "online",
-    avatarInitials: "PC",
-    color: "#00CEC9",
-  },
-  {
-    id: "p3",
-    name: "Ana Costa",
-    character: "Zael",
-    class: "Ranger",
-    level: 5,
-    hp: 35,
-    maxHp: 35,
-    ac: 15,
-    status: "offline",
-    avatarInitials: "AC",
-    color: "#FDCB6E",
-  },
-  {
-    id: "p4",
-    name: "Joao Oliveira",
-    character: "Theron",
-    class: "Clerigo",
-    level: 5,
-    hp: 38,
-    maxHp: 42,
-    ac: 18,
-    status: "online",
-    avatarInitials: "JO",
-    color: "#FF6B6B",
-  },
-];
+export const MOCK_PLAYERS: GamePlayer[] = [];
 
-export const MOCK_TOKENS: GameToken[] = [
-  {
-    id: "tok_eldrin",
-    name: "Eldrin",
-    alignment: "player",
-    hp: 25,
-    maxHp: 32,
-    ac: 14,
-    initiative: 18,
-    size: 1,
-    x: 8,
-    y: 10,
-    onMap: true,
-    conditions: ["concentrating"],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p1",
-  },
-  {
-    id: "tok_kira",
-    name: "Kira",
-    alignment: "player",
-    hp: 12,
-    maxHp: 28,
-    ac: 16,
-    initiative: 22,
-    size: 1,
-    x: 10,
-    y: 11,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p2",
-  },
-  {
-    id: "tok_zael",
-    name: "Zael",
-    alignment: "player",
-    hp: 35,
-    maxHp: 35,
-    ac: 15,
-    initiative: 15,
-    size: 1,
-    x: 7,
-    y: 12,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 35,
-    playerId: "p3",
-  },
-  {
-    id: "tok_theron",
-    name: "Theron",
-    alignment: "player",
-    hp: 38,
-    maxHp: 42,
-    ac: 18,
-    initiative: 12,
-    size: 1,
-    x: 9,
-    y: 13,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-    playerId: "p4",
-  },
-  {
-    id: "tok_skel1",
-    name: "Esqueleto 1",
-    alignment: "hostile",
-    hp: 8,
-    maxHp: 13,
-    ac: 13,
-    initiative: 16,
-    size: 1,
-    x: 12,
-    y: 9,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-  },
-  {
-    id: "tok_skel2",
-    name: "Esqueleto 2",
-    alignment: "hostile",
-    hp: 0,
-    maxHp: 13,
-    ac: 13,
-    initiative: 14,
-    size: 1,
-    x: 13,
-    y: 10,
-    onMap: true,
-    conditions: [],
-    visibility: "visible",
-    speed: 30,
-  },
-  {
-    id: "tok_wolf",
-    name: "Lobo Sombrio",
-    alignment: "hostile",
-    hp: 22,
-    maxHp: 22,
-    ac: 13,
-    initiative: 0,
-    size: 1,
-    x: 0,
-    y: 0,
-    onMap: false,
-    conditions: [],
-    visibility: "visible",
-    speed: 40,
-  },
-  {
-    id: "tok_chest",
-    name: "Bau Misterioso",
-    alignment: "neutral",
-    hp: 10,
-    maxHp: 10,
-    ac: 15,
-    initiative: 0,
-    size: 1,
-    x: 0,
-    y: 0,
-    onMap: false,
-    conditions: [],
-    visibility: "visible",
-    speed: 0,
-  },
-];
+export const MOCK_TOKENS: GameToken[] = [];
 
 export const MOCK_COMBAT: CombatState = {
-  active: true,
-  round: 3,
+  active: false,
+  round: 0,
   turnIndex: 0,
-  order: [
-    { tokenId: "tok_kira", initiative: 22, status: "active" },
-    { tokenId: "tok_eldrin", initiative: 18, status: "active" },
-    { tokenId: "tok_skel1", initiative: 16, status: "active" },
-    { tokenId: "tok_zael", initiative: 15, status: "active" },
-    { tokenId: "tok_skel2", initiative: 14, status: "dead" },
-    { tokenId: "tok_theron", initiative: 12, status: "active" },
-  ],
+  order: [],
 };
 
-export const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: "msg1",
-    channel: "geral",
-    type: "system",
-    sender: "Sistema",
-    senderInitials: "S",
-    isGM: false,
-    content: "Combate iniciado — Rodada 1",
-    timestamp: "19:45",
-  },
-  {
-    id: "msg2",
-    channel: "geral",
-    type: "roll",
-    sender: "Maria Santos",
-    senderInitials: "MS",
-    isGM: false,
-    content: "Eldrin ataca com Bola de Fogo!",
-    timestamp: "19:48",
-    rollFormula: "8d6",
-    rollResult: 34,
-    rollDetails: "4+6+5+3+6+2+5+3",
-  },
-  {
-    id: "msg3",
-    channel: "geral",
-    type: "roll",
-    sender: "Pedro Costa",
-    senderInitials: "PC",
-    isGM: false,
-    content: "Kira tenta ataque furtivo",
-    timestamp: "19:52",
-    rollFormula: "1d20+7",
-    rollResult: 27,
-    rollDetails: "20+7",
-    isNat20: true,
-  },
-  {
-    id: "msg4",
-    channel: "mesa-gm",
-    type: "normal",
-    sender: "GM",
-    senderInitials: "GM",
-    isGM: true,
-    content: "O esqueleto 2 cai em pedacos. Faltam 1 esqueleto na sala.",
-    timestamp: "19:53",
-  },
-  {
-    id: "msg5",
-    channel: "geral",
-    type: "normal",
-    sender: "Joao Oliveira",
-    senderInitials: "JO",
-    isGM: false,
-    content: "Theron se posiciona para curar Kira no proximo turno",
-    timestamp: "19:55",
-  },
-];
+export const MOCK_MESSAGES: ChatMessage[] = [];
 
 export const MOCK_MAP: MapConfig = {
-  name: "Torre de Ravenloft — Andar 3",
+  name: "",
   gridCols: 25,
   gridRows: 25,
-  cellSize: 40,
+  cellSize: 64,
   cellSizeFt: 5,
 };
+
+// ── Session Maps ────────────────────────────────────
+
+export interface SessionMapItem {
+  id: string;
+  name: string;
+  gridCols: number;
+  gridRows: number;
+  thumbnail: string | null;
+  category: string;
+  isActive: boolean;
+}
+
+export const MOCK_SESSION_MAPS: SessionMapItem[] = [
+  { id: "map-1", name: "Cena 1", gridCols: 25, gridRows: 25, thumbnail: null, category: "Dungeon", isActive: true },
+  { id: "map-2", name: "Sala do Trono", gridCols: 30, gridRows: 20, thumbnail: null, category: "Dungeon", isActive: false },
+  { id: "map-3", name: "Floresta Svalich", gridCols: 40, gridRows: 30, thumbnail: null, category: "Overworld", isActive: false },
+];
 
 // ── Helpers ──────────────────────────────────────────
 
@@ -617,14 +542,6 @@ export function getElapsedTime(startedAt: Date): string {
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return `${h}h${m.toString().padStart(2, "0")}m`;
-}
-
-export function getTokenById(id: string): GameToken | undefined {
-  return MOCK_TOKENS.find((t) => t.id === id);
-}
-
-export function getPlayerById(id: string): GamePlayer | undefined {
-  return MOCK_PLAYERS.find((p) => p.id === id);
 }
 
 export function getAlignmentColor(alignment: TokenAlignment): string {

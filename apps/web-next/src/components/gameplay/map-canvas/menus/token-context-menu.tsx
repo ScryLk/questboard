@@ -14,12 +14,14 @@ import {
   Swords,
   Trash2,
   User,
+  Users,
   XCircle,
   Zap,
 } from "lucide-react";
-import type { GameToken, ConditionType, TokenVisibility } from "@/lib/gameplay-mock-data";
+import type { GameToken, ConditionType, TokenAlignment, TokenVisibility } from "@/lib/gameplay-mock-data";
 import { ALL_CONDITIONS, getAlignmentColor } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { ALIGNMENT_EYE_COLORS, ALIGNMENT_LABELS } from "@/constants/creature-sprites";
 
 interface TokenContextMenuProps {
   token: GameToken;
@@ -44,12 +46,13 @@ const VISIBILITY_OPTIONS: { value: TokenVisibility; label: string }[] = [
 
 export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [submenu, setSubmenu] = useState<"conditions" | "visibility" | "size" | null>(null);
+  const [submenu, setSubmenu] = useState<"conditions" | "visibility" | "alignment" | "size" | null>(null);
 
   const removeToken = useGameplayStore((s) => s.removeToken);
   const duplicateToken = useGameplayStore((s) => s.duplicateToken);
   const toggleTokenCondition = useGameplayStore((s) => s.toggleTokenCondition);
   const setTokenVisibility = useGameplayStore((s) => s.setTokenVisibility);
+  const setTokenAlignment = useGameplayStore((s) => s.setTokenAlignment);
   const setTokenSize = useGameplayStore((s) => s.setTokenSize);
   const undoMovement = useGameplayStore((s) => s.undoMovement);
   const setHpAdjustTarget = useGameplayStore((s) => s.setHpAdjustTarget);
@@ -182,6 +185,12 @@ export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps
         />
         <div className="mx-2 my-0.5 h-px bg-brand-border" />
         <MenuItem
+          icon={Users}
+          label="Indole"
+          hasSubmenu
+          onHover={() => setSubmenu("alignment")}
+        />
+        <MenuItem
           icon={Eye}
           label="Visibilidade"
           hasSubmenu
@@ -257,6 +266,38 @@ export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps
                   {active && <span className="text-[8px] text-white">✓</span>}
                 </div>
                 {c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {submenu === "alignment" && (
+        <div className="ml-1 min-w-[160px] rounded-lg border border-brand-border bg-[#16161D] py-1 shadow-xl">
+          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-brand-muted">
+            Indole
+          </div>
+          {(["hostile", "neutral", "ally"] as TokenAlignment[]).map((a) => {
+            const active = token.alignment === a;
+            return (
+              <button
+                key={a}
+                onClick={() => {
+                  setTokenAlignment(token.id, a);
+                  onClose();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-brand-text hover:bg-white/[0.05]"
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: ALIGNMENT_EYE_COLORS[a],
+                    boxShadow: active ? `0 0 6px ${ALIGNMENT_EYE_COLORS[a]}` : undefined,
+                  }}
+                />
+                <span style={{ color: active ? ALIGNMENT_EYE_COLORS[a] : undefined }}>
+                  {ALIGNMENT_LABELS[a]}
+                </span>
               </button>
             );
           })}

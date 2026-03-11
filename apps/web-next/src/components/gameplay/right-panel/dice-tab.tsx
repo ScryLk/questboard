@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Dices, Eye, EyeOff } from "lucide-react";
 import type { DieType } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { playSFX } from "@/lib/audio/sfx-triggers";
 
 const DICE: { type: DieType; sides: number; label: string }[] = [
   { type: "d4", sides: 4, label: "D4" },
@@ -56,6 +57,13 @@ export function DiceTab() {
         }),
       };
       setHistory((prev) => [entry, ...prev].slice(0, 20));
+
+      // SFX
+      const isNat20 = qty === 1 && sides === 20 && rolls[0] === 20;
+      const isNat1 = qty === 1 && sides === 20 && rolls[0] === 1;
+      if (isNat20) playSFX("dice:nat20");
+      else if (isNat1) playSFX("dice:nat1");
+      else playSFX("dice:roll");
 
       if (!secret) {
         addMessage({

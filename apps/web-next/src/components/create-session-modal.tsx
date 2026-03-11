@@ -60,12 +60,43 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  const handleCreate = useCallback(() => {
-    const code = generateCode();
-    setGeneratedCode(code);
-    setStep("confirmation");
-  }, []);
+  const handleCreate = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+      const res = await fetch(`${apiUrl}/sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": "web-dev-user",
+        },
+        body: JSON.stringify({
+          name: title,
+          system: "dnd5e",
+          maxPlayers: players.filter((p) => p.checked).length + 1,
+          isPublic: false,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data?.inviteCode) {
+        setGeneratedCode(data.data.inviteCode);
+        setStep("confirmation");
+      } else {
+        // Fallback to local code if API fails
+        setGeneratedCode(generateCode());
+        setStep("confirmation");
+      }
+    } catch {
+      // Fallback to local code if API unreachable
+      setGeneratedCode(generateCode());
+      setStep("confirmation");
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, title, players]);
 
   const handleClose = useCallback(() => {
     setStep("form");
@@ -267,14 +298,14 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!title.trim()}
+                disabled={!title.trim() || creating}
                 className={`rounded-[10px] px-5 py-2.5 text-sm font-semibold text-white transition-colors ${
-                  !title.trim()
+                  !title.trim() || creating
                     ? "cursor-not-allowed bg-white/5 text-brand-muted"
                     : "bg-brand-accent hover:bg-brand-accent-hover"
                 }`}
               >
-                Criar Sessao
+                {creating ? "Criando..." : "Criar Sessao"}
               </button>
             </div>
           </>

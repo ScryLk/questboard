@@ -36,7 +36,17 @@ export type TerrainType =
   | "stairs_down"
   | "portal"
   | "altar"
-  | "custom";
+  | "custom"
+  // Extended
+  | "cave_floor"
+  | "tiles_white"
+  | "acid"
+  | "blood"
+  | "wood_wall"
+  | "dungeon_wall"
+  | "brick_wall"
+  | "dense_trees"
+  | "light_trees";
 
 export type BiomeType =
   | "dungeon"

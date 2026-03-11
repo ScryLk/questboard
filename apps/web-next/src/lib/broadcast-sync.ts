@@ -14,6 +14,7 @@ export type BroadcastMessageType =
   | "gm:token-move"          // Token moved
   | "gm:token-hp"            // Token HP changed
   | "gm:token-visibility"    // Token visibility changed
+  | "gm:token-alignment"     // Token alignment/disposition changed
   | "gm:token-add"           // Token added
   | "gm:token-remove"        // Token removed
   | "gm:token-condition"     // Token condition changed
@@ -23,6 +24,7 @@ export type BroadcastMessageType =
   | "gm:combat-end"          // Combat ended
   | "gm:scene-show"          // Scene card
   | "gm:scene-dismiss"       // Scene card dismissed
+  | "gm:map-switch"          // Map switched (via scene card)
   | "gm:soundtrack-play"     // Play soundtrack
   | "gm:soundtrack-stop"     // Stop soundtrack
   | "gm:chat-message"        // Chat message from GM
@@ -37,7 +39,23 @@ export type BroadcastMessageType =
   | "player:roll"            // Player rolled dice
   | "player:end-turn"        // Player ends turn
   | "player:join"            // Player connected
-  | "player:leave";          // Player disconnected
+  | "player:leave"           // Player disconnected
+  // Lobby — GM → Players
+  | "lobby:session-info"     // Session metadata
+  | "lobby:player-list"      // Full player list update
+  | "lobby:player-accepted"  // Join request accepted
+  | "lobby:player-rejected"  // Join request rejected
+  | "lobby:player-kicked"    // Player kicked from lobby
+  | "lobby:chat-message"     // Lobby chat message
+  | "lobby:countdown-start"  // Countdown began
+  | "lobby:countdown-cancel" // Countdown cancelled
+  | "lobby:session-start"    // Session started
+  // Lobby — Player → GM
+  | "lobby:join-request"     // Player wants to join
+  | "lobby:character-selected" // Player selected character
+  | "lobby:ready"            // Player ready toggle
+  | "lobby:player-chat"      // Player lobby chat
+  | "lobby:ping";            // Heartbeat
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;

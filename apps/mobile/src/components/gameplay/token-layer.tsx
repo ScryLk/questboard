@@ -1,5 +1,5 @@
 import { memo, useCallback, useContext } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Alert } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -12,6 +12,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { Text } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { useCombatStore } from "../../stores/combatStore";
 import { TokenIcon } from "./token-icon";
 import { useMapPanRef } from "./map-canvas";
 import type { TokenState } from "../../lib/gameplay-store";
@@ -34,6 +35,7 @@ const TokenItem = memo(function TokenItem({
   const moveToken = useGameplayStore((s) => s.moveToken);
   const showContextMenu = useGameplayStore((s) => s.showContextMenu);
   const myTokenId = useGameplayStore((s) => s.myTokenId);
+  const setDraggingTokenId = useGameplayStore((s) => s.setDraggingTokenId);
   const mapPanRef = useMapPanRef();
 
   const size = token.size * gridSize;
@@ -45,6 +47,17 @@ const TokenItem = memo(function TokenItem({
 
   // If not visible and not GM, don't render
   if (!token.visible && !isGM) return null;
+
+  const handleDragStart = useCallback(() => {
+    const store = useGameplayStore.getState();
+    if (store.combatActive) {
+      setDraggingTokenId(token.id);
+    }
+  }, [token.id, setDraggingTokenId]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingTokenId(null);
+  }, [setDraggingTokenId]);
 
   const handleTokenPress = useCallback(() => {
     try {
@@ -68,9 +81,31 @@ const TokenItem = memo(function TokenItem({
     (finalX: number, finalY: number) => {
       const snappedX = Math.round(finalX / gridSize);
       const snappedY = Math.round(finalY / gridSize);
+
+      // Validate movement in combat if combatStore has this combatant
+      const gameState = useGameplayStore.getState();
+      if (gameState.combatActive) {
+        const combatState = useCombatStore.getState();
+        const combatant = combatState.combatants.find(
+          (c) => c.tokenId === token.id,
+        );
+        if (combatant) {
+          // Chebyshev distance (diagonal = 1 square in D&D 5e)
+          const distanceSquares = Math.max(
+            Math.abs(snappedX - token.x),
+            Math.abs(snappedY - token.y),
+          );
+          const success = combatState.useMovement(combatant.id, distanceSquares);
+          if (!success) {
+            Alert.alert("Movimento insuficiente", "Não há quadrados de movimento disponíveis.");
+            return; // Don't move — token snaps back via spring animation
+          }
+        }
+      }
+
       moveToken(token.id, snappedX, snappedY);
     },
-    [token.id, gridSize, moveToken],
+    [token.id, token.x, token.y, gridSize, moveToken],
   );
 
   const handleLongPress = useCallback(
@@ -96,10 +131,15 @@ const TokenItem = memo(function TokenItem({
       runOnJS(handleLongPress)(e.absoluteX, e.absoluteY);
     });
 
+  // Players can only drag their own token
+  const canDrag = isGM || token.id === myTokenId;
+
   const dragGesture = Gesture.Pan()
     .activateAfterLongPress(200)
+    .enabled(canDrag)
     .onStart(() => {
       isDragging.value = true;
+      runOnJS(handleDragStart)();
     })
     .onUpdate((e) => {
       offsetX.value = e.translationX;
@@ -110,6 +150,7 @@ const TokenItem = memo(function TokenItem({
       const finalPixelX = token.x * gridSize + offsetX.value;
       const finalPixelY = token.y * gridSize + offsetY.value;
       runOnJS(handleDrop)(finalPixelX, finalPixelY);
+      runOnJS(handleDragEnd)();
       offsetX.value = withSpring(0);
       offsetY.value = withSpring(0);
     });

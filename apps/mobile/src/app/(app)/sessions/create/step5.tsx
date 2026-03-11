@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronRight, Sparkles } from "lucide-react-native";
+import { ChevronRight, Loader2, Sparkles } from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { WizardHeader } from "../../../../components/wizard-header";
 import { SessionPreviewCard } from "../../../../components/session-preview-card";
 import { useSessionCreationStore } from "../../../../lib/session-creation-store";
+import { useApi } from "../../../../lib/api-context";
 import {
-  MY_SESSIONS_GM,
   SYSTEM_LABELS,
   CAMPAIGN_TYPES,
   HP_METHODS,
@@ -66,7 +67,10 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 export default function Step5Review() {
   const router = useRouter();
   const store = useSessionCreationStore();
+  const api = useApi();
   const { identity, configuration, ambiance, invite } = store;
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const systemLabel = SYSTEM_LABELS[identity.system] ?? identity.system;
   const typeLabel =
@@ -79,23 +83,29 @@ export default function Step5Review() {
     DICE_VISIBILITY_OPTIONS.find((d) => d.key === configuration.diceVisibility)
       ?.label ?? configuration.diceVisibility;
 
-  function handleCreate() {
-    MY_SESSIONS_GM.push({
-      id: `session-${Date.now()}`,
-      name: identity.name,
-      system: identity.system,
-      gmName: "Você",
-      playerCount: 0,
-      maxPlayers: configuration.maxPlayers,
-      tags: identity.tags,
-      accentColor: "#6C5CE7",
-      description: identity.description,
-      isLive: false,
-      role: "gm",
-      sessionNumber: 1,
-      status: "idle",
-    });
-    router.push("/(app)/sessions/create/celebration");
+  async function handleCreate() {
+    if (creating) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await api.createSession({
+        name: identity.name,
+        system: identity.system,
+        maxPlayers: configuration.maxPlayers,
+        isPublic: configuration.visibility === "public",
+        tags: identity.tags,
+      });
+      if (res.success) {
+        store.updateInvite({ inviteCode: res.data!.inviteCode });
+        router.push("/(app)/sessions/create/celebration");
+      } else {
+        setError("Erro ao criar sessão. Tente novamente.");
+      }
+    } catch {
+      setError("Erro de conexão. Verifique sua internet.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   function handleEditIdentity() {
@@ -235,7 +245,13 @@ export default function Step5Review() {
         backgroundColor="$bg"
         borderTopWidth={1}
         borderTopColor="$border"
+        gap={8}
       >
+        {error && (
+          <Text fontSize={13} color="#FF6B6B" textAlign="center">
+            {error}
+          </Text>
+        )}
         <Stack
           onPress={handleCreate}
           height={52}
@@ -244,11 +260,16 @@ export default function Step5Review() {
           alignItems="center"
           justifyContent="center"
           pressStyle={{ opacity: 0.85 }}
+          opacity={creating ? 0.6 : 1}
         >
           <XStack alignItems="center" gap={8}>
-            <Sparkles size={18} color="white" />
+            {creating ? (
+              <Loader2 size={18} color="white" />
+            ) : (
+              <Sparkles size={18} color="white" />
+            )}
             <Text fontSize={16} fontWeight="700" color="white">
-              Criar Sessão
+              {creating ? "Criando..." : "Criar Sessão"}
             </Text>
           </XStack>
         </Stack>

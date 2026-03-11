@@ -113,6 +113,12 @@ function handleBroadcastMessage(msg: BroadcastMessage) {
       usePlayerViewStore.getState().setActiveScene(null);
       break;
 
+    case "gm:map-switch": {
+      const { mapId, mapName } = msg.payload as { mapId: string; mapName?: string };
+      usePlayerViewStore.getState().setActiveMap(mapId, mapName);
+      break;
+    }
+
     case "gm:session-pause":
       usePlayerViewStore.getState().setSessionPaused(true);
       break;

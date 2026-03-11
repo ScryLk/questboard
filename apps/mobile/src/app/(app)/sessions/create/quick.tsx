@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ScrollView, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,10 +11,10 @@ import {
   useSessionCreationStore,
   canProceedQuick,
 } from "../../../../lib/session-creation-store";
+import { useApi } from "../../../../lib/api-context";
 import {
   SYSTEM_LABELS,
   SYSTEM_ICONS,
-  MY_SESSIONS_GM,
   VISIBILITY_OPTIONS,
 } from "../../../../lib/mock-data";
 
@@ -27,26 +28,28 @@ export default function QuickCreateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const store = useSessionCreationStore();
+  const api = useApi();
   const { identity, configuration, invite } = store;
   const canCreate = canProceedQuick(store);
+  const [creating, setCreating] = useState(false);
 
-  function handleCreate() {
-    MY_SESSIONS_GM.push({
-      id: `session-${Date.now()}`,
-      name: identity.name,
-      system: identity.system,
-      gmName: "Você",
-      playerCount: 0,
-      maxPlayers: configuration.maxPlayers,
-      tags: [],
-      accentColor: "#6C5CE7",
-      description: "",
-      isLive: false,
-      role: "gm",
-      sessionNumber: 1,
-      status: "idle",
-    });
-    router.push("/(app)/sessions/create/celebration");
+  async function handleCreate() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = await api.createSession({
+        name: identity.name,
+        system: identity.system,
+        maxPlayers: configuration.maxPlayers,
+        isPublic: configuration.visibility === "public",
+      });
+      if (res.success) {
+        store.updateInvite({ inviteCode: res.data!.inviteCode });
+        router.push("/(app)/sessions/create/celebration");
+      }
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -206,10 +209,11 @@ export default function QuickCreateScreen() {
         <Button
           variant="primary"
           size="lg"
-          disabled={!canCreate}
+          disabled={!canCreate || creating}
+          loading={creating}
           onPress={handleCreate}
         >
-          Criar Sessão
+          {creating ? "Criando..." : "Criar Sessão"}
         </Button>
       </YStack>
     </YStack>

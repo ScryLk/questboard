@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Menu, Settings, Users } from "lucide-react-native";
 import { Stack, Text, XStack } from "tamagui";
 import { useGameplayStore } from "../../lib/gameplay-store";
+import { PhaseBadge } from "./phase-badge";
 
 function TopBarInner() {
   const router = useRouter();
@@ -14,6 +15,7 @@ function TopBarInner() {
   const sessionStatus = useGameplayStore((s) => s.sessionStatus);
   const onlinePlayers = useGameplayStore((s) => s.onlinePlayers);
   const isGM = useGameplayStore((s) => s.isGM);
+  const openSettingsModal = useGameplayStore((s) => s.openSettingsModal);
 
   const onlineCount = onlinePlayers.filter((p) => p.isOnline).length;
 
@@ -96,6 +98,8 @@ function TopBarInner() {
             </Text>
           </XStack>
         )}
+
+        <PhaseBadge />
       </XStack>
 
       {/* Right: Player count + GM settings */}
@@ -107,17 +111,16 @@ function TopBarInner() {
           </Text>
         </XStack>
 
-        {isGM && (
-          <Stack
-            width={36}
-            height={36}
-            alignItems="center"
-            justifyContent="center"
-            pressStyle={{ opacity: 0.6 }}
-          >
-            <Settings size={16} color="#5A5A6E" />
-          </Stack>
-        )}
+        <Stack
+          width={36}
+          height={36}
+          alignItems="center"
+          justifyContent="center"
+          pressStyle={{ opacity: 0.6 }}
+          onPress={openSettingsModal}
+        >
+          <Settings size={16} color="#5A5A6E" />
+        </Stack>
       </XStack>
     </XStack>
   );

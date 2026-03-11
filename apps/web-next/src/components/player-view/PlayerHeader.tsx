@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Volume2,
   VolumeX,
   User,
   LogOut,
+  Map,
   Radio,
   ChevronDown,
   Swords,
@@ -19,13 +20,14 @@ export function PlayerHeader() {
   const soundtrack = usePlayerViewStore((s) => s.soundtrack);
   const toggleMute = usePlayerViewStore((s) => s.toggleMute);
   const connected = usePlayerViewStore((s) => s.connected);
+  const activeMapName = usePlayerViewStore((s) => s.activeMapName);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const elapsed = useMemo(
-    () => getElapsedTime(MOCK_SESSION.startedAt),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Math.floor(Date.now() / 60000)],
-  );
+  const [elapsed, setElapsed] = useState(() => getElapsedTime(MOCK_SESSION.startedAt));
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(getElapsedTime(MOCK_SESSION.startedAt)), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const characterName = myToken?.name ?? playerName ?? "Jogador";
 
@@ -62,6 +64,16 @@ export function PlayerHeader() {
             {elapsed}
           </span>
         </div>
+
+        {/* Current map indicator */}
+        {activeMapName && (
+          <div className="hidden items-center gap-1.5 rounded-md bg-brand-accent/10 px-2 py-0.5 sm:flex">
+            <Map className="h-3 w-3 text-brand-accent/70" />
+            <span className="max-w-[140px] truncate text-[11px] font-medium text-brand-accent/70">
+              {activeMapName}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Spacer */}

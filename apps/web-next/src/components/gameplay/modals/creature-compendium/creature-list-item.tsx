@@ -1,6 +1,62 @@
 "use client";
 
-import { Star } from "lucide-react";
+import {
+  Star,
+  User,
+  Swords,
+  Eye,
+  Shield,
+  Footprints,
+  Sword,
+  Bone,
+  Skull,
+  PawPrint,
+  Axe,
+  ShieldAlert,
+  EyeOff,
+  Ghost,
+  Bug,
+  Crown,
+  Hammer,
+  Box,
+  Bird,
+  Target,
+  ShieldCheck,
+  HeartPulse,
+  Sparkles,
+  Brain,
+  Crosshair,
+  Flame,
+  type LucideIcon,
+} from "lucide-react";
+
+const CREATURE_ICONS: Record<string, LucideIcon> = {
+  user: User,
+  swords: Swords,
+  eye: Eye,
+  shield: Shield,
+  footprints: Footprints,
+  sword: Sword,
+  bone: Bone,
+  skull: Skull,
+  "paw-print": PawPrint,
+  axe: Axe,
+  "shield-alert": ShieldAlert,
+  "eye-off": EyeOff,
+  ghost: Ghost,
+  bug: Bug,
+  crown: Crown,
+  hammer: Hammer,
+  box: Box,
+  bird: Bird,
+  target: Target,
+  "shield-check": ShieldCheck,
+  "heart-pulse": HeartPulse,
+  sparkles: Sparkles,
+  brain: Brain,
+  crosshair: Crosshair,
+  flame: Flame,
+};
 import {
   getCRColor,
   CREATURE_TYPE_LABELS,
@@ -38,6 +94,8 @@ export function CreatureListItem({
   const sizeLabel = CREATURE_SIZE_LABELS[creature.size];
   const sizeAbbr = SIZE_ABBREVIATIONS[sizeLabel] ?? sizeLabel;
 
+  const IconComponent = CREATURE_ICONS[creature.icon] ?? Sword;
+
   return (
     <div className="border-b border-brand-border">
       {/* Row */}
@@ -46,8 +104,11 @@ export function CreatureListItem({
         onClick={onToggleExpand}
       >
         {/* Icon */}
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-base">
-          {creature.icon}
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+          style={{ backgroundColor: creature.color + "18" }}
+        >
+          <IconComponent className="h-4 w-4" style={{ color: creature.color }} />
         </span>
 
         {/* Name */}

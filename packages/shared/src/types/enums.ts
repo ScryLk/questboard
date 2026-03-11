@@ -12,9 +12,11 @@ export enum SessionType {
 
 export enum SessionStatus {
   IDLE = "IDLE",
+  LOBBY = "LOBBY",
   LIVE = "LIVE",
   PAUSED = "PAUSED",
   ENDED = "ENDED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum PlayerRole {
@@ -56,4 +58,29 @@ export enum DiceRollMode {
   PUBLIC = "PUBLIC",
   GM_ONLY = "GM_ONLY",
   SELF = "SELF",
+}
+
+export enum PostType {
+  TEXT = "TEXT",
+  CHARACTER_CARD = "CHARACTER_CARD",
+  SESSION_HIGHLIGHT = "SESSION_HIGHLIGHT",
+  ARTWORK = "ARTWORK",
+  CAMPAIGN_RECRUIT = "CAMPAIGN_RECRUIT",
+  DICE_ROLL = "DICE_ROLL",
+  QUOTE = "QUOTE",
+}
+
+export enum PostVisibility {
+  PUBLIC = "PUBLIC",
+  FOLLOWERS = "FOLLOWERS",
+  CAMPAIGN_ONLY = "CAMPAIGN_ONLY",
+}
+
+export enum ReactionType {
+  EPIC = "EPIC",
+  LORE = "LORE",
+  LAUGH = "LAUGH",
+  RIP = "RIP",
+  HYPE = "HYPE",
+  HEART = "HEART",
 }

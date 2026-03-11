@@ -1,41 +1,57 @@
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { TextInput, StyleSheet, ScrollView } from "react-native";
-import { Clapperboard, BookOpen, MapPin, BookmarkPlus, Send } from "lucide-react-native";
+import {
+  BookmarkPlus,
+  Send,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Play,
+} from "lucide-react-native";
 import { Stack, Text, XStack, YStack } from "tamagui";
 import { SubModalSheet } from "./SubModalSheet";
 import { SceneCardPreview } from "./SceneCardPreview";
 import { useGameplayStore } from "../../../lib/gameplay-store";
-import type { SceneCardData } from "../../../lib/gameplay-store";
+import {
+  SCENE_TYPE_META,
+  SCENE_TYPE_ORDER,
+  DEFAULT_ATMOSPHERE,
+  DEFAULT_TIMING,
+  PARTICLE_OPTIONS,
+  ATMOSPHERE_TAGS,
+} from "../../../constants/sceneConfig";
+import type {
+  SceneType,
+  SceneCard,
+  ParticleEffect,
+} from "../../../types/scene";
 
-type SceneVariant = SceneCardData["variant"];
-
-const VARIANT_OPTIONS: {
-  key: SceneVariant;
-  label: string;
-  Icon: typeof Clapperboard;
-}[] = [
-  { key: "cinematic", label: "Cinemático", Icon: Clapperboard },
-  { key: "title", label: "Capítulo", Icon: BookOpen },
-  { key: "location", label: "Locação", Icon: MapPin },
-];
-
-const ATMOSPHERE_TAGS = [
-  "Névoa", "Escuridão", "Frio", "Calor", "Chuva", "Vento",
-  "Silêncio", "Sons de batalha", "Música distante", "Gritos",
-  "Cheiro de morte", "Flores", "Pó", "Maresia",
-];
+// ─── Component ──────────────────────────────────────────
 
 function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
   const closeGMToolView = useGameplayStore((s) => s.closeGMToolView);
   const showSceneCard = useGameplayStore((s) => s.showSceneCard);
   const saveSceneCardDraft = useGameplayStore((s) => s.saveSceneCardDraft);
   const sceneCardDrafts = useGameplayStore((s) => s.sceneCardDrafts);
+  const sceneHistory = useGameplayStore((s) => s.sceneHistory);
+  const reshowScene = useGameplayStore((s) => s.reshowScene);
 
-  const [variant, setVariant] = useState<SceneVariant>("cinematic");
+  const [sceneType, setSceneType] = useState<SceneType>("cinematic");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [chapter, setChapter] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [particles, setParticles] = useState<ParticleEffect | null>(null);
+  const [holdDuration, setHoldDuration] = useState(5);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Reset defaults when type changes
+  useEffect(() => {
+    const atm = DEFAULT_ATMOSPHERE[sceneType];
+    const tim = DEFAULT_TIMING[sceneType];
+    setParticles(atm.particles);
+    setHoldDuration(tim.holdDuration);
+  }, [sceneType]);
 
   const handleDismiss = useCallback(() => {
     useGameplayStore.setState({ activeGMToolView: null });
@@ -48,15 +64,26 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
     setSelectedTags([]);
   }, []);
 
-  const buildCard = useCallback((): SceneCardData => {
+  const buildCard = useCallback((): SceneCard => {
     return {
-      variant,
+      id: `scene-${Date.now()}`,
+      type: sceneType,
       title: title.trim(),
       subtitle: subtitle.trim() || undefined,
       chapter: chapter.trim() || undefined,
-      details: selectedTags.length > 0 ? selectedTags : undefined,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
+      atmosphere: {
+        ...DEFAULT_ATMOSPHERE[sceneType],
+        particles,
+      },
+      timing: {
+        ...DEFAULT_TIMING[sceneType],
+        holdDuration,
+      },
+      reactions: [],
+      createdAt: new Date(),
     };
-  }, [variant, title, subtitle, chapter, selectedTags]);
+  }, [sceneType, title, subtitle, chapter, selectedTags, particles, holdDuration]);
 
   const handleSend = useCallback(() => {
     if (!title.trim()) return;
@@ -67,10 +94,19 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
 
   const handleSaveDraft = useCallback(() => {
     if (!title.trim()) return;
+    const card = buildCard();
     saveSceneCardDraft({
       id: `draft-${Date.now()}`,
       label: title.trim().slice(0, 20),
-      card: buildCard(),
+      card: {
+        type: card.type,
+        title: card.title,
+        subtitle: card.subtitle,
+        chapter: card.chapter,
+        tags: card.tags,
+        atmosphere: card.atmosphere,
+        timing: card.timing,
+      },
     });
   }, [title, buildCard, saveSceneCardDraft]);
 
@@ -78,11 +114,13 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
     (draftId: string) => {
       const draft = sceneCardDrafts.find((d) => d.id === draftId);
       if (!draft) return;
-      setVariant(draft.card.variant);
+      setSceneType(draft.card.type);
       setTitle(draft.card.title);
       setSubtitle(draft.card.subtitle ?? "");
       setChapter(draft.card.chapter ?? "");
-      setSelectedTags(draft.card.details ?? []);
+      setSelectedTags(draft.card.tags ?? []);
+      setParticles(draft.card.atmosphere.particles);
+      setHoldDuration(draft.card.timing.holdDuration);
     },
     [sceneCardDrafts],
   );
@@ -95,12 +133,43 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
     });
   }, []);
 
-  const previewCard = { variant, title, subtitle, chapter, details: selectedTags };
+  const previewCard = {
+    type: sceneType,
+    title,
+    subtitle,
+    chapter,
+    tags: selectedTags,
+    atmosphere: { ...DEFAULT_ATMOSPHERE[sceneType], particles },
+    timing: { ...DEFAULT_TIMING[sceneType], holdDuration },
+  };
+
+  const showTags = sceneType === "location" || sceneType === "weather";
+
+  // Placeholders per type
+  const titlePlaceholder: Record<SceneType, string> = {
+    cinematic: "Título dramático...",
+    chapter: "Título do capítulo...",
+    location: "Nome da locação...",
+    mystery: "O que se revela...",
+    danger: "EMBOSCADA! / ARMADILHA!...",
+    flashback: "Três anos antes...",
+    weather: "TEMPESTADE SE APROXIMA...",
+  };
+
+  const subtitlePlaceholder: Record<SceneType, string> = {
+    cinematic: "Narração curta...",
+    chapter: "Subtítulo do capítulo...",
+    location: "Uma floresta densa e sombria...",
+    mystery: "Descrição do mistério...",
+    danger: "O que está acontecendo...",
+    flashback: "A memória que retorna...",
+    weather: "+2 dificuldade em percepção...",
+  };
 
   return (
     <SubModalSheet
       isOpen={isOpen}
-      snapPoints={["45%", "75%"]}
+      snapPoints={["55%", "92%"]}
       title="Nova Cena"
       onBack={closeGMToolView}
       onDismiss={handleDismiss}
@@ -138,7 +207,7 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
             <XStack alignItems="center" gap={6}>
               <Send size={14} color="white" />
               <Text fontSize={13} fontWeight="600" color="white">
-                Enviar para Todos
+                Disparar para Todos
               </Text>
             </XStack>
           </Stack>
@@ -148,10 +217,7 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
       <YStack gap={16}>
         {/* Draft pills */}
         {sceneCardDrafts.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <XStack gap={6}>
               {sceneCardDrafts.map((draft) => (
                 <Stack
@@ -174,38 +240,45 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
           </ScrollView>
         )}
 
-        {/* Variant selector */}
-        <XStack gap={8} justifyContent="center">
-          {VARIANT_OPTIONS.map((opt) => {
-            const isActive = variant === opt.key;
-            return (
-              <Stack
-                key={opt.key}
-                width={100}
-                height={80}
-                borderRadius={12}
-                backgroundColor={isActive ? "rgba(108, 92, 231, 0.1)" : "#1C1C24"}
-                borderWidth={1}
-                borderColor={isActive ? "#6C5CE7" : "#2A2A35"}
-                alignItems="center"
-                justifyContent="center"
-                gap={6}
-                pressStyle={{ opacity: 0.7 }}
-                onPress={() => setVariant(opt.key)}
-              >
-                <opt.Icon size={24} color={isActive ? "#6C5CE7" : "#9090A0"} />
-                <Text fontSize={11} color={isActive ? "#6C5CE7" : "#9090A0"}>
-                  {opt.label}
-                </Text>
-              </Stack>
-            );
-          })}
-        </XStack>
+        {/* Type selector — 2 rows */}
+        <YStack gap={8}>
+          <XStack gap={8} justifyContent="center" flexWrap="wrap">
+            {SCENE_TYPE_ORDER.map((type) => {
+              const meta = SCENE_TYPE_META[type];
+              const isActive = sceneType === type;
+              const Icon = meta.icon;
+              return (
+                <Stack
+                  key={type}
+                  width={75}
+                  height={70}
+                  borderRadius={12}
+                  backgroundColor={isActive ? meta.bgColor : "#1C1C24"}
+                  borderWidth={1}
+                  borderColor={isActive ? meta.color : "#2A2A35"}
+                  alignItems="center"
+                  justifyContent="center"
+                  gap={4}
+                  pressStyle={{ opacity: 0.7 }}
+                  onPress={() => setSceneType(type)}
+                >
+                  <Icon size={20} color={isActive ? meta.color : "#9090A0"} />
+                  <Text
+                    fontSize={9}
+                    fontWeight="600"
+                    color={isActive ? meta.color : "#9090A0"}
+                    textAlign="center"
+                  >
+                    {meta.label}
+                  </Text>
+                </Stack>
+              );
+            })}
+          </XStack>
+        </YStack>
 
-        {/* Dynamic fields based on variant */}
-
-        {/* Chapter number (title variant) */}
-        {variant === "title" && (
+        {/* Chapter number (chapter type only) */}
+        {sceneType === "chapter" && (
           <YStack gap={6}>
             <Text fontSize={12} fontWeight="600" color="#9090A0">
               Número do capítulo
@@ -229,7 +302,7 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
           </YStack>
         )}
 
-        {/* Title (all variants) */}
+        {/* Title (all types) */}
         <YStack gap={6}>
           <Text fontSize={12} fontWeight="600" color="#9090A0">
             Título
@@ -245,11 +318,7 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder={
-                variant === "cinematic" ? "Título dramático..." :
-                variant === "title" ? "Título do capítulo..." :
-                "Nome da locação..."
-              }
+              placeholder={titlePlaceholder[sceneType]}
               placeholderTextColor="#5A5A6E"
               style={styles.input}
               maxLength={60}
@@ -257,39 +326,130 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
           </Stack>
         </YStack>
 
-        {/* Subtitle (cinematic + title variants) */}
-        {(variant === "cinematic" || variant === "title" || variant === "location") && (
-          <YStack gap={6}>
-            <Text fontSize={12} fontWeight="600" color="#9090A0">
-              {variant === "location" ? "Descrição" : "Subtítulo"}
-            </Text>
-            <Stack
-              backgroundColor="#0F0F12"
-              borderRadius={8}
-              borderWidth={1}
-              borderColor="#2A2A35"
-              paddingHorizontal={12}
-              paddingVertical={10}
-            >
-              <TextInput
-                value={subtitle}
-                onChangeText={setSubtitle}
-                placeholder={
-                  variant === "location"
-                    ? "Uma floresta densa e sombria..."
-                    : "Narração curta..."
-                }
-                placeholderTextColor="#5A5A6E"
-                style={[styles.input, { minHeight: 40, textAlignVertical: "top" }]}
-                multiline
-                maxLength={200}
-              />
-            </Stack>
-          </YStack>
-        )}
+        {/* Subtitle / Description */}
+        <YStack gap={6}>
+          <Text fontSize={12} fontWeight="600" color="#9090A0">
+            {sceneType === "location" || sceneType === "weather"
+              ? "Descrição"
+              : "Subtítulo"}
+          </Text>
+          <Stack
+            backgroundColor="#0F0F12"
+            borderRadius={8}
+            borderWidth={1}
+            borderColor="#2A2A35"
+            paddingHorizontal={12}
+            paddingVertical={10}
+          >
+            <TextInput
+              value={subtitle}
+              onChangeText={setSubtitle}
+              placeholder={subtitlePlaceholder[sceneType]}
+              placeholderTextColor="#5A5A6E"
+              style={[styles.input, { minHeight: 40, textAlignVertical: "top" }]}
+              multiline
+              maxLength={200}
+            />
+          </Stack>
+        </YStack>
 
-        {/* Atmosphere tags (location variant) */}
-        {variant === "location" && (
+        {/* Particle picker */}
+        <YStack gap={6}>
+          <Text fontSize={12} fontWeight="600" color="#9090A0">
+            Partículas
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap={6}>
+              {PARTICLE_OPTIONS.map((opt) => {
+                const isActive =
+                  opt.key === "none" ? particles === null : particles === opt.key;
+                return (
+                  <Stack
+                    key={opt.key}
+                    paddingHorizontal={12}
+                    paddingVertical={6}
+                    borderRadius={8}
+                    backgroundColor={
+                      isActive
+                        ? `${SCENE_TYPE_META[sceneType].color}20`
+                        : "#1C1C24"
+                    }
+                    borderWidth={1}
+                    borderColor={
+                      isActive ? SCENE_TYPE_META[sceneType].color : "#2A2A35"
+                    }
+                    pressStyle={{ opacity: 0.7 }}
+                    onPress={() =>
+                      setParticles(opt.key === "none" ? null : opt.key)
+                    }
+                  >
+                    <Text
+                      fontSize={11}
+                      color={
+                        isActive ? SCENE_TYPE_META[sceneType].color : "#5A5A6E"
+                      }
+                    >
+                      {opt.label}
+                    </Text>
+                  </Stack>
+                );
+              })}
+            </XStack>
+          </ScrollView>
+        </YStack>
+
+        {/* Timing */}
+        <YStack gap={6}>
+          <XStack justifyContent="space-between" alignItems="center">
+            <Text fontSize={12} fontWeight="600" color="#9090A0">
+              Duração
+            </Text>
+            <Text fontSize={10} color="#5A5A6E">
+              {DEFAULT_TIMING[sceneType].autoDismiss
+                ? "Auto-dismiss"
+                : "Manual (GM encerra)"}
+            </Text>
+          </XStack>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap={6}>
+              {[3, 4, 5, 6, 7, 8, 10, 12, 15].map((sec) => {
+                const isActive = holdDuration === sec;
+                return (
+                  <Stack
+                    key={sec}
+                    paddingHorizontal={12}
+                    paddingVertical={6}
+                    borderRadius={8}
+                    backgroundColor={
+                      isActive
+                        ? `${SCENE_TYPE_META[sceneType].color}20`
+                        : "#1C1C24"
+                    }
+                    borderWidth={1}
+                    borderColor={
+                      isActive ? SCENE_TYPE_META[sceneType].color : "#2A2A35"
+                    }
+                    pressStyle={{ opacity: 0.7 }}
+                    onPress={() => setHoldDuration(sec)}
+                  >
+                    <Text
+                      fontSize={12}
+                      fontWeight="600"
+                      color={
+                        isActive ? SCENE_TYPE_META[sceneType].color : "#5A5A6E"
+                      }
+                    >
+                      {sec}s
+                    </Text>
+                  </Stack>
+                );
+              })}
+            </XStack>
+          </ScrollView>
+        </YStack>
+
+        {/* Atmosphere tags (location & weather) */}
+        {showTags && (
           <YStack gap={6}>
             <Text fontSize={12} fontWeight="600" color="#9090A0">
               Tags atmosféricas (max 4)
@@ -303,15 +463,23 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
                     paddingHorizontal={10}
                     paddingVertical={5}
                     borderRadius={6}
-                    backgroundColor={isActive ? "rgba(108, 92, 231, 0.15)" : "#1C1C24"}
+                    backgroundColor={
+                      isActive
+                        ? `${SCENE_TYPE_META[sceneType].color}20`
+                        : "#1C1C24"
+                    }
                     borderWidth={1}
-                    borderColor={isActive ? "#6C5CE7" : "#2A2A35"}
+                    borderColor={
+                      isActive ? SCENE_TYPE_META[sceneType].color : "#2A2A35"
+                    }
                     pressStyle={{ opacity: 0.7 }}
                     onPress={() => toggleTag(tag)}
                   >
                     <Text
                       fontSize={11}
-                      color={isActive ? "#6C5CE7" : "#5A5A6E"}
+                      color={
+                        isActive ? SCENE_TYPE_META[sceneType].color : "#5A5A6E"
+                      }
                     >
                       {tag}
                     </Text>
@@ -322,13 +490,128 @@ function SceneCardModalInner({ isOpen }: { isOpen: boolean }) {
           </YStack>
         )}
 
-        {/* Preview */}
+        {/* Preview + Test button */}
         <YStack gap={6}>
-          <Text fontSize={12} fontWeight="600" color="#9090A0">
-            Preview
-          </Text>
+          <XStack justifyContent="space-between" alignItems="center">
+            <Text fontSize={12} fontWeight="600" color="#9090A0">
+              Preview
+            </Text>
+            {title.trim() ? (
+              <Stack
+                paddingHorizontal={10}
+                paddingVertical={5}
+                borderRadius={8}
+                backgroundColor={`${SCENE_TYPE_META[sceneType].color}20`}
+                borderWidth={1}
+                borderColor={`${SCENE_TYPE_META[sceneType].color}60`}
+                pressStyle={{ opacity: 0.7 }}
+                onPress={() => {
+                  showSceneCard(buildCard());
+                }}
+              >
+                <XStack alignItems="center" gap={4}>
+                  <Play size={10} color={SCENE_TYPE_META[sceneType].color} />
+                  <Text
+                    fontSize={11}
+                    fontWeight="600"
+                    color={SCENE_TYPE_META[sceneType].color}
+                  >
+                    Testar Agora
+                  </Text>
+                </XStack>
+              </Stack>
+            ) : null}
+          </XStack>
           <SceneCardPreview card={previewCard} />
         </YStack>
+
+        {/* Scene History */}
+        {sceneHistory.length > 0 && (
+          <YStack gap={8}>
+            <Stack
+              pressStyle={{ opacity: 0.7 }}
+              onPress={() => setShowHistory(!showHistory)}
+            >
+              <XStack alignItems="center" justifyContent="space-between">
+                <Text fontSize={12} fontWeight="600" color="#9090A0">
+                  Cenas anteriores ({sceneHistory.length})
+                </Text>
+                {showHistory ? (
+                  <ChevronUp size={14} color="#9090A0" />
+                ) : (
+                  <ChevronDown size={14} color="#9090A0" />
+                )}
+              </XStack>
+            </Stack>
+
+            {showHistory && (
+              <YStack gap={6}>
+                {sceneHistory
+                  .slice()
+                  .reverse()
+                  .map((scene) => {
+                    const meta = SCENE_TYPE_META[scene.type];
+                    const Icon = meta.icon;
+                    const reactionCount = scene.reactions.length;
+                    return (
+                      <XStack
+                        key={scene.id}
+                        backgroundColor="#1C1C24"
+                        borderRadius={8}
+                        paddingHorizontal={10}
+                        paddingVertical={8}
+                        alignItems="center"
+                        gap={8}
+                      >
+                        <Stack
+                          width={28}
+                          height={28}
+                          borderRadius={6}
+                          backgroundColor={meta.bgColor}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon size={14} color={meta.color} />
+                        </Stack>
+                        <YStack flex={1} gap={2}>
+                          <Text
+                            fontSize={12}
+                            fontWeight="600"
+                            color="#E8E8ED"
+                            numberOfLines={1}
+                          >
+                            {scene.title}
+                          </Text>
+                          <Text fontSize={10} color="#5A5A6E">
+                            {meta.label}
+                            {reactionCount > 0 && ` · ${reactionCount} reações`}
+                          </Text>
+                        </YStack>
+                        <Stack
+                          paddingHorizontal={8}
+                          paddingVertical={4}
+                          borderRadius={6}
+                          backgroundColor="#0F0F12"
+                          pressStyle={{ opacity: 0.7 }}
+                          onPress={() => {
+                            reshowScene(scene.id);
+                            useGameplayStore.setState({ activeGMToolView: null });
+                          }}
+                        >
+                          <XStack alignItems="center" gap={4}>
+                            <RotateCcw size={10} color="#9090A0" />
+                            <Text fontSize={10} color="#9090A0">
+                              Redisparar
+                            </Text>
+                          </XStack>
+                        </Stack>
+                      </XStack>
+                    );
+                  })}
+              </YStack>
+            )}
+          </YStack>
+        )}
       </YStack>
     </SubModalSheet>
   );

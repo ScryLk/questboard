@@ -1,0 +1,43 @@
+/* ── React Flow Dark Theme Overrides ── */
+
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-node-border-radius: 8px;
+  --xy-node-color: #e8e8ed;
+  --xy-node-background-color: transparent;
+  --xy-node-border: none;
+  --xy-node-boxshadow-hover: 0 0 0 1px #6c5ce7;
+  --xy-node-boxshadow-selected: 0 0 0 2px #6c5ce7;
+  --xy-edge-stroke: #9090a0;
+  --xy-edge-stroke-selected: #6c5ce7;
+  --xy-edge-stroke-width: 2;
+  --xy-handle-background-color: #6c5ce7;
+  --xy-handle-border-color: #111116;
+  --xy-minimap-background: #111116;
+  --xy-minimap-mask-background: rgba(10, 10, 15, 0.7);
+  --xy-controls-button-background-color: #1a1a24;
+  --xy-controls-button-background-color-hover: #2a2a3a;
+  --xy-controls-button-color: #e8e8ed;
+  --xy-controls-button-border-color: #1e1e2a;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* Active edge animation */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.narrative-edge-active {
+  stroke-dasharray: 10 5;
+  animation: dash-flow 1.5s linear infinite;
+}
+
+/* MiniMap node colors */
+.react-flow__minimap-node {
+  fill: #3a3a5a;
+}

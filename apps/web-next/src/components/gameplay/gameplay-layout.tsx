@@ -12,12 +12,24 @@ import { GameplayToolbar } from "./toolbar/gameplay-toolbar";
 import { AoeShapePicker } from "./toolbar/aoe-shape-picker";
 import { DrawToolPicker } from "./toolbar/draw-tool-picker";
 import { FogToolPicker } from "./toolbar/fog-tool-picker";
+import { TerrainToolPicker } from "./toolbar/terrain-tool-picker";
+import { WallToolPicker } from "./toolbar/wall-tool-picker";
+import { ObjectToolPicker } from "./toolbar/object-tool-picker";
+import { GridAlignmentPanel } from "./toolbar/grid-alignment-panel";
 import { VisionPanel } from "./toolbar/vision-panel";
 import { LeftPanel } from "./left-panel/left-panel";
 import { RightPanel } from "./right-panel/right-panel";
 import { MapCanvas } from "./map-canvas/map-canvas";
 import { ResizableDivider } from "./shared/resizable-divider";
 import { GameplayModals } from "./modals/gameplay-modals";
+import { ActionBar } from "./action-bar/action-bar";
+import { GameTooltip } from "@/components/ui/game-tooltip";
+import { OAAlertVignette } from "./effects/oa-alert-vignette";
+import { PhaseModal } from "./PhaseModal";
+import { SceneCardIndicator } from "./toolbar/scene-card-indicator";
+import { AIGenerationPanel } from "./ai-generation-panel";
+import { SFXProvider } from "./audio/sfx-provider";
+
 
 export function GameplayLayout() {
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
@@ -28,8 +40,10 @@ export function GameplayLayout() {
   const toggleRightPanel = useGameplayStore((s) => s.toggleRightPanel);
   const setLeftPanelWidth = useGameplayStore((s) => s.setLeftPanelWidth);
   const setRightPanelWidth = useGameplayStore((s) => s.setRightPanelWidth);
+  const pendingReaction = useGameplayStore((s) => s.pendingReaction);
 
   return (
+    <SFXProvider>
     <div
       className="bg-[#0A0A0F]"
       style={{
@@ -45,10 +59,17 @@ export function GameplayLayout() {
         <GameplayToolbar session={MOCK_SESSION} />
       </div>
 
+      {/* Scene card active indicator */}
+      <SceneCardIndicator />
+
       {/* Floating pickers — at root level so overflow:hidden doesn't clip them */}
       <AoeShapePicker />
       <DrawToolPicker />
       <FogToolPicker />
+      <TerrainToolPicker />
+      <WallToolPicker />
+      <ObjectToolPicker />
+      <GridAlignmentPanel />
       <VisionPanel />
 
       {/* Main content: 3-panel layout */}
@@ -71,18 +92,19 @@ export function GameplayLayout() {
         )}
 
         {/* Left collapse toggle */}
-        <button
-          onClick={toggleLeftPanel}
-          className="flex items-center justify-center border-r border-brand-border bg-[#0D0D12] text-brand-muted transition-colors hover:bg-white/[0.03] hover:text-brand-text"
-          style={{ width: 20, flexShrink: 0 }}
-          title={leftPanelOpen ? "Fechar painel" : "Abrir painel"}
-        >
-          {leftPanelOpen ? (
-            <PanelLeftClose className="h-3.5 w-3.5" />
-          ) : (
-            <PanelLeftOpen className="h-3.5 w-3.5" />
-          )}
-        </button>
+        <GameTooltip label={leftPanelOpen ? "Recolher" : "Expandir"} side="right">
+          <button
+            onClick={toggleLeftPanel}
+            className="flex items-center justify-center border-r border-brand-border bg-[#0D0D12] text-brand-muted transition-colors hover:bg-white/[0.03] hover:text-brand-text"
+            style={{ width: 20, flexShrink: 0 }}
+          >
+            {leftPanelOpen ? (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </GameTooltip>
 
         {/* Left resizable divider */}
         {leftPanelOpen && (
@@ -98,18 +120,19 @@ export function GameplayLayout() {
         )}
 
         {/* Right collapse toggle */}
-        <button
-          onClick={toggleRightPanel}
-          className="flex items-center justify-center border-l border-brand-border bg-[#0D0D12] text-brand-muted transition-colors hover:bg-white/[0.03] hover:text-brand-text"
-          style={{ width: 20, flexShrink: 0 }}
-          title={rightPanelOpen ? "Fechar painel" : "Abrir painel"}
-        >
-          {rightPanelOpen ? (
-            <PanelRightClose className="h-3.5 w-3.5" />
-          ) : (
-            <PanelRightOpen className="h-3.5 w-3.5" />
-          )}
-        </button>
+        <GameTooltip label={rightPanelOpen ? "Recolher" : "Expandir"} side="left">
+          <button
+            onClick={toggleRightPanel}
+            className="flex items-center justify-center border-l border-brand-border bg-[#0D0D12] text-brand-muted transition-colors hover:bg-white/[0.03] hover:text-brand-text"
+            style={{ width: 20, flexShrink: 0 }}
+          >
+            {rightPanelOpen ? (
+              <PanelRightClose className="h-3.5 w-3.5" />
+            ) : (
+              <PanelRightOpen className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </GameTooltip>
 
         {/* Right panel */}
         {rightPanelOpen && (
@@ -128,8 +151,21 @@ export function GameplayLayout() {
         )}
       </div>
 
+      {/* Action Bar — combat turn controls */}
+      <ActionBar />
+
       {/* Modals */}
       <GameplayModals />
+
+      {/* Phase side panel */}
+      <PhaseModal />
+
+      {/* AI Generation Panel */}
+      <AIGenerationPanel />
+
+      {/* OA dramatic vignette */}
+      <OAAlertVignette active={pendingReaction !== null} />
     </div>
+    </SFXProvider>
   );
 }
