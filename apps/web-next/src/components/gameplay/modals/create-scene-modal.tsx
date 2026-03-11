@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Image, Upload, X } from "lucide-react";
+import { Image, Map, Upload, X } from "lucide-react";
 import { ModalShell } from "./modal-shell";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { MOCK_SESSION_MAPS } from "@/lib/gameplay-mock-data";
 
 interface CreateSceneModalProps {
   onClose: () => void;
@@ -23,6 +24,7 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   const [cellSize, setCellSize] = useState("40");
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const setMapBackgroundImage = useGameplayStore(
@@ -176,10 +178,57 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
         )}
       </div>
 
-      {/* Preset maps */}
+      {/* Session maps */}
+      {MOCK_SESSION_MAPS.length > 0 && (
+        <div className="mb-4">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
+            Mapas da Sessao
+          </label>
+          <div className="grid max-h-[180px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+            {MOCK_SESSION_MAPS.map((map) => {
+              const isSelected = selectedMapId === map.id;
+              return (
+                <button
+                  key={map.id}
+                  onClick={() => {
+                    setName(map.name);
+                    setCols(String(map.gridCols));
+                    setRows(String(map.gridRows));
+                    setSelectedMapId(map.id);
+                  }}
+                  className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition-colors ${
+                    isSelected
+                      ? "border-brand-accent/60 bg-brand-accent/10"
+                      : "border-brand-border bg-brand-primary hover:border-brand-accent/30"
+                  }`}
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
+                    <Map className="h-4 w-4 text-brand-muted" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-brand-text">
+                      {map.name}
+                    </p>
+                    <p className="text-[10px] text-brand-muted">
+                      {map.gridCols}x{map.gridRows} · {map.category}
+                    </p>
+                  </div>
+                  {map.isActive && (
+                    <span className="ml-auto shrink-0 rounded-full bg-brand-success/15 px-1.5 py-0.5 text-[9px] font-medium text-brand-success">
+                      Ativo
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Preset templates */}
       <div className="mb-5">
         <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-          Mapas prontos
+          Templates
         </label>
         <div className="grid grid-cols-2 gap-2">
           {PRESET_MAPS.map((map) => (
@@ -190,6 +239,7 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
                 const [c, r] = map.size.split("x");
                 setCols(c);
                 setRows(r);
+                setSelectedMapId(null);
               }}
               className="flex items-center gap-2 rounded-lg border border-brand-border bg-brand-primary p-2.5 text-left transition-colors hover:border-brand-accent/50"
             >

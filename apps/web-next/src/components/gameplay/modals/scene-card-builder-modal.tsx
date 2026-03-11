@@ -7,12 +7,15 @@ import {
   Clapperboard,
   CloudRain,
   Film,
+  Map,
   MapPin,
   Play,
   Search,
+  X,
 } from "lucide-react";
 import { ModalShell } from "./modal-shell";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { MOCK_SESSION_MAPS } from "@/lib/gameplay-mock-data";
 import type { SceneCardStyle, SceneCard } from "@/lib/player-view-store";
 
 interface SceneCardBuilderModalProps {
@@ -52,6 +55,13 @@ export function SceneCardBuilderModal({ onClose }: SceneCardBuilderModalProps) {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(5);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [linkedMapId, setLinkedMapId] = useState<string | null>(null);
+  const [autoSwitchMap, setAutoSwitchMap] = useState(true);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+
+  const linkedMap = linkedMapId
+    ? MOCK_SESSION_MAPS.find((m) => m.id === linkedMapId) ?? null
+    : null;
 
   const activeConfig = SCENE_TYPES.find((t) => t.type === sceneType)!;
 
@@ -70,8 +80,11 @@ export function SceneCardBuilderModal({ onClose }: SceneCardBuilderModalProps) {
       duration: duration * 1000,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
       chapter: chapter.trim() || undefined,
+      linkedMapId: linkedMapId ?? undefined,
+      linkedMapName: linkedMap?.name,
+      autoSwitchMap,
     };
-  }, [sceneType, title, subtitle, description, duration, selectedTags, chapter]);
+  }, [sceneType, title, subtitle, description, duration, selectedTags, chapter, linkedMapId, linkedMap, autoSwitchMap]);
 
   const handleFire = () => {
     const card = buildCard();
@@ -253,6 +266,93 @@ export function SceneCardBuilderModal({ onClose }: SceneCardBuilderModalProps) {
           </button>
         </div>
         <ScenePreview type={sceneType} title={title} subtitle={subtitle} chapter={chapter} color={activeConfig.color} />
+      </div>
+
+      {/* Mapa Vinculado */}
+      <div className="mb-5">
+        <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
+          Mapa Vinculado (opcional)
+        </label>
+
+        {linkedMap ? (
+          <div className="flex items-center gap-3 rounded-lg border border-brand-accent/30 bg-brand-accent/5 p-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
+              <Map className="h-4 w-4 text-brand-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-brand-text">
+                {linkedMap.name}
+              </p>
+              <p className="text-[10px] text-brand-muted">
+                {linkedMap.gridCols}x{linkedMap.gridRows} · {linkedMap.category}
+              </p>
+            </div>
+            <button
+              onClick={() => setLinkedMapId(null)}
+              className="shrink-0 rounded-md p-1 text-brand-muted transition-colors hover:bg-white/10 hover:text-brand-text"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMapPicker((v) => !v)}
+            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-brand-border px-3 py-2.5 text-xs text-brand-muted transition-colors hover:border-brand-accent/50 hover:text-brand-text"
+          >
+            <Map className="h-4 w-4" />
+            Selecionar mapa da sessao
+          </button>
+        )}
+
+        {/* Auto-switch toggle */}
+        {linkedMap && (
+          <label className="mt-2 flex cursor-pointer items-center gap-2">
+            <button
+              onClick={() => setAutoSwitchMap((v) => !v)}
+              className="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+              style={{
+                backgroundColor: autoSwitchMap ? activeConfig.color : "rgba(255,255,255,0.1)",
+              }}
+            >
+              <span
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform"
+                style={{ left: autoSwitchMap ? 18 : 2 }}
+              />
+            </button>
+            <span className="text-[11px] text-brand-muted">
+              Trocar mapa dos jogadores ao disparar
+            </span>
+          </label>
+        )}
+
+        {/* Map picker dropdown */}
+        {showMapPicker && !linkedMap && (
+          <div className="mt-2 max-h-[160px] space-y-1 overflow-y-auto rounded-lg border border-brand-border bg-brand-primary p-1.5">
+            {MOCK_SESSION_MAPS.map((map) => (
+              <button
+                key={map.id}
+                onClick={() => {
+                  setLinkedMapId(map.id);
+                  setShowMapPicker(false);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-white/[0.06]"
+              >
+                <Map className="h-3.5 w-3.5 shrink-0 text-brand-muted" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs text-brand-text">{map.name}</p>
+                  <p className="text-[10px] text-brand-muted">
+                    {map.gridCols}x{map.gridRows} · {map.category}
+                  </p>
+                </div>
+                {map.isActive && (
+                  <span className="shrink-0 rounded-full bg-brand-success/15 px-1.5 py-0.5 text-[9px] font-medium text-brand-success">
+                    Ativo
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
