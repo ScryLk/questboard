@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { PlayerHeader } from "./PlayerHeader";
 import { PlayerCanvas } from "./PlayerCanvas";
@@ -11,13 +12,24 @@ import { DamageVignette } from "./effects/DamageVignette";
 import { HealGlow } from "./effects/HealGlow";
 import { ScreenShake } from "./effects/ScreenShake";
 import { NatCelebration } from "./effects/NatCelebration";
+import { QuickBar } from "@/app/play/[code]/_components/QuickBar";
+import { WhisperOverlay } from "@/app/play/[code]/_components/WhisperOverlay";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
   const sessionPaused = usePlayerViewStore((s) => s.sessionPaused);
+  const sessionEnded = usePlayerViewStore((s) => s.sessionEnded);
   const activeScene = usePlayerViewStore((s) => s.activeScene);
   const combat = usePlayerViewStore((s) => s.combat);
   const screenShake = usePlayerViewStore((s) => s.screenShake);
+  const pendingWhisper = usePlayerViewStore((s) => s.pendingWhisper);
+
+  // Transition to end screen when session ends
+  useEffect(() => {
+    if (sessionEnded) {
+      usePlayerViewStore.getState().setJoinStep("ended");
+    }
+  }, [sessionEnded]);
 
   return (
     <div
@@ -60,6 +72,11 @@ export function PlayerViewLayout() {
         )}
       </div>
 
+      {/* Quick bar — mobile only, above bottom tabs */}
+      <div className="md:hidden" style={{ flexShrink: 0 }}>
+        <QuickBar />
+      </div>
+
       {/* Mobile bottom tabs */}
       <div className="md:hidden" style={{ flexShrink: 0 }}>
         <MobileBottomTabs />
@@ -69,6 +86,9 @@ export function PlayerViewLayout() {
       <DamageVignette />
       <HealGlow />
       <NatCelebration />
+
+      {/* Whisper overlay */}
+      {pendingWhisper && <WhisperOverlay />}
 
       {/* Modal overlays */}
       {activeScene && <SceneCardOverlay scene={activeScene} />}

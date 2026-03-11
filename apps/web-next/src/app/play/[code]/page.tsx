@@ -4,8 +4,10 @@ import { useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { PlayerViewLayout } from "@/components/player-view/PlayerViewLayout";
-import { WaitingForGM } from "@/components/player-view/connection/WaitingForGM";
 import { BroadcastSync } from "@/components/player-view/connection/BroadcastSync";
+import { JoinScreen } from "./_components/JoinScreen";
+import { LobbyScreen } from "./_components/LobbyScreen";
+import { EndScreen } from "./_components/EndScreen";
 
 export default function PlayerSessionPage() {
   const params = useParams();
@@ -16,26 +18,24 @@ export default function PlayerSessionPage() {
   const joinStep = usePlayerViewStore((s) => s.joinStep);
   const setSessionCode = usePlayerViewStore((s) => s.setSessionCode);
   const setPlayerName = usePlayerViewStore((s) => s.setPlayerName);
-  const setJoinStep = usePlayerViewStore((s) => s.setJoinStep);
-  const setConnected = usePlayerViewStore((s) => s.setConnected);
 
   useEffect(() => {
     setSessionCode(code);
     if (nameParam) {
       setPlayerName(nameParam);
     }
-    // Auto-connect for demo — skip waiting step
-    setJoinStep("playing");
-    setConnected(true);
-  }, [code, nameParam, setSessionCode, setPlayerName, setJoinStep, setConnected]);
+  }, [code, nameParam, setSessionCode, setPlayerName]);
 
   return (
     <>
-      {/* BroadcastChannel sync — always mounted */}
-      <BroadcastSync />
+      {/* BroadcastChannel sync — mounted only during gameplay */}
+      {joinStep === "playing" && <BroadcastSync />}
 
-      {joinStep === "waiting-gm" && <WaitingForGM />}
+      {/* Join flow screens */}
+      {joinStep === "enter-code" && <JoinScreen sessionCode={code} />}
+      {joinStep === "waiting-gm" && <LobbyScreen />}
       {joinStep === "playing" && <PlayerViewLayout />}
+      {joinStep === "ended" && <EndScreen />}
     </>
   );
 }
