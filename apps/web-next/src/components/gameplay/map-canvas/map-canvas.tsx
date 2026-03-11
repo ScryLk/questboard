@@ -43,8 +43,7 @@ import { OAPreviewOverlay } from "./overlays/oa-preview-overlay";
 import { ReactionPrompt } from "./overlays/reaction-prompt";
 import { detectOpportunityAttacks } from "@/lib/reactions";
 import { playOAAlertSound } from "@/lib/oa-alert-sound";
-import { PixiCombatLayer } from "./pixi-combat-layer";
-import { PixiGridLayer } from "./pixi-grid-layer";
+import { PixiCanvas } from "./pixi-canvas";
 import { executeAttackWithAnimation } from "@/lib/animation/attack-with-animation";
 import { PathOverlay } from "./overlays/path-overlay";
 import { PathPreviewPanel } from "./overlays/path-preview-panel";
@@ -64,6 +63,7 @@ import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import { AMBIENT_LIGHT_CONFIG } from "@/lib/map-sidebar-types";
 import type { LayerId } from "@/lib/map-sidebar-types";
 import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
+import { useCameraStore } from "@/lib/camera-store";
 
 export function MapCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
@@ -152,8 +152,13 @@ export function MapCanvas() {
   const canvasH = gridRows * CELL_SIZE;
   const onMapTokens = tokens.filter((t) => t.onMap);
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const reactWorldRef = useRef<HTMLDivElement>(null);
+
+  // Camera state
+  const panX = useCameraStore((s) => s.panX);
+  const panY = useCameraStore((s) => s.panY);
+  const zoom = useCameraStore((s) => s.zoom);
 
   // Drag state
   const dragRef = useRef<{
@@ -199,32 +204,30 @@ export function MapCanvas() {
 
   const getGridCell = useCallback(
     (e: MouseEvent | React.MouseEvent) => {
-      if (!scrollRef.current) return null;
-      const rect = scrollRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current.scrollLeft;
-      const sTop = scrollRef.current.scrollTop;
-      const px = e.clientX - rect.left + sLeft;
-      const py = e.clientY - rect.top + sTop;
+      if (!viewportRef.current) return null;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const worldX = (e.clientX - rect.left - cam.panX) / cam.zoom;
+      const worldY = (e.clientY - rect.top - cam.panY) / cam.zoom;
       return {
-        x: Math.max(0, Math.min(gridCols - 1, Math.floor(px / scaledCell))),
-        y: Math.max(0, Math.min(gridRows - 1, Math.floor(py / scaledCell))),
+        x: Math.max(0, Math.min(gridCols - 1, Math.floor(worldX / CELL_SIZE))),
+        y: Math.max(0, Math.min(gridRows - 1, Math.floor(worldY / CELL_SIZE))),
       };
     },
-    [scaledCell, gridCols, gridRows],
+    [gridCols, gridRows],
   );
 
   // Get nearest wall edge from mouse position (edge-based)
   const getMouseEdge = useCallback(
     (e: MouseEvent | React.MouseEvent): NearestEdge | null => {
-      if (!scrollRef.current) return null;
-      const rect = scrollRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current.scrollLeft;
-      const sTop = scrollRef.current.scrollTop;
-      const px = e.clientX - rect.left + sLeft;
-      const py = e.clientY - rect.top + sTop;
-      return getNearestEdge(px, py, scaledCell, gridCols, gridRows);
+      if (!viewportRef.current) return null;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const px = (e.clientX - rect.left - cam.panX) / cam.zoom;
+      const py = (e.clientY - rect.top - cam.panY) / cam.zoom;
+      return getNearestEdge(px, py, CELL_SIZE, gridCols, gridRows);
     },
-    [scaledCell, gridCols, gridRows],
+    [gridCols, gridRows],
   );
 
   // Region drag
@@ -356,17 +359,18 @@ export function MapCanvas() {
       if (pathPlanningActive) return;
 
       const token = tokens.find((t) => t.id === tokenId);
-      if (!token || !scrollRef.current) return;
-      const rect = scrollRef.current.getBoundingClientRect();
-      const sLeft = scrollRef.current.scrollLeft;
-      const sTop = scrollRef.current.scrollTop;
+      if (!token || !viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const worldX = (e.clientX - rect.left - cam.panX) / cam.zoom;
+      const worldY = (e.clientY - rect.top - cam.panY) / cam.zoom;
 
       dragRef.current = {
         tokenId,
         originX: token.x,
         originY: token.y,
-        offsetX: e.clientX - rect.left + sLeft - token.x * scaledCell,
-        offsetY: e.clientY - rect.top + sTop - token.y * scaledCell,
+        offsetX: worldX - token.x * CELL_SIZE,
+        offsetY: worldY - token.y * CELL_SIZE,
       };
 
       // Clear waypoints at drag start
@@ -376,12 +380,13 @@ export function MapCanvas() {
       let lastDragGridKey = `${token.x},${token.y}`;
 
       function onMove(ev: MouseEvent) {
-        if (!dragRef.current || !scrollRef.current) return;
-        const r = scrollRef.current.getBoundingClientRect();
-        const sl = scrollRef.current.scrollLeft;
-        const st = scrollRef.current.scrollTop;
-        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((ev.clientX - r.left + sl - dragRef.current.offsetX) / scaledCell)));
-        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((ev.clientY - r.top + st - dragRef.current.offsetY) / scaledCell)));
+        if (!dragRef.current || !viewportRef.current) return;
+        const r = viewportRef.current.getBoundingClientRect();
+        const cam = useCameraStore.getState();
+        const wx = (ev.clientX - r.left - cam.panX) / cam.zoom;
+        const wy = (ev.clientY - r.top - cam.panY) / cam.zoom;
+        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((wx - dragRef.current.offsetX) / CELL_SIZE)));
+        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((wy - dragRef.current.offsetY) / CELL_SIZE)));
         setDragPos({ id: dragRef.current.tokenId, x: gx, y: gy });
 
         // Track grid position changes for waypoints
@@ -402,12 +407,13 @@ export function MapCanvas() {
       }
 
       function commit(ev: MouseEvent) {
-        if (!dragRef.current || !scrollRef.current) { done(); return; }
-        const r = scrollRef.current.getBoundingClientRect();
-        const sl = scrollRef.current.scrollLeft;
-        const st = scrollRef.current.scrollTop;
-        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((ev.clientX - r.left + sl - dragRef.current.offsetX) / scaledCell)));
-        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((ev.clientY - r.top + st - dragRef.current.offsetY) / scaledCell)));
+        if (!dragRef.current || !viewportRef.current) { done(); return; }
+        const r = viewportRef.current.getBoundingClientRect();
+        const cam = useCameraStore.getState();
+        const wx = (ev.clientX - r.left - cam.panX) / cam.zoom;
+        const wy = (ev.clientY - r.top - cam.panY) / cam.zoom;
+        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((wx - dragRef.current.offsetX) / CELL_SIZE)));
+        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((wy - dragRef.current.offsetY) / CELL_SIZE)));
         const orig = dragRef.current;
         if (gx !== orig.originX || gy !== orig.originY) {
           // Calculate total distance along waypoints
@@ -469,7 +475,7 @@ export function MapCanvas() {
             if (pendingOAs.length > 0) {
               // Process all OAs sequentially (async, fire-and-forget from mouseup)
               const movedTokenId = orig.tokenId;
-              const canvas = canvasRef.current;
+              const canvas = viewportRef.current;
               (async () => {
                 for (const oa of pendingOAs) {
                   useGameplayStore.getState().setPendingReaction(oa);
@@ -523,6 +529,28 @@ export function MapCanvas() {
   // Canvas mousedown (selection box, ruler, ping, pan)
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Middle-click pan
+      if (e.button === 1) {
+        e.preventDefault();
+        panRef.current = { lastX: e.clientX, lastY: e.clientY };
+        function onPanMove(ev: MouseEvent) {
+          if (!panRef.current) return;
+          const dx = ev.clientX - panRef.current.lastX;
+          const dy = ev.clientY - panRef.current.lastY;
+          useCameraStore.getState().pan(dx, dy);
+          panRef.current = { lastX: ev.clientX, lastY: ev.clientY };
+        }
+        function onPanUp() {
+          panRef.current = null;
+          document.removeEventListener("mousemove", onPanMove);
+          document.removeEventListener("mouseup", onPanUp);
+          document.body.style.cursor = "";
+        }
+        document.addEventListener("mousemove", onPanMove);
+        document.addEventListener("mouseup", onPanUp);
+        document.body.style.cursor = "grabbing";
+        return;
+      }
       if (e.button !== 0) return;
       closeContextMenu();
 
@@ -817,12 +845,11 @@ export function MapCanvas() {
 
       // Draw
       if (activeTool === "draw") {
-        if (!scrollRef.current) return;
-        const rect = scrollRef.current.getBoundingClientRect();
-        const sLeft = scrollRef.current.scrollLeft;
-        const sTop = scrollRef.current.scrollTop;
-        const px = e.clientX - rect.left + sLeft;
-        const py = e.clientY - rect.top + sTop;
+        if (!viewportRef.current) return;
+        const rect = viewportRef.current.getBoundingClientRect();
+        const cam = useCameraStore.getState();
+        const px = (e.clientX - rect.left - cam.panX) / cam.zoom;
+        const py = (e.clientY - rect.top - cam.panY) / cam.zoom;
 
         // If Shift+click, paint terrain instead
         if (e.shiftKey) {
@@ -841,12 +868,11 @@ export function MapCanvas() {
         useGameplayStore.getState().setActiveStroke(stroke);
 
         function onDrawMove(ev: MouseEvent) {
-          if (!scrollRef.current) return;
-          const r = scrollRef.current.getBoundingClientRect();
-          const sl = scrollRef.current.scrollLeft;
-          const st = scrollRef.current.scrollTop;
-          const mx = ev.clientX - r.left + sl;
-          const my = ev.clientY - r.top + st;
+          if (!viewportRef.current) return;
+          const r = viewportRef.current.getBoundingClientRect();
+          const cam = useCameraStore.getState();
+          const mx = (ev.clientX - r.left - cam.panX) / cam.zoom;
+          const my = (ev.clientY - r.top - cam.panY) / cam.zoom;
           const state = useGameplayStore.getState();
           if (!state.activeStroke) return;
           const newPoints = [...state.activeStroke.points, { x: mx, y: my }];
@@ -1021,9 +1047,10 @@ export function MapCanvas() {
       if (activeTool === "pan" || spaceHeld) {
         panRef.current = { lastX: e.clientX, lastY: e.clientY };
         function onPanMove(ev: MouseEvent) {
-          if (!panRef.current || !scrollRef.current) return;
-          scrollRef.current.scrollLeft -= ev.clientX - panRef.current.lastX;
-          scrollRef.current.scrollTop -= ev.clientY - panRef.current.lastY;
+          if (!panRef.current) return;
+          const dx = ev.clientX - panRef.current.lastX;
+          const dy = ev.clientY - panRef.current.lastY;
+          useCameraStore.getState().pan(dx, dy);
           panRef.current = { lastX: ev.clientX, lastY: ev.clientY };
         }
         function onPanUp() {
@@ -1039,25 +1066,22 @@ export function MapCanvas() {
       }
 
       // Selection box (pointer)
-      if (activeTool === "pointer" && !scrollRef.current) return;
-      if (activeTool !== "pointer") return;
-      const rect = scrollRef.current!.getBoundingClientRect();
-      const sLeft = scrollRef.current!.scrollLeft;
-      const sTop = scrollRef.current!.scrollTop;
-      const px = e.clientX - rect.left + sLeft;
-      const py = e.clientY - rect.top + sTop;
+      if (activeTool !== "pointer" || !viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const px = (e.clientX - rect.left - cam.panX) / cam.zoom;
+      const py = (e.clientY - rect.top - cam.panY) / cam.zoom;
       selBoxRef.current = { startPxX: px, startPxY: py };
 
       function onMove(ev: MouseEvent) {
-        if (!selBoxRef.current || !scrollRef.current) return;
-        const r = scrollRef.current.getBoundingClientRect();
-        const sl = scrollRef.current.scrollLeft;
-        const st = scrollRef.current.scrollTop;
+        if (!selBoxRef.current || !viewportRef.current) return;
+        const r = viewportRef.current.getBoundingClientRect();
+        const cam = useCameraStore.getState();
         setSelectionBox({
           startX: selBoxRef.current.startPxX,
           startY: selBoxRef.current.startPxY,
-          endX: ev.clientX - r.left + sl,
-          endY: ev.clientY - r.top + st,
+          endX: (ev.clientX - r.left - cam.panX) / cam.zoom,
+          endY: (ev.clientY - r.top - cam.panY) / cam.zoom,
         });
       }
 
@@ -1249,12 +1273,8 @@ export function MapCanvas() {
         const ids = useGameplayStore.getState().selectedTokenIds;
         if (ids.length === 1) {
           const tok = useGameplayStore.getState().tokens.find((t) => t.id === ids[0]);
-          if (tok && scrollRef.current) {
-            scrollRef.current.scrollTo({
-              left: tok.x * scaledCell + scaledCell / 2 - scrollRef.current.clientWidth / 2,
-              top: tok.y * scaledCell + scaledCell / 2 - scrollRef.current.clientHeight / 2,
-              behavior: "smooth",
-            });
+          if (tok) {
+            useCameraStore.getState().centerOnCell(tok.x, tok.y);
           }
         }
         return;
@@ -1280,7 +1300,11 @@ export function MapCanvas() {
       if (key === "/") {
         e.preventDefault();
         document.querySelector<HTMLInputElement>("[data-chat-input]")?.focus();
+        return;
       }
+      if (e.key === "=" || e.key === "+") { useCameraStore.getState().zoomIn(); return; }
+      if (e.key === "-") { useCameraStore.getState().zoomOut(); return; }
+      if (e.key === "0") { useCameraStore.getState().reset(); return; }
     }
     function onUp(e: KeyboardEvent) {
       if (e.key === " ") setSpaceHeld(false);
@@ -1293,36 +1317,43 @@ export function MapCanvas() {
   // Track viewport for mini-map + store
   const setMapViewport = useGameplayStore((s) => s.setMapViewport);
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    function update() {
-      if (!el) return;
+    // Subscribe to camera changes and update viewport/store
+    const unsub = useCameraStore.subscribe((cam) => {
       setViewport({
-        x: el.scrollLeft,
-        y: el.scrollTop,
-        w: el.clientWidth,
-        h: el.clientHeight,
+        x: -cam.panX / cam.zoom,
+        y: -cam.panY / cam.zoom,
+        w: cam.viewportWidth / cam.zoom,
+        h: cam.viewportHeight / cam.zoom,
       });
       setMapViewport({
-        scrollLeft: el.scrollLeft,
-        scrollTop: el.scrollTop,
-        viewportW: el.clientWidth,
-        viewportH: el.clientHeight,
-        cellSize: scaledCell,
+        scrollLeft: -cam.panX / cam.zoom,
+        scrollTop: -cam.panY / cam.zoom,
+        viewportW: cam.viewportWidth / cam.zoom,
+        viewportH: cam.viewportHeight / cam.zoom,
+        cellSize: CELL_SIZE,
       });
+    });
+
+    // Resize observer for viewport size
+    const el = viewportRef.current;
+    if (el) {
+      const ro = new ResizeObserver(() => {
+        useCameraStore.getState().setViewportSize(el.clientWidth, el.clientHeight);
+      });
+      ro.observe(el);
+      // Initial size
+      useCameraStore.getState().setViewportSize(el.clientWidth, el.clientHeight);
+      return () => { unsub(); ro.disconnect(); };
     }
-    update();
-    el.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    return () => {
-      el.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [canvasW, canvasH, scaledCell, setMapViewport]);
+    return unsub;
+  }, [setMapViewport]);
 
   const handleMiniMapNavigate = useCallback(
-    (x: number, y: number) => {
-      scrollRef.current?.scrollTo({ left: x, top: y, behavior: "smooth" });
+    (worldX: number, worldY: number) => {
+      const cam = useCameraStore.getState();
+      const targetPanX = cam.viewportWidth / 2 - worldX * cam.zoom;
+      const targetPanY = cam.viewportHeight / 2 - worldY * cam.zoom;
+      cam.setPan(targetPanX, targetPanY);
     },
     [],
   );
@@ -1341,12 +1372,13 @@ export function MapCanvas() {
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     // Convert drop position to grid cell
-    if (!scrollRef.current) return;
-    const rect = scrollRef.current.getBoundingClientRect();
-    const sLeft = scrollRef.current.scrollLeft;
-    const sTop = scrollRef.current.scrollTop;
-    const cellX = Math.floor((e.clientX - rect.left + sLeft) / scaledCell);
-    const cellY = Math.floor((e.clientY - rect.top + sTop) / scaledCell);
+    if (!viewportRef.current) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    const cam = useCameraStore.getState();
+    const worldX = (e.clientX - rect.left - cam.panX) / cam.zoom;
+    const worldY = (e.clientY - rect.top - cam.panY) / cam.zoom;
+    const cellX = Math.floor(worldX / CELL_SIZE);
+    const cellY = Math.floor(worldY / CELL_SIZE);
 
     // ── NPC drop ──
     const npcId = e.dataTransfer.getData("application/questboard-npc");
@@ -1428,20 +1460,55 @@ export function MapCanvas() {
     : activeTool === "draw" || activeTool === "wall" || activeTool === "terrain" || activeTool === "objects" ? "cursor-crosshair"
     : "cursor-default";
 
+  // Wheel zoom — native event listener with passive:false for proper preventDefault
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const cam = useCameraStore.getState();
+      if (e.deltaY < 0) cam.zoomIn(1.1, mouseX, mouseY);
+      else cam.zoomOut(1.1, mouseX, mouseY);
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
   return (
-    <div className={`relative bg-[#0F0F12] ${cursorClass}`} style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-      <div ref={scrollRef} className="scrollbar-hidden h-full w-full overflow-auto">
-        <div
-          ref={canvasRef}
-          className="relative"
-          style={{ width: canvasW, height: canvasH }}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onDoubleClick={handleCanvasDoubleClick}
-          onContextMenu={handleCanvasContextMenu}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
-          onDrop={handleDrop}
-        >
+    <div
+      ref={viewportRef}
+      className={`relative bg-[#0F0F12] ${cursorClass}`}
+      style={{ flex: 1, minWidth: 0, overflow: "hidden", "--camera-zoom": zoom } as React.CSSProperties}
+      onMouseDown={handleCanvasMouseDown}
+      onMouseMove={handleCanvasMouseMove}
+      onDoubleClick={handleCanvasDoubleClick}
+      onContextMenu={handleCanvasContextMenu}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+      onDrop={handleDrop}
+    >
+      {/* Layer 0: Single unified PIXI.Application (combat animations only) */}
+      <PixiCanvas
+        gridCols={gridCols}
+        gridRows={gridRows}
+        gridVisible={gridVisible && (getLayer("grid")?.visible ?? true)}
+        gridOpacity={(getLayer("grid")?.opacity ?? 100) / 100}
+      />
+
+      {/* Layer 1: React world-space overlays (CSS transform synced with camera) */}
+      <div
+        ref={reactWorldRef}
+        className="pointer-events-none absolute left-0 top-0"
+        style={{
+          transformOrigin: "0 0",
+          transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+          width: canvasW,
+          height: canvasH,
+          willChange: "transform",
+        }}
+      >
           {/* Background image (layer: background) */}
           {mapBackgroundImage && getLayer("background")?.visible && (
             <img
@@ -1459,7 +1526,7 @@ export function MapCanvas() {
             />
           )}
 
-          {/* AI generated layers (before grid so grid lines appear on top) */}
+          {/* AI generated layers */}
           {aiLayers.map((layer) => {
             const lx1 = Math.min(layer.x1, layer.x2);
             const ly1 = Math.min(layer.y1, layer.y2);
@@ -1484,15 +1551,6 @@ export function MapCanvas() {
               />
             );
           })}
-
-          {/* Grid (layer: grid) — Pixi.js: drawn ONCE, never redrawn */}
-          {gridVisible && getLayer("grid")?.visible && (
-            <PixiGridLayer
-              gridCols={gridCols}
-              gridRows={gridRows}
-              opacity={(getLayer("grid")?.opacity ?? 100) / 100}
-            />
-          )}
 
           {/* Terrain (layer: terrain) */}
           {getLayer("terrain")?.visible && (
@@ -1541,11 +1599,13 @@ export function MapCanvas() {
                 scaledCell={scaledCell}
                 scrollLeft={viewport.x}
                 scrollTop={viewport.y}
-                viewportW={viewport.w}
-                viewportH={viewport.h}
+                viewportW={viewport.w > 0 ? viewport.w : canvasW}
+                viewportH={viewport.h > 0 ? viewport.h : canvasH}
               />
             </div>
           )}
+
+          {/* Grid is rendered by PIXI in worldContainer (pixi-canvas.tsx) */}
 
           {/* Movement preview (hidden during path planning) */}
           {currentTurnToken?.onMap && !pathPlanningActive && (
@@ -1600,8 +1660,7 @@ export function MapCanvas() {
             <RegionSelectOverlay
               region={regionSelection}
               scaledCell={scaledCell}
-              canvasRef={canvasRef}
-              scrollRef={scrollRef}
+              viewportRef={viewportRef}
             />
           )}
 
@@ -1610,8 +1669,7 @@ export function MapCanvas() {
             <AISelectionOverlay
               selection={aiSelection}
               scaledCell={scaledCell}
-              canvasRef={canvasRef}
-              scrollRef={scrollRef}
+              viewportRef={viewportRef}
             />
           )}
 
@@ -1633,8 +1691,7 @@ export function MapCanvas() {
           {/* Damage floats */}
           <DamageFloatOverlay floats={damageFloats} tokens={onMapTokens} scaledCell={scaledCell} />
 
-          {/* Combat animations (Pixi) */}
-          <PixiCombatLayer scaledCell={scaledCell} gridCols={gridCols} gridRows={gridRows} />
+          {/* Combat animations are now in the unified PixiCanvas */}
 
           {/* Drawings */}
           <DrawOverlay strokes={drawStrokes} activeStroke={activeStroke} canvasW={canvasW} canvasH={canvasH} />
@@ -1720,7 +1777,7 @@ export function MapCanvas() {
             return (
               <div
                 key={token.id}
-                className={`absolute flex cursor-grab flex-col items-center justify-center ${isDead ? "opacity-30" : ""} ${isDragging ? "z-30 opacity-70" : ""} ${isHidden ? "opacity-40" : ""}`}
+                className={`pointer-events-auto absolute flex cursor-grab flex-col items-center justify-center ${isDead ? "opacity-30" : ""} ${isDragging ? "z-30 opacity-70" : ""} ${isHidden ? "opacity-40" : ""}`}
                 style={{
                   left: dx, top: dy, width: size, height: size,
                   transition: isDragging ? "none" : "left 200ms ease-out, top 200ms ease-out",
@@ -1764,7 +1821,7 @@ export function MapCanvas() {
                   );
                 })()}
 
-                {scaledCell >= 30 && (
+                {scaledCell * zoom >= 20 && (
                   <div className="mt-px flex flex-col items-center" style={{ width: size }}>
                     <span className="truncate text-center font-medium text-white" style={{ fontSize: Math.max(7, scaledCell * 0.2) }}>
                       {token.name}
@@ -1798,7 +1855,6 @@ export function MapCanvas() {
               </div>
             );
           })}
-        </div>
       </div>
 
       {/* Tooltip */}
@@ -1806,16 +1862,19 @@ export function MapCanvas() {
         <TokenTooltip token={hoveredToken} x={tooltipPos.x} y={tooltipPos.y} />
       )}
 
-      {/* Context menus */}
-      {contextMenu.open && contextMenu.type === "token" && contextToken && (
-        <TokenContextMenu token={contextToken} x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
-      )}
-      {contextMenu.open && contextMenu.type === "cell" && (
-        <CellContextMenu cellX={contextMenu.cellX} cellY={contextMenu.cellY} x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
-      )}
-      {contextMenu.open && contextMenu.type === "canvas" && (
-        <CanvasContextMenu x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
-      )}
+      {/* Context menus — stopPropagation prevents canvas mousedown from closing before onClick fires */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div onMouseDown={(e) => e.stopPropagation()}>
+        {contextMenu.open && contextMenu.type === "token" && contextToken && (
+          <TokenContextMenu token={contextToken} x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
+        )}
+        {contextMenu.open && contextMenu.type === "cell" && (
+          <CellContextMenu cellX={contextMenu.cellX} cellY={contextMenu.cellY} x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
+        )}
+        {contextMenu.open && contextMenu.type === "canvas" && (
+          <CanvasContextMenu x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />
+        )}
+      </div>
 
       {/* Mini-map */}
       <MiniMap

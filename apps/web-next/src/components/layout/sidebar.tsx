@@ -6,6 +6,8 @@ import {
   LayoutDashboard,
   Map,
   BookOpen,
+  Package,
+  Skull,
   Users,
   Swords,
   Gamepad2,
@@ -20,6 +22,8 @@ const CAMPAIGN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/maps", label: "Mapas", icon: Map },
   { href: "/story", label: "Historia", icon: BookOpen },
+  { href: "/objects", label: "Objetos", icon: Package },
+  { href: "/characters", label: "Personagens", icon: Skull },
   { href: "/players", label: "Jogadores", icon: Users },
   { href: "/encounters", label: "Encontros", icon: Swords },
 ];

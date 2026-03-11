@@ -30,6 +30,7 @@ import { SceneCardIndicator } from "./toolbar/scene-card-indicator";
 import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
 
+
 export function GameplayLayout() {
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);

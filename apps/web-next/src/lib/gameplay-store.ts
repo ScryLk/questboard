@@ -123,6 +123,8 @@ export type ModalName =
   | "npcEditor"
   | "tokenEditor"
   | "encounterGroupEditor"
+  | "objectEditor"
+  | "characterEditor"
   | null;
 
 export interface ContextMenuState {
@@ -303,6 +305,14 @@ interface GameplayState {
   // Encounter group editor target
   encounterGroupEditorTargetId: string | null;
   setEncounterGroupEditorTarget: (id: string | null) => void;
+
+  // Object editor target
+  objectEditorTargetId: string | null;
+  setObjectEditorTarget: (id: string | null) => void;
+
+  // Character editor target
+  characterEditorTargetId: string | null;
+  setCharacterEditorTarget: (id: string | null) => void;
 
   // Creature compendium favorites
   compendiumFavorites: Set<string>;
@@ -917,6 +927,12 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   encounterGroupEditorTargetId: null,
   setEncounterGroupEditorTarget: (id) => set({ encounterGroupEditorTargetId: id }),
 
+  objectEditorTargetId: null,
+  setObjectEditorTarget: (id) => set({ objectEditorTargetId: id }),
+
+  characterEditorTargetId: null,
+  setCharacterEditorTarget: (id) => set({ characterEditorTargetId: id }),
+
   compendiumFavorites: new Set<string>(),
   toggleCompendiumFavorite: (id) =>
     set((s) => {
@@ -935,6 +951,15 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   fireSceneCard: (card) => {
     set({ activeSceneCard: card, sceneCardFiredAt: Date.now() });
     broadcastSend("gm:scene-show", card, "gm");
+
+    // Se tem mapa vinculado e autoSwitch → trocar mapa
+    if (card.linkedMapId && card.autoSwitchMap !== false) {
+      broadcastSend("gm:map-switch", {
+        mapId: card.linkedMapId,
+        mapName: card.linkedMapName,
+      }, "gm");
+    }
+
     // Auto-clear after duration
     const duration = card.duration || 6000;
     setTimeout(() => {
@@ -1201,7 +1226,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     return { x: centerX, y: centerY };
   },
 
-  collapsedSections: { tokens: true, npcs: true, audio: true },
+  collapsedSections: { tokens: true, npcs: true, characters: true, audio: true },
   toggleSection: (key) =>
     set((s) => ({
       collapsedSections: {

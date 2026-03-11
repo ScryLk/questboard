@@ -5,12 +5,13 @@ import { Sparkles } from "lucide-react";
 import { MOCK_MAP } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { AISelection } from "@/lib/gameplay-store";
+import { useCameraStore } from "@/lib/camera-store";
+import { CELL_SIZE } from "@/lib/gameplay/constants";
 
 interface AISelectionOverlayProps {
   selection: AISelection;
   scaledCell: number;
-  canvasRef: React.RefObject<HTMLDivElement | null>;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  viewportRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const HANDLE_SIZE = 8;
@@ -19,8 +20,7 @@ const { cellSizeFt } = MOCK_MAP;
 export function AISelectionOverlay({
   selection,
   scaledCell,
-  canvasRef,
-  scrollRef,
+  viewportRef,
 }: AISelectionOverlayProps) {
   const handleDragRef = useRef(false);
   const aiGenerationStatus = useGameplayStore((s) => s.aiGenerationStatus);
@@ -45,18 +45,17 @@ export function AISelectionOverlay({
 
   const getGridCellFromEvent = useCallback(
     (ev: MouseEvent) => {
-      if (!canvasRef.current) return null;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const sl = scrollRef.current?.scrollLeft ?? 0;
-      const st = scrollRef.current?.scrollTop ?? 0;
-      const px = ev.clientX - rect.left + sl;
-      const py = ev.clientY - rect.top + st;
+      if (!viewportRef.current) return null;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const worldX = (ev.clientX - rect.left - cam.panX) / cam.zoom;
+      const worldY = (ev.clientY - rect.top - cam.panY) / cam.zoom;
       return {
-        x: Math.floor(px / scaledCell),
-        y: Math.floor(py / scaledCell),
+        x: Math.floor(worldX / CELL_SIZE),
+        y: Math.floor(worldY / CELL_SIZE),
       };
     },
-    [scaledCell, canvasRef, scrollRef],
+    [viewportRef],
   );
 
   const handleHandleMouseDown = useCallback(

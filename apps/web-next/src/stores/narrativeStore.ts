@@ -19,6 +19,13 @@ import {
   MOCK_VIEWPORT,
 } from "@/lib/narrative-mock-data";
 
+interface NarrativeProgress {
+  total: number;
+  completed: number;
+  percent: number;
+  currentEvent: string | null;
+}
+
 interface NarrativeStore {
   nodes: NarrativeFlowNode[];
   edges: NarrativeFlowEdge[];
@@ -28,6 +35,7 @@ interface NarrativeStore {
   detailDrawerOpen: boolean;
   contextMenu: ContextMenuState | null;
   isPlayerView: boolean;
+  isStoryPanelOpen: boolean;
 
   // React Flow callbacks
   onNodesChange: OnNodesChange<NarrativeFlowNode>;
@@ -51,6 +59,12 @@ interface NarrativeStore {
   closeDrawer: () => void;
   setContextMenu: (menu: ContextMenuState | null) => void;
   togglePlayerView: () => void;
+  openStoryPanel: () => void;
+  closeStoryPanel: () => void;
+  toggleStoryPanel: () => void;
+
+  // Computed
+  getProgress: () => NarrativeProgress;
 }
 
 let nodeCounter = 100;
@@ -64,6 +78,7 @@ export const useNarrativeStore = create<NarrativeStore>((set, get) => ({
   detailDrawerOpen: false,
   contextMenu: null,
   isPlayerView: false,
+  isStoryPanelOpen: false,
 
   // ── React Flow Callbacks ──
 
@@ -199,5 +214,29 @@ export const useNarrativeStore = create<NarrativeStore>((set, get) => ({
 
   togglePlayerView: () => {
     set({ isPlayerView: !get().isPlayerView });
+  },
+
+  openStoryPanel: () => set({ isStoryPanelOpen: true }),
+  closeStoryPanel: () => set({ isStoryPanelOpen: false }),
+  toggleStoryPanel: () => set({ isStoryPanelOpen: !get().isStoryPanelOpen }),
+
+  getProgress: () => {
+    const nodes = get().nodes;
+    const trackable = nodes.filter(
+      (n) => n.type === "event" || n.type === "consequence",
+    );
+    const completed = trackable.filter((n) => n.data.status === "active");
+    const total = trackable.length;
+    const percent = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+
+    const activeEvents = nodes.filter(
+      (n) => n.type === "event" && n.data.status === "active",
+    );
+    const currentEvent =
+      activeEvents.length > 0
+        ? activeEvents[activeEvents.length - 1].data.title
+        : null;
+
+    return { total, completed: completed.length, percent, currentEvent };
   },
 }));

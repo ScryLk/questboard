@@ -517,6 +517,24 @@ export const MOCK_MAP: MapConfig = {
   cellSizeFt: 5,
 };
 
+// ── Session Maps ────────────────────────────────────
+
+export interface SessionMapItem {
+  id: string;
+  name: string;
+  gridCols: number;
+  gridRows: number;
+  thumbnail: string | null;
+  category: string;
+  isActive: boolean;
+}
+
+export const MOCK_SESSION_MAPS: SessionMapItem[] = [
+  { id: "map-1", name: "Cena 1", gridCols: 25, gridRows: 25, thumbnail: null, category: "Dungeon", isActive: true },
+  { id: "map-2", name: "Sala do Trono", gridCols: 30, gridRows: 20, thumbnail: null, category: "Dungeon", isActive: false },
+  { id: "map-3", name: "Floresta Svalich", gridCols: 40, gridRows: 30, thumbnail: null, category: "Overworld", isActive: false },
+];
+
 // ── Helpers ──────────────────────────────────────────
 
 export function getElapsedTime(startedAt: Date): string {

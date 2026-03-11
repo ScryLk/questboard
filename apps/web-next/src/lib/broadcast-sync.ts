@@ -24,6 +24,7 @@ export type BroadcastMessageType =
   | "gm:combat-end"          // Combat ended
   | "gm:scene-show"          // Scene card
   | "gm:scene-dismiss"       // Scene card dismissed
+  | "gm:map-switch"          // Map switched (via scene card)
   | "gm:soundtrack-play"     // Play soundtrack
   | "gm:soundtrack-stop"     // Stop soundtrack
   | "gm:chat-message"        // Chat message from GM

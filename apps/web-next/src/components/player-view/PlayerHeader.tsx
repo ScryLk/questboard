@@ -6,6 +6,7 @@ import {
   VolumeX,
   User,
   LogOut,
+  Map,
   Radio,
   ChevronDown,
   Swords,
@@ -19,6 +20,7 @@ export function PlayerHeader() {
   const soundtrack = usePlayerViewStore((s) => s.soundtrack);
   const toggleMute = usePlayerViewStore((s) => s.toggleMute);
   const connected = usePlayerViewStore((s) => s.connected);
+  const activeMapName = usePlayerViewStore((s) => s.activeMapName);
   const [showDropdown, setShowDropdown] = useState(false);
 
   const [elapsed, setElapsed] = useState(() => getElapsedTime(MOCK_SESSION.startedAt));
@@ -62,6 +64,16 @@ export function PlayerHeader() {
             {elapsed}
           </span>
         </div>
+
+        {/* Current map indicator */}
+        {activeMapName && (
+          <div className="hidden items-center gap-1.5 rounded-md bg-brand-accent/10 px-2 py-0.5 sm:flex">
+            <Map className="h-3 w-3 text-brand-accent/70" />
+            <span className="max-w-[140px] truncate text-[11px] font-medium text-brand-accent/70">
+              {activeMapName}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Spacer */}

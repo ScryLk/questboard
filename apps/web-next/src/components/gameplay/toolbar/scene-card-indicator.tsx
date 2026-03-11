@@ -7,6 +7,7 @@ import {
   Clapperboard,
   CloudRain,
   Film,
+  Map,
   MapPin,
   Search,
   X,
@@ -99,6 +100,17 @@ export function SceneCardIndicator() {
       <span className="max-w-[200px] truncate text-xs font-medium text-brand-text">
         {activeSceneCard.title}
       </span>
+
+      {/* Linked map badge */}
+      {activeSceneCard.linkedMapName && (
+        <span className="flex items-center gap-1 text-[10px] text-brand-accent/70">
+          <Map className="h-3 w-3" />
+          {activeSceneCard.linkedMapName}
+          {activeSceneCard.autoSwitchMap !== false && (
+            <span className="text-white/20">· troca auto</span>
+          )}
+        </span>
+      )}
 
       {/* Countdown */}
       <div className="flex items-center gap-2">

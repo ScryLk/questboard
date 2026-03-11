@@ -15,6 +15,8 @@ import { CreatureCompendiumModal } from "./creature-compendium-modal";
 import { NPCEditorModal } from "./npc-editor/npc-editor-modal";
 import { TokenEditorModal } from "./token-editor/token-editor-modal";
 import { EncounterGroupEditor } from "./encounter-group-editor";
+import { ObjectEditorModal } from "./object-editor/object-editor-modal";
+import { CharacterEditorModal } from "./character-editor/character-editor-modal";
 
 export function GameplayModals() {
   const activeModal = useGameplayStore((s) => s.activeModal);
@@ -51,6 +53,10 @@ export function GameplayModals() {
       return <TokenEditorModal onClose={closeModal} />;
     case "encounterGroupEditor":
       return <EncounterGroupEditor onClose={closeModal} />;
+    case "objectEditor":
+      return <ObjectEditorModal onClose={closeModal} />;
+    case "characterEditor":
+      return <CharacterEditorModal onClose={closeModal} />;
     default:
       return null;
   }
