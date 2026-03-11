@@ -70,6 +70,38 @@ export interface SceneCard {
   duration: number; // ms
 }
 
+// ── Lobby types ──────────────────────────────────────────────
+
+export interface LobbyCharacter {
+  id: string;
+  name: string;
+  class: string;
+  level: number;
+  portraitUrl?: string;
+  emoji?: string;
+  taken: boolean;
+  takenBy?: string;
+}
+
+export interface LobbyPlayer {
+  id: string;
+  name: string;
+  characterId: string | null;
+  characterName: string | null;
+  ready: boolean;
+  isMe: boolean;
+}
+
+// ── Session summary for end screen ──────────────────────────
+
+export interface SessionSummary {
+  duration: string;
+  totalRounds: number;
+  totalMessages: number;
+  totalRolls: number;
+  mvp?: string;
+}
+
 // ── GM settings that affect player view ───────────────────────
 
 export interface PlayerViewSettings {
@@ -125,7 +157,15 @@ interface PlayerViewState {
   playerName: string;
   characterId: string | null;
   connected: boolean;
-  joinStep: "enter-code" | "waiting-gm" | "playing";
+  joinStep: "enter-code" | "waiting-gm" | "playing" | "ended";
+
+  // Session info for lobby/join
+  campaignName: string;
+  gmName: string;
+  playerCount: number;
+  sessionNumber: number;
+  availableCharacters: LobbyCharacter[];
+  lobbyPlayers: LobbyPlayer[];
 
   // My character info
   myToken: PlayerToken | null;
@@ -180,7 +220,7 @@ interface PlayerViewState {
   setSessionCode: (code: string) => void;
   setPlayerName: (name: string) => void;
   joinSession: (code: string, name: string) => void;
-  setJoinStep: (step: "enter-code" | "waiting-gm" | "playing") => void;
+  setJoinStep: (step: "enter-code" | "waiting-gm" | "playing" | "ended") => void;
   setConnected: (v: boolean) => void;
 
   // Sync from GM state
@@ -212,6 +252,27 @@ interface PlayerViewState {
   // Session
   setSessionPaused: (v: boolean) => void;
   setSessionEnded: (v: boolean) => void;
+
+  // Lobby / Join flow
+  setCampaignInfo: (info: { campaignName: string; gmName: string; playerCount: number; sessionNumber: number }) => void;
+  setAvailableCharacters: (chars: LobbyCharacter[]) => void;
+  setLobbyPlayers: (players: LobbyPlayer[]) => void;
+  addLobbyPlayer: (player: LobbyPlayer) => void;
+  removeLobbyPlayer: (playerId: string) => void;
+  setCharacterId: (id: string | null) => void;
+
+  // Summary
+  sessionSummary: SessionSummary | null;
+  setSessionSummary: (summary: SessionSummary | null) => void;
+
+  // Whisper
+  pendingWhisper: { fromName: string; message: string; fromId: string } | null;
+  showWhisper: (whisper: { fromName: string; message: string; fromId: string }) => void;
+  dismissWhisper: () => void;
+
+  // Signal
+  playerSignal: string | null;
+  sendSignal: (type: string) => void;
 }
 
 // ── Payload from GM sync ──────────────────────────────────────
@@ -243,6 +304,13 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   characterId: "p1",
   connected: false,
   joinStep: "enter-code",
+
+  campaignName: "",
+  gmName: "",
+  playerCount: 0,
+  sessionNumber: 0,
+  availableCharacters: [],
+  lobbyPlayers: [],
 
   myToken: null,
   visibleTokens: [],
@@ -347,4 +415,30 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
 
   setSessionPaused: (v) => set({ sessionPaused: v }),
   setSessionEnded: (v) => set({ sessionEnded: v }),
+
+  // Lobby / Join flow
+  setCampaignInfo: (info) => set(info),
+  setAvailableCharacters: (chars) => set({ availableCharacters: chars }),
+  setLobbyPlayers: (players) => set({ lobbyPlayers: players }),
+  addLobbyPlayer: (player) =>
+    set((s) => ({ lobbyPlayers: [...s.lobbyPlayers, player] })),
+  removeLobbyPlayer: (playerId) =>
+    set((s) => ({ lobbyPlayers: s.lobbyPlayers.filter((p) => p.id !== playerId) })),
+  setCharacterId: (id) => set({ characterId: id }),
+
+  // Summary
+  sessionSummary: null,
+  setSessionSummary: (summary) => set({ sessionSummary: summary }),
+
+  // Whisper
+  pendingWhisper: null,
+  showWhisper: (whisper) => set({ pendingWhisper: whisper }),
+  dismissWhisper: () => set({ pendingWhisper: null }),
+
+  // Signal
+  playerSignal: null,
+  sendSignal: (type) => {
+    set({ playerSignal: type });
+    setTimeout(() => set({ playerSignal: null }), 3000);
+  },
 }));
