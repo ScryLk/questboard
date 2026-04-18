@@ -50,6 +50,7 @@ import { wallSideToEdgeKey } from "./wall-helpers";
 import { playSFXSync } from "./audio/sfx-triggers";
 import { broadcastSend } from "./broadcast-sync";
 import { useCameraStore } from "./camera-store";
+import { CELL_SIZE } from "./gameplay/constants";
 import type { SceneCard as PlayerSceneCard } from "./player-view-store";
 
 
@@ -1222,7 +1223,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setMapBackgroundOpacity: (opacity) => set({ mapBackgroundOpacity: Math.max(0, Math.min(1, opacity)) }),
   setMapGridOffset: (x, y) => set({ mapGridOffsetX: x, mapGridOffsetY: y }),
 
-  mapViewport: { scrollLeft: 0, scrollTop: 0, viewportW: 800, viewportH: 600, cellSize: 64 },
+  mapViewport: { scrollLeft: 0, scrollTop: 0, viewportW: 800, viewportH: 600, cellSize: CELL_SIZE },
   setMapViewport: (v) => set({ mapViewport: v }),
   getViewportCenter: () => {
     const { mapViewport: v } = get();

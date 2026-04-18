@@ -1,3 +1,5 @@
+import { CELL_SIZE, CELL_SIZE_FT } from "./gameplay/constants";
+
 // ── Types ────────────────────────────────────────────
 
 export type PlayerStatus = "online" | "offline" | "away";
@@ -513,8 +515,8 @@ export const MOCK_MAP: MapConfig = {
   name: "",
   gridCols: 25,
   gridRows: 25,
-  cellSize: 64,
-  cellSizeFt: 5,
+  cellSize: CELL_SIZE,
+  cellSizeFt: CELL_SIZE_FT,
 };
 
 // ── Session Maps ────────────────────────────────────

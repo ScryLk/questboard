@@ -44,7 +44,8 @@ FLOOR AND ELEMENTS:
 OUTPUT: A single seamless pixel art map texture. No borders. Full bleed.`;
 }
 
-const CELL_SIZE = 64;
+import { CELL_SIZE } from "@/lib/gameplay/constants";
+
 const MAX_PX = 1024;
 
 export function calculatePromptDimensions(widthCells: number, heightCells: number) {

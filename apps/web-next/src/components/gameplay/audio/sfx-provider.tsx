@@ -21,7 +21,7 @@ export function SFXProvider({ children }: { children: React.ReactNode }) {
         .then(() => {
           if (!cancelled) {
             setReady(true);
-            console.log(`[SFX] ${SFX_DEFINITIONS.length} sons carregados via Freesound`);
+            /* loaded */
           }
         })
         .catch((err) => {

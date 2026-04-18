@@ -4,19 +4,21 @@ import { redis } from "../../lib/redis.js";
 
 export function registerFogHandler(_nsp: Namespace, socket: Socket): void {
   socket.on("fog:updated", async (data: { mapId: string; fogData: unknown }) => {
-    const sessionId = socket.data.sessionId;
-    if (!sessionId) return;
+    try {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
 
-    // Only GM can update fog
-    const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
-    if (session?.ownerId !== socket.data.user.id) return;
+      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
+      if (session?.ownerId !== socket.data.user.id) return;
 
-    // Cache in Redis for fast reads
-    await redis.set(`session:${sessionId}:fog:${data.mapId}`, JSON.stringify(data.fogData));
+      await redis.set(`session:${sessionId}:fog:${data.mapId}`, JSON.stringify(data.fogData));
 
-    socket.to(`session:${sessionId}`).emit("fog:updated", {
-      mapId: data.mapId,
-      fogData: data.fogData,
-    });
+      socket.to(`session:${sessionId}`).emit("fog:updated", {
+        mapId: data.mapId,
+        fogData: data.fogData,
+      });
+    } catch (err) {
+      console.error("[fog:updated] Error:", err);
+    }
   });
 }

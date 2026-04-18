@@ -101,27 +101,29 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async join(inviteCode: string, userId: string) {
-      const session = await prisma.session.findUnique({
-        where: { inviteCode },
-        select: { id: true, maxPlayers: true, _count: { select: { players: true } } },
-      });
-      if (!session) throw new NotFoundError("Session");
+      return prisma.$transaction(async (tx) => {
+        const session = await tx.session.findUnique({
+          where: { inviteCode },
+          select: { id: true, maxPlayers: true, _count: { select: { players: true } } },
+        });
+        if (!session) throw new NotFoundError("Session");
 
-      if (session._count.players >= session.maxPlayers) {
-        throw new BadRequestError("Sessão cheia");
-      }
+        if (session._count.players >= session.maxPlayers) {
+          throw new BadRequestError("Sessão cheia");
+        }
 
-      const existing = await prisma.sessionPlayer.findUnique({
-        where: { userId_sessionId: { userId, sessionId: session.id } },
-      });
-      if (existing) throw new ConflictError("Já está na sessão");
+        const existing = await tx.sessionPlayer.findUnique({
+          where: { userId_sessionId: { userId, sessionId: session.id } },
+        });
+        if (existing) throw new ConflictError("Já está na sessão");
 
-      return prisma.sessionPlayer.create({
-        data: {
-          userId,
-          sessionId: session.id,
-          role: "PLAYER",
-        },
+        return tx.sessionPlayer.create({
+          data: {
+            userId,
+            sessionId: session.id,
+            role: "PLAYER",
+          },
+        });
       });
     },
 

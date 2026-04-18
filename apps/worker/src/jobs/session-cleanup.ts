@@ -9,7 +9,6 @@ export function createSessionCleanupWorker(connection: ConnectionOptions) {
   const worker = new Worker(
     "session-cleanup",
     async () => {
-      // Find LIVE sessions without heartbeat > 30min
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
 
       const staleSessions = await prisma.session.findMany({
@@ -21,34 +20,31 @@ export function createSessionCleanupWorker(connection: ConnectionOptions) {
       });
 
       for (const session of staleSessions) {
-        console.log(`Cleaning up stale session ${session.id}`);
+        try {
+          const presenceCount = await redis.hlen(`session:${session.id}:presence`);
+          if (presenceCount > 0) {
+            await prisma.session.update({
+              where: { id: session.id },
+              data: { updatedAt: new Date() },
+            });
+            continue;
+          }
 
-        // Check Redis for recent presence
-        const presenceCount = await redis.hlen(`session:${session.id}:presence`);
-        if (presenceCount > 0) {
-          // Session has active connections, touch it
-          await prisma.session.update({
-            where: { id: session.id },
-            data: { updatedAt: new Date() },
+          await prisma.session.updateMany({
+            where: { id: session.id, status: "LIVE" },
+            data: { status: "PAUSED" },
           });
-          continue;
+
+          const keys = await redis.keys(`session:${session.id}:*`);
+          if (keys.length > 0) await redis.del(...keys);
+
+          await prisma.sessionPlayer.updateMany({
+            where: { sessionId: session.id },
+            data: { isOnline: false },
+          });
+        } catch (err) {
+          console.error(`[session-cleanup] Error cleaning session ${session.id}:`, err);
         }
-
-        // No presence — mark as PAUSED
-        await prisma.session.update({
-          where: { id: session.id },
-          data: { status: "PAUSED" },
-        });
-
-        // Cleanup Redis state
-        const keys = await redis.keys(`session:${session.id}:*`);
-        if (keys.length > 0) await redis.del(...keys);
-
-        // Mark all players offline
-        await prisma.sessionPlayer.updateMany({
-          where: { sessionId: session.id },
-          data: { isOnline: false },
-        });
       }
     },
     {
@@ -56,10 +52,6 @@ export function createSessionCleanupWorker(connection: ConnectionOptions) {
       concurrency: 1,
     },
   );
-
-  worker.on("completed", (job) => {
-    console.log(`Session cleanup job ${job.id} completed`);
-  });
 
   worker.on("failed", (job, error) => {
     console.error(`Session cleanup job ${job?.id} failed:`, error);

@@ -5,8 +5,7 @@ import { Sparkles, X, Loader2 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { AIGeneratedLayer } from "@/lib/gameplay-store";
 import { buildMapGenerationPrompt, calculatePromptDimensions } from "@/lib/ai-map-prompt";
-
-const CELL_SIZE = 64;
+import { CELL_SIZE } from "@/lib/gameplay/constants";
 
 const QUICK_REFS: { emoji: string; label: string; text: string }[] = [
   { emoji: "🏰", label: "Masmorra", text: "masmorra subterrânea, pedras úmidas, tochas, grades de ferro, névoa baixa" },

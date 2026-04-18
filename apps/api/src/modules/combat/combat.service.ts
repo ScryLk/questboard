@@ -64,6 +64,11 @@ export function createCombatService(prisma: PrismaClient) {
     async nextTurn(sessionId: string, userId: string) {
       await assertGM(sessionId, userId);
 
+      const lockKey = `combat:lock:${sessionId}`;
+      const acquired = await redis.set(lockKey, "1", "EX", 3, "NX");
+      if (!acquired) throw new BadRequestError("Turno sendo processado, tente novamente");
+
+      try {
       const combat = await prisma.combatState.findUnique({
         where: { sessionId },
         include: { participants: { orderBy: { order: "asc" } } },
@@ -95,6 +100,9 @@ export function createCombatService(prisma: PrismaClient) {
 
       await redis.set(`session:${sessionId}:combat`, JSON.stringify(updated));
       return updated;
+      } finally {
+        await redis.del(lockKey);
+      }
     },
 
     async updateParticipant(sessionId: string, userId: string, participantId: string, changes: Record<string, unknown>) {
@@ -103,10 +111,22 @@ export function createCombatService(prisma: PrismaClient) {
       const participant = await prisma.combatParticipant.findUnique({ where: { id: participantId } });
       if (!participant) throw new NotFoundError("CombatParticipant");
 
-      return prisma.combatParticipant.update({ where: { id: participantId }, data: changes });
+      const ALLOWED_FIELDS = new Set([
+        "name", "hpCurrent", "hpMax", "hpTemp", "ac", "initiative", "order",
+        "conditions", "isDead", "concentrationSpellId", "actionUsed",
+        "bonusUsed", "reactionUsed", "movementUsed", "movementMax", "isDashing",
+        "isNPC", "visible", "notes",
+      ]);
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(changes)) {
+        if (ALLOWED_FIELDS.has(key)) sanitized[key] = val;
+      }
+
+      return prisma.combatParticipant.update({ where: { id: participantId }, data: sanitized });
     },
 
-    async damage(_sessionId: string, _userId: string, participantId: string, amount: number) {
+    async damage(sessionId: string, userId: string, participantId: string, amount: number) {
+      await assertGM(sessionId, userId);
       if (amount <= 0) throw new BadRequestError("Dano deve ser positivo");
 
       const participant = await prisma.combatParticipant.findUnique({ where: { id: participantId } });
@@ -130,7 +150,8 @@ export function createCombatService(prisma: PrismaClient) {
       });
     },
 
-    async heal(_sessionId: string, _userId: string, participantId: string, amount: number) {
+    async heal(sessionId: string, userId: string, participantId: string, amount: number) {
+      await assertGM(sessionId, userId);
       if (amount <= 0) throw new BadRequestError("Cura deve ser positiva");
 
       const participant = await prisma.combatParticipant.findUnique({ where: { id: participantId } });
