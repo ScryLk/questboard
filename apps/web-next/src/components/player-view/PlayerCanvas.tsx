@@ -42,6 +42,9 @@ export function PlayerCanvas() {
   const canvasW = gridCols * scaledCell;
   const canvasH = gridRows * scaledCell;
 
+  // F-33: Reset scroll on scene/map change
+  const activeMapId = usePlayerViewStore((s) => s.activeMapId);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +98,19 @@ export function PlayerCanvas() {
     const cy = myToken.y * scaledCell + scaledCell / 2 - el.clientHeight / 2;
     el.scrollTo({ left: cx, top: cy, behavior: "smooth" });
   }, [myToken?.x, myToken?.y, scaledCell]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // F-33: Reset scroll to origin on map/scene change, then re-center on token
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    if (myToken) {
+      const cx = myToken.x * scaledCell + scaledCell / 2 - el.clientWidth / 2;
+      const cy = myToken.y * scaledCell + scaledCell / 2 - el.clientHeight / 2;
+      el.scrollTo({ left: cx, top: cy, behavior: "instant" });
+    } else {
+      el.scrollTo({ left: 0, top: 0, behavior: "instant" });
+    }
+  }, [activeMapId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getGridCell = useCallback(
     (e: MouseEvent | React.MouseEvent) => {

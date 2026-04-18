@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { Hash, Lock, Send } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Hash, Lock, Send, ChevronDown } from "lucide-react";
 import type { ChatMessage } from "@/lib/gameplay-mock-data";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
@@ -26,14 +26,49 @@ export function PlayerChatTab() {
   const myToken = usePlayerViewStore((s) => s.myToken);
 
   const [input, setInput] = useState("");
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevMessageCount = useRef(0);
 
   // Filter messages for current channel view
-  const filteredMessages = messages.filter((m) => {
-    if (chatChannel === "geral") return m.channel === "geral";
-    if (chatChannel === "sussurro") return m.channel === "sussurro" || m.channel === "geral";
-    return false;
-  });
+  // F-28: Sort by timestamp to ensure order
+  const filteredMessages = messages
+    .filter((m) => {
+      if (chatChannel === "geral") return m.channel === "geral";
+      if (chatChannel === "sussurro") return m.channel === "sussurro" || m.channel === "geral";
+      return false;
+    })
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+  // F-29: Smart autoscroll — only scroll if user is near bottom
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+      setIsNearBottom(nearBottom);
+      if (nearBottom) setUnreadCount(0);
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (filteredMessages.length > prevMessageCount.current) {
+      if (isNearBottom) {
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        });
+      } else {
+        setUnreadCount((c) => c + (filteredMessages.length - prevMessageCount.current));
+      }
+    }
+    prevMessageCount.current = filteredMessages.length;
+  }, [filteredMessages.length, isNearBottom]);
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -89,15 +124,34 @@ export function PlayerChatTab() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
-        {filteredMessages.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-brand-muted">
-            Nenhuma mensagem ainda
-          </p>
-        ) : (
-          filteredMessages.map((msg) => (
-            <PlayerMessageBubble key={msg.id} message={msg} />
-          ))
+      <div className="relative flex-1 overflow-hidden">
+        <div ref={scrollRef} className="h-full overflow-y-auto px-3 py-2">
+          {filteredMessages.length === 0 ? (
+            <p className="py-8 text-center text-[11px] text-brand-muted">
+              Nenhuma mensagem ainda
+            </p>
+          ) : (
+            filteredMessages.map((msg) => (
+              <PlayerMessageBubble key={msg.id} message={msg} />
+            ))
+          )}
+        </div>
+
+        {/* F-29: New message indicator when scrolled up */}
+        {unreadCount > 0 && (
+          <button
+            onClick={() => {
+              scrollRef.current?.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: "smooth",
+              });
+              setUnreadCount(0);
+            }}
+            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-brand-accent px-3 py-1 text-[10px] font-medium text-white shadow-lg"
+          >
+            <ChevronDown className="h-3 w-3" />
+            {unreadCount} nova{unreadCount > 1 ? "s" : ""}
+          </button>
         )}
       </div>
 

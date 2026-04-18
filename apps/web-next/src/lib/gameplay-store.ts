@@ -49,6 +49,7 @@ import type { RoomTemplate } from "./room-templates";
 import { wallSideToEdgeKey } from "./wall-helpers";
 import { playSFXSync } from "./audio/sfx-triggers";
 import { broadcastSend } from "./broadcast-sync";
+import { useCameraStore } from "./camera-store";
 import type { SceneCard as PlayerSceneCard } from "./player-view-store";
 
 
@@ -959,6 +960,8 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
         mapId: card.linkedMapId,
         mapName: card.linkedMapName,
       }, "gm");
+      // F-33: Reset camera on map switch
+      useCameraStore.getState().reset();
     }
 
     // Auto-clear after duration

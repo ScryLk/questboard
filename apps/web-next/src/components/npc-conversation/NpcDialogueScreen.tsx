@@ -9,6 +9,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { useNpcConversationStore } from "@/lib/npc-conversation-store";
+import { usePlayerViewStore } from "@/lib/player-view-store";
 import {
   MOOD_LABELS,
   MOOD_COLORS,
@@ -43,6 +44,8 @@ export function NpcDialogueScreen() {
   const [freeText, setFreeText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [urgentBanner, setUrgentBanner] = useState<string | null>(null);
+  const [tokenMovedToast, setTokenMovedToast] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -54,6 +57,45 @@ export function NpcDialogueScreen() {
   useEffect(() => {
     scrollToBottom();
   }, [conversation?.messages.length, scrollToBottom]);
+
+  // F-27: Combat started while in NPC conversation → auto-close with banner
+  const combat = usePlayerViewStore((s) => s.combat);
+  useEffect(() => {
+    if (combat?.active && conversationId) {
+      setUrgentBanner("⚔️ Combate iniciado! Saindo da conversa…");
+      const timer = setTimeout(() => {
+        endConversation(conversationId);
+        closePlayerConversation();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [combat?.active, conversationId, endConversation, closePlayerConversation]);
+
+  // F-38: Session ended while in NPC conversation
+  const sessionEnded = usePlayerViewStore((s) => s.sessionEnded);
+  useEffect(() => {
+    if (sessionEnded && conversationId) {
+      setUrgentBanner("Sessão encerrada pelo mestre.");
+      const timer = setTimeout(() => {
+        endConversation(conversationId);
+        closePlayerConversation();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionEnded, conversationId, endConversation, closePlayerConversation]);
+
+  // F-22: Token moved by GM while in NPC conversation
+  const myToken = usePlayerViewStore((s) => s.myToken);
+  const prevTokenPos = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!myToken) return;
+    if (prevTokenPos.current && (prevTokenPos.current.x !== myToken.x || prevTokenPos.current.y !== myToken.y)) {
+      setTokenMovedToast(true);
+      const timer = setTimeout(() => setTokenMovedToast(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    prevTokenPos.current = { x: myToken.x, y: myToken.y };
+  }, [myToken?.x, myToken?.y]);
 
   if (!conversationId || !conversation) return null;
 
@@ -178,6 +220,9 @@ export function NpcDialogueScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // F-46: 10s timeout for AI response
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       const historyForAI = conversation!.messages
         .filter((m) => m.role !== "SYSTEM")
@@ -258,16 +303,26 @@ export function NpcDialogueScreen() {
         reputationDelta: 0,
       });
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") return;
       setNpcThinking(conversationId!, false);
-      addMessage(conversationId!, {
-        role: "NPC",
-        text: "*O NPC fica em silêncio por um momento.*",
-        wasAI: false,
-        gmOverride: false,
-        reputationDelta: 0,
-      });
+      if (err instanceof Error && err.name === "AbortError") {
+        addMessage(conversationId!, {
+          role: "NPC",
+          text: "[O NPC parece distraído e não responde agora]",
+          wasAI: false,
+          gmOverride: false,
+          reputationDelta: 0,
+        });
+      } else {
+        addMessage(conversationId!, {
+          role: "NPC",
+          text: "*O NPC fica em silêncio por um momento.*",
+          wasAI: false,
+          gmOverride: false,
+          reputationDelta: 0,
+        });
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsStreaming(false);
     }
   }
@@ -278,6 +333,20 @@ export function NpcDialogueScreen() {
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Blurred background */}
       <div className="absolute inset-0 bg-[#0A0A0F]/80 backdrop-blur-xl" />
+
+      {/* F-27/F-38: Urgent banner (combat started, session ended) */}
+      {urgentBanner && (
+        <div className="absolute left-1/2 top-8 z-30 -translate-x-1/2 rounded-xl border border-[#E17055]/40 bg-[#E17055]/20 px-6 py-3 text-sm font-semibold text-white shadow-lg backdrop-blur-sm">
+          {urgentBanner}
+        </div>
+      )}
+
+      {/* F-22: Token moved toast */}
+      {tokenMovedToast && (
+        <div className="absolute left-1/2 bottom-8 z-30 -translate-x-1/2 rounded-lg border border-white/10 bg-[#111116]/90 px-4 py-2 text-xs text-white/70 shadow-lg backdrop-blur-sm">
+          Seu personagem foi movido pelo mestre enquanto você estava em conversa.
+        </div>
+      )}
 
       {/* Main panel */}
       <div

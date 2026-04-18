@@ -39,8 +39,10 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     ? usePlayerViewStore.getState().availableCharacters
     : MOCK_CHARACTERS;
 
+  const nameError = name.trim().length > 0 && name.trim().length < 2 ? "Nome muito curto" : "";
+
   const handleJoin = async () => {
-    if (!name.trim() || !selectedCharacterId) return;
+    if (!name.trim() || name.trim().length < 2 || !selectedCharacterId) return;
     setJoining(true);
 
     setPlayerName(name.trim());
@@ -103,7 +105,11 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
           placeholder="Como quer ser chamado?"
           className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder-white/20 outline-none transition-colors focus:border-brand-accent"
           autoFocus
+          maxLength={30}
         />
+        {nameError && (
+          <p className="mt-1 text-xs text-[#FF4444]">{nameError}</p>
+        )}
       </div>
 
       {/* Character selection */}
@@ -149,7 +155,7 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
       <button
         type="button"
         onClick={handleJoin}
-        disabled={!name.trim() || !selectedCharacterId || joining}
+        disabled={!name.trim() || name.trim().length < 2 || !selectedCharacterId || joining}
         className="mt-8 w-full max-w-sm rounded-xl bg-brand-accent py-4 text-base font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
       >
         {joining ? (
