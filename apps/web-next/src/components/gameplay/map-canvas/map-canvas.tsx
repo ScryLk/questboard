@@ -65,6 +65,7 @@ import type { LayerId } from "@/lib/map-sidebar-types";
 import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
 import { useCameraStore } from "@/lib/camera-store";
 import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
+import { canTokenMoveTo } from "@/lib/collision";
 
 export function MapCanvas() {
   const behaviorRenderStates = useNpcBehaviorStore((s) => s.renderStates);
@@ -418,6 +419,23 @@ export function MapCanvas() {
         const gy = Math.max(0, Math.min(gridRows - 1, Math.round((wy - dragRef.current.offsetY) / CELL_SIZE)));
         const orig = dragRef.current;
         if (gx !== orig.originX || gy !== orig.originY) {
+          // Wall collision check — validate move against wall edges
+          const dragStoreState = useGameplayStore.getState();
+          const wallCheck = canTokenMoveTo(
+            orig.originX, orig.originY, gx, gy,
+            gridCols, gridRows, dragStoreState.wallEdges,
+          );
+          if (!wallCheck.allowed) {
+            const el = document.querySelector(`[data-token-id="${orig.tokenId}"]`) as HTMLElement | null;
+            if (el) { el.classList.add("token-bump"); setTimeout(() => el.classList.remove("token-bump"), 200); }
+            if ("message" in wallCheck) dragStoreState.addToast(wallCheck.message);
+            dragRef.current = null;
+            setDragPos(null);
+            useGameplayStore.getState().clearDragWaypoints();
+            done();
+            return;
+          }
+
           // Calculate total distance along waypoints
           const wps = useGameplayStore.getState().dragWaypoints;
           const allPts = [
@@ -1782,6 +1800,7 @@ export function MapCanvas() {
             return (
               <div
                 key={token.id}
+                data-token-id={token.id}
                 className={`pointer-events-auto absolute flex cursor-grab flex-col items-center justify-center ${isDead ? "opacity-30" : ""} ${isDragging ? "z-30 opacity-70" : ""} ${isHidden ? "opacity-40" : ""}`}
                 style={{
                   left: dx, top: dy, width: size, height: size,

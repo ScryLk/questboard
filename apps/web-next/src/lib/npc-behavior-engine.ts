@@ -246,4 +246,86 @@ export function computeNextState(
   return { ...npc, x: newX, y: newY, vx: finalVx, vy: finalVy, facing };
 }
 
+export function computeNextStateWithPath(
+  npc: NpcState,
+  others: NpcState[],
+  config: BehaviorConfig,
+  nextWaypoint: { x: number; y: number } | null,
+  tick: number,
+): NpcState {
+  let fx = 0;
+  let fy = 0;
+
+  if (nextWaypoint) {
+    const s = seek(npc, nextWaypoint, config.speed);
+    const sep = separate(npc, others, config.separationRadius);
+    const chaos =
+      config.type === "PANIC"
+        ? randomPerturbation(config.chaosCoefficient * 0.4)
+        : { fx: 0, fy: 0 };
+    fx = s.fx + sep.fx * 0.5 + chaos.fx;
+    fy = s.fy + sep.fy * 0.5 + chaos.fy;
+  } else {
+    switch (config.type) {
+      case "PANIC": {
+        const changeDirEvery = 2;
+        const shouldChange =
+          tick % changeDirEvery === 0 || (npc.vx === 0 && npc.vy === 0);
+        const dir = shouldChange
+          ? randomPerturbation(1.0)
+          : { fx: npc.vx, fy: npc.vy };
+        const sep = separate(npc, others, config.separationRadius);
+        const p = randomPerturbation(config.chaosCoefficient);
+        const spd = cellsPerTick(config.speed * (0.5 + Math.random() * 0.8));
+        const mag = Math.hypot(dir.fx, dir.fy) || 1;
+        fx = (dir.fx / mag) * spd + sep.fx * 0.6 + p.fx;
+        fy = (dir.fy / mag) * spd + sep.fy * 0.6 + p.fy;
+        break;
+      }
+      case "RIOT": {
+        const leaders = others.filter((o) => o.role === "LEADER");
+        const pivot = leaders[0] ?? others[0];
+        if (npc.role === "LEADER" && pivot) {
+          const f = seek(npc, pivot, config.speed * 0.8);
+          const s = separate(npc, others, config.separationRadius * 0.6);
+          fx = f.fx + s.fx * 0.3;
+          fy = f.fy + s.fy * 0.3;
+        } else {
+          const p = randomPerturbation(config.chaosCoefficient);
+          const s = separate(npc, others, config.separationRadius);
+          fx = p.fx * 2 + s.fx * 0.4;
+          fy = p.fy * 2 + s.fy * 0.4;
+        }
+        break;
+      }
+      default: {
+        const p = randomPerturbation(config.chaosCoefficient || 0.3);
+        const s = separate(npc, others, config.separationRadius);
+        fx = p.fx + s.fx * 0.5;
+        fy = p.fy + s.fy * 0.5;
+        break;
+      }
+    }
+  }
+
+  const w = avoidWalls(npc.x, npc.y, fx, fy, config.walls);
+  fx += w.fx;
+  fy += w.fy;
+
+  const damping = 0.75;
+  const nvx = npc.vx * damping + fx;
+  const nvy = npc.vy * damping + fy;
+  const maxSpeed = cellsPerTick(config.speed * 1.5);
+  const speed = Math.hypot(nvx, nvy);
+  const scale = speed > maxSpeed ? maxSpeed / speed : 1;
+
+  const finalVx = nvx * scale;
+  const finalVy = nvy * scale;
+  const newX = npc.x + finalVx;
+  const newY = npc.y + finalVy;
+  const facing = speed > 0.01 ? Math.atan2(finalVy, finalVx) : npc.facing;
+
+  return { ...npc, x: newX, y: newY, vx: finalVx, vy: finalVy, facing };
+}
+
 export const TICK_INTERVAL_MS = TICK_MS;

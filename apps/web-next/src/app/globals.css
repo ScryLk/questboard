@@ -352,3 +352,41 @@ body {
   0%, 100% { background-position: 200% 0; }
   50% { background-position: -200% 0; }
 }
+
+/* ── Token collision bump animation ── */
+@keyframes tokenBump {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(4px); }
+  30%  { transform: translateX(-4px); }
+  45%  { transform: translateX(3px); }
+  60%  { transform: translateX(-3px); }
+  75%  { transform: translateX(1px); }
+  100% { transform: translateX(0); }
+}
+
+.token-bump {
+  animation: tokenBump 200ms ease-out;
+}
+
+/* ── Door slam open animation ── */
+@keyframes doorSlamOpen {
+  0%   { transform: scaleX(1); opacity: 1; }
+  50%  { transform: scaleX(0.3); opacity: 0.5; }
+  100% { transform: scaleX(0); opacity: 0; }
+}
+
+.door-slam-open {
+  animation: doorSlamOpen 200ms ease-out forwards;
+}
+
+/* ── Door break animation ── */
+@keyframes doorBreak {
+  0%   { transform: scale(1) rotate(0deg); opacity: 1; }
+  30%  { transform: scale(1.1) rotate(2deg); opacity: 1; }
+  60%  { transform: scale(0.8) rotate(-5deg); opacity: 0.5; }
+  100% { transform: scale(0.3) rotate(10deg); opacity: 0; }
+}
+
+.door-break {
+  animation: doorBreak 400ms ease-out forwards;
+}

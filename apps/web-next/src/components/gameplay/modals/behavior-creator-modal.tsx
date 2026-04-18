@@ -14,7 +14,10 @@ import type {
   AiBehaviorParams,
 } from "@/lib/npc-behavior-types";
 import { broadcastSend } from "@/lib/broadcast-sync";
+import { MOCK_MAP } from "@/lib/gameplay-mock-data";
+import { buildWallSetFromEdges } from "@/lib/behavior-walls";
 import { ModalShell } from "./modal-shell";
+import { ExitZoneConfig } from "./exit-zone-config";
 
 interface BehaviorCreatorModalProps {
   onClose: () => void;
@@ -23,6 +26,7 @@ interface BehaviorCreatorModalProps {
 export function BehaviorCreatorModal({ onClose }: BehaviorCreatorModalProps) {
   const tokens = useGameplayStore((s) => s.tokens);
   const selectedTokenIds = useGameplayStore((s) => s.selectedTokenIds);
+  const wallEdges = useGameplayStore((s) => s.wallEdges);
   const activeMapId = "default";
 
   const selectedTokens = tokens.filter(
@@ -121,8 +125,9 @@ export function BehaviorCreatorModal({ onClose }: BehaviorCreatorModalProps) {
       aiParams: overrideAi,
     });
 
-    const walls = new Set<string>();
-    store.startBehavior(behaviorId, walls);
+    const walls = buildWallSetFromEdges(wallEdges);
+    const gridSize = { w: MOCK_MAP.gridCols, h: MOCK_MAP.gridRows };
+    store.startBehavior(behaviorId, walls, wallEdges, gridSize);
 
     broadcastSend("npc:behavior-started", {
       behaviorId,
@@ -398,6 +403,11 @@ export function BehaviorCreatorModal({ onClose }: BehaviorCreatorModalProps) {
                   ))}
                 </select>
               </div>
+
+              {/* Exit zones — shown for behaviors that use pathfinding */}
+              {needsTarget && (
+                <ExitZoneConfig gridCols={MOCK_MAP.gridCols} gridRows={MOCK_MAP.gridRows} />
+              )}
 
               {/* Start button */}
               <button

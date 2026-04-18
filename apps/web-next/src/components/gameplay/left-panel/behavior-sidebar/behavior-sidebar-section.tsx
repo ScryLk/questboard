@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Bot,
   ChevronDown,
@@ -12,9 +11,17 @@ import {
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
+import type { NpcPathStatus } from "@/lib/npc-behavior-store";
 import { BEHAVIOR_META } from "@/lib/npc-behavior-types";
 import type { NpcBehavior } from "@/lib/npc-behavior-types";
 import { broadcastSend } from "@/lib/broadcast-sync";
+
+const PATH_STATUS_CONFIG: Record<NpcPathStatus, { label: string; color: string; dot: string }> = {
+  seeking: { label: "procurando saída", color: "text-amber-400", dot: "bg-amber-400" },
+  following: { label: "em fuga", color: "text-[#00B894]", dot: "bg-[#00B894]" },
+  trapped: { label: "PRESO", color: "text-red-400", dot: "bg-red-400" },
+  escaped: { label: "escapou", color: "text-blue-400", dot: "bg-blue-400" },
+};
 
 export function BehaviorSidebarSection() {
   const collapsed = useGameplayStore((s) => s.collapsedSections["behaviors"]);
@@ -22,6 +29,7 @@ export function BehaviorSidebarSection() {
   const openModal = useGameplayStore((s) => s.openModal);
 
   const behaviors = useNpcBehaviorStore((s) => s.behaviors);
+  const escapedTokens = useNpcBehaviorStore((s) => s.escapedTokens);
   const activeBehaviors = Object.values(behaviors).filter(
     (b) => b.status === "ACTIVE" || b.status === "PAUSED",
   );
@@ -69,6 +77,20 @@ export function BehaviorSidebarSection() {
               ))}
             </div>
           )}
+
+          {/* Escaped tokens summary */}
+          {escapedTokens.length > 0 && (
+            <div className="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-2 py-1.5">
+              <div className="text-[9px] font-semibold text-blue-400 mb-1">
+                Escaparam ({escapedTokens.length})
+              </div>
+              {escapedTokens.slice(-5).map((esc, i) => (
+                <div key={i} className="text-[9px] text-brand-muted">
+                  👤 {esc.tokenId.slice(0, 8)} → {esc.exitLabel}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -80,6 +102,7 @@ function BehaviorItem({ behavior }: { behavior: NpcBehavior }) {
   const resumeBehavior = useNpcBehaviorStore((s) => s.resumeBehavior);
   const stopBehavior = useNpcBehaviorStore((s) => s.stopBehavior);
   const removeBehavior = useNpcBehaviorStore((s) => s.removeBehavior);
+  const npcPaths = useNpcBehaviorStore((s) => s.npcPaths);
 
   const meta = BEHAVIOR_META[behavior.type];
   const isPaused = behavior.status === "PAUSED";
@@ -90,6 +113,9 @@ function BehaviorItem({ behavior }: { behavior: NpcBehavior }) {
     behavior.durationMs && behavior.durationMs > 0
       ? Math.min(1, elapsed / behavior.durationMs)
       : null;
+
+  const paths = npcPaths[behavior.id];
+  const hasPathData = paths && Object.keys(paths).length > 0;
 
   function handlePauseResume() {
     if (isPaused) {
@@ -128,8 +154,6 @@ function BehaviorItem({ behavior }: { behavior: NpcBehavior }) {
             </span>
           </div>
           <div className="text-[9px] text-brand-muted truncate">
-            {behavior.participants.map((p) => p.tokenId.slice(0, 6)).join(", ")}
-            {" · "}
             {behavior.participants.length} tokens
           </div>
         </div>
@@ -161,6 +185,31 @@ function BehaviorItem({ behavior }: { behavior: NpcBehavior }) {
           </button>
         </div>
       </div>
+
+      {/* NPC path status indicators */}
+      {hasPathData && (
+        <div className="mt-1 space-y-0.5">
+          {behavior.participants.map((p) => {
+            const pathState = paths[p.tokenId];
+            if (!pathState) return null;
+            const statusConf = PATH_STATUS_CONFIG[pathState.status];
+            return (
+              <div key={p.tokenId} className="flex items-center gap-1 text-[9px]">
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusConf.dot}`} />
+                <span className={statusConf.color}>
+                  {p.tokenId.slice(0, 6)}
+                </span>
+                <span className="text-brand-muted">
+                  — {statusConf.label}
+                  {pathState.targetExit && pathState.status === "following" && (
+                    <> ({pathState.targetExit.label})</>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {progress !== null && (
         <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">

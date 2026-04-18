@@ -74,7 +74,12 @@ export type BroadcastMessageType =
   | "npc:behavior-started"      // Behavior started (with participant info)
   | "npc:behavior-tick"         // Behavior tick (positions update)
   | "npc:behavior-paused"       // Behavior paused
-  | "npc:behavior-ended";       // Behavior stopped/completed
+  | "npc:behavior-ended"        // Behavior stopped/completed
+  // NPC Behavior — Door & Escape events
+  | "door:npc-opened"           // NPC in panic pushed a door open
+  | "door:npc-broken"           // NPC in riot broke a door
+  | "npc:escaped"               // NPC reached exit cell and disappeared
+  | "npc:trapped";              // NPC has no path to any exit
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;
