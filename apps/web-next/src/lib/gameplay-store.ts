@@ -127,6 +127,7 @@ export type ModalName =
   | "objectEditor"
   | "characterEditor"
   | "dialogueTreeEditor"
+  | "behaviorCreator"
   | null;
 
 export interface ContextMenuState {
@@ -1230,7 +1231,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     return { x: centerX, y: centerY };
   },
 
-  collapsedSections: { tokens: true, npcs: true, characters: true, audio: true },
+  collapsedSections: { tokens: true, npcs: true, characters: true, audio: true, behaviors: true },
   toggleSection: (key) =>
     set((s) => ({
       collapsedSections: {

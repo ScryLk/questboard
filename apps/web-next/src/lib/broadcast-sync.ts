@@ -69,7 +69,12 @@ export type BroadcastMessageType =
   // NPC Voice — Player → GM
   | "npc:voice-recording"       // Player started recording voice
   | "npc:voice-processing"      // Voice audio sent for processing
-  | "npc:voice-result";         // Voice result (transcription + NPC response)
+  | "npc:voice-result"          // Voice result (transcription + NPC response)
+  // NPC Behavior — GM → Player
+  | "npc:behavior-started"      // Behavior started (with participant info)
+  | "npc:behavior-tick"         // Behavior tick (positions update)
+  | "npc:behavior-paused"       // Behavior paused
+  | "npc:behavior-ended";       // Behavior stopped/completed
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;

@@ -64,8 +64,10 @@ import { AMBIENT_LIGHT_CONFIG } from "@/lib/map-sidebar-types";
 import type { LayerId } from "@/lib/map-sidebar-types";
 import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
 import { useCameraStore } from "@/lib/camera-store";
+import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
 
 export function MapCanvas() {
+  const behaviorRenderStates = useNpcBehaviorStore((s) => s.renderStates);
   const gridVisible = useGameplayStore((s) => s.gridVisible);
   const tokens = useGameplayStore((s) => s.tokens);
   const tokenCreatureMap = useGameplayStore((s) => s.tokenCreatureMap);
@@ -1771,8 +1773,11 @@ export function MapCanvas() {
             const isInvisible = token.visibility === "invisible";
             const isHidden = token.visibility === "hidden";
             const size = token.size * scaledCell;
-            const dx = isDragging ? dragPos.x * scaledCell : token.x * scaledCell;
-            const dy = isDragging ? dragPos.y * scaledCell : token.y * scaledCell;
+            const behRender = behaviorRenderStates[token.id];
+            const baseX = behRender ? behRender.targetX : token.x;
+            const baseY = behRender ? behRender.targetY : token.y;
+            const dx = isDragging ? dragPos.x * scaledCell : baseX * scaledCell;
+            const dy = isDragging ? dragPos.y * scaledCell : baseY * scaledCell;
 
             return (
               <div

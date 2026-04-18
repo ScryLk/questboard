@@ -8,6 +8,7 @@ import { NPCSidebarSection } from "./npc-sidebar/npc-sidebar-section";
 import { CharacterSidebarSection } from "./character-sidebar/character-sidebar-section";
 import { ObjectLibrarySection } from "./object-library/object-library-section";
 import { AudioPanel } from "../audio/audio-panel";
+import { BehaviorSidebarSection } from "./behavior-sidebar/behavior-sidebar-section";
 
 export function LeftPanel() {
   return (
@@ -19,6 +20,7 @@ export function LeftPanel() {
       <NPCSidebarSection />
       <CharacterSidebarSection />
       <ObjectLibrarySection />
+      <BehaviorSidebarSection />
       <AudioPanel />
     </div>
   );

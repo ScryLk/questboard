@@ -30,6 +30,7 @@ import { SceneCardIndicator } from "./toolbar/scene-card-indicator";
 import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
 import { NpcConversationSync } from "@/components/npc-conversation/NpcConversationSync";
+import { NpcBehaviorSync } from "./npc-behavior-sync";
 
 
 export function GameplayLayout() {
@@ -169,6 +170,9 @@ export function GameplayLayout() {
 
       {/* NPC Conversation sync */}
       <NpcConversationSync role="gm" />
+
+      {/* NPC Behavior sync (tick broadcast + combat/scene integration) */}
+      <NpcBehaviorSync />
     </div>
     </SFXProvider>
   );

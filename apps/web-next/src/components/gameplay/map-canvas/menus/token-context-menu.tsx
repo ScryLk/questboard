@@ -17,11 +17,15 @@ import {
   Users,
   XCircle,
   Zap,
+  Bot,
 } from "lucide-react";
 import type { GameToken, ConditionType, TokenAlignment, TokenVisibility } from "@/lib/gameplay-mock-data";
 import { ALL_CONDITIONS, getAlignmentColor } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { ALIGNMENT_EYE_COLORS, ALIGNMENT_LABELS } from "@/constants/creature-sprites";
+import { BEHAVIOR_META } from "@/lib/npc-behavior-types";
+import type { BehaviorType } from "@/lib/npc-behavior-types";
+import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
 
 interface TokenContextMenuProps {
   token: GameToken;
@@ -46,7 +50,7 @@ const VISIBILITY_OPTIONS: { value: TokenVisibility; label: string }[] = [
 
 export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [submenu, setSubmenu] = useState<"conditions" | "visibility" | "alignment" | "size" | null>(null);
+  const [submenu, setSubmenu] = useState<"conditions" | "visibility" | "alignment" | "size" | "behavior" | null>(null);
 
   const removeToken = useGameplayStore((s) => s.removeToken);
   const duplicateToken = useGameplayStore((s) => s.duplicateToken);
@@ -209,6 +213,12 @@ export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps
           hasSubmenu
           onHover={() => setSubmenu("size")}
         />
+        <MenuItem
+          icon={Bot}
+          label="Comportamento"
+          hasSubmenu
+          onHover={() => setSubmenu("behavior")}
+        />
         <div className="mx-2 my-0.5 h-px bg-brand-border" />
         <MenuItem
           icon={Copy}
@@ -352,6 +362,38 @@ export function TokenContextMenu({ token, x, y, onClose }: TokenContextMenuProps
                   }`}
                 />
                 {s.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {submenu === "behavior" && (
+        <div className="ml-1 min-w-[200px] rounded-lg border border-brand-border bg-[#16161D] py-1 shadow-xl">
+          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-brand-muted">
+            Comportamento
+          </div>
+          {(Object.keys(BEHAVIOR_META) as BehaviorType[]).map((type) => {
+            const meta = BEHAVIOR_META[type];
+            const activeBeh = useNpcBehaviorStore.getState().getBehaviorForToken(token.id);
+            const isActive = activeBeh?.type === type;
+            return (
+              <button
+                key={type}
+                onClick={() => {
+                  useGameplayStore.getState().openModal("behaviorCreator");
+                  onClose();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-brand-text hover:bg-white/[0.05]"
+              >
+                <span className="text-sm">{meta.emoji}</span>
+                <div className="flex-1">
+                  <span className={isActive ? "text-[#7c5cfc] font-semibold" : ""}>{meta.label}</span>
+                  <span className="ml-1.5 text-[9px] text-brand-muted">{meta.description}</span>
+                </div>
+                {isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#00B894] animate-pulse" />
+                )}
               </button>
             );
           })}

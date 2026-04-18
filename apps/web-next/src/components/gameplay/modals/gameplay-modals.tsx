@@ -18,6 +18,7 @@ import { EncounterGroupEditor } from "./encounter-group-editor";
 import { ObjectEditorModal } from "./object-editor/object-editor-modal";
 import { CharacterEditorModal } from "./character-editor/character-editor-modal";
 import { DialogueTreeEditor } from "@/components/npc-conversation/DialogueTreeEditor";
+import { BehaviorCreatorModal } from "./behavior-creator-modal";
 
 export function GameplayModals() {
   const activeModal = useGameplayStore((s) => s.activeModal);
@@ -60,6 +61,8 @@ export function GameplayModals() {
       return <CharacterEditorModal onClose={closeModal} />;
     case "dialogueTreeEditor":
       return <DialogueTreeEditor onClose={closeModal} />;
+    case "behaviorCreator":
+      return <BehaviorCreatorModal onClose={closeModal} />;
     default:
       return null;
   }
