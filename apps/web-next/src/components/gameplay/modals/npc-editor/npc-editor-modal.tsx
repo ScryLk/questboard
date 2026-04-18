@@ -5,6 +5,7 @@ import {
   BookOpen,
   Brain,
   Heart,
+  MessageCircle,
   Sparkles,
   Sword,
   User,
@@ -18,12 +19,14 @@ import { TabPersonalidade } from "./tab-personalidade";
 import { TabConhecimento } from "./tab-conhecimento";
 import { TabCombate } from "./tab-combate";
 import { TabIA } from "./tab-ia";
+import { TabConversa } from "./tab-conversa";
 
 const TABS = [
   { key: "basico", label: "Basico", icon: User },
   { key: "personalidade", label: "Personalidade", icon: Heart },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
   { key: "combate", label: "Combate", icon: Sword },
+  { key: "conversa", label: "Conversa", icon: MessageCircle },
   { key: "ia", label: "IA", icon: Sparkles },
 ] as const;
 
@@ -129,6 +132,9 @@ export function NPCEditorModal({ onClose }: NPCEditorModalProps) {
           )}
           {activeTab === "combate" && (
             <TabCombate form={form} onUpdate={updateForm} />
+          )}
+          {activeTab === "conversa" && (
+            <TabConversa form={form} onUpdate={updateForm} />
           )}
           {activeTab === "ia" && <TabIA form={form} onUpdate={updateForm} />}
         </div>

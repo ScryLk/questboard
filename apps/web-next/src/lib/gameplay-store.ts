@@ -125,6 +125,7 @@ export type ModalName =
   | "encounterGroupEditor"
   | "objectEditor"
   | "characterEditor"
+  | "dialogueTreeEditor"
   | null;
 
 export interface ContextMenuState {

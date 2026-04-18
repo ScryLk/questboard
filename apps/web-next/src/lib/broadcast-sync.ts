@@ -55,7 +55,17 @@ export type BroadcastMessageType =
   | "lobby:character-selected" // Player selected character
   | "lobby:ready"            // Player ready toggle
   | "lobby:player-chat"      // Player lobby chat
-  | "lobby:ping";            // Heartbeat
+  | "lobby:ping"             // Heartbeat
+  // NPC Conversation — Player → GM
+  | "npc:conversation-started"  // Player started NPC conversation
+  | "npc:player-message"        // Player sent message to NPC
+  | "npc:conversation-ended"    // Player ended NPC conversation
+  // NPC Conversation — GM → Player
+  | "npc:gm-override"           // GM typed as NPC
+  | "npc:mood-changed"          // GM changed NPC mood
+  | "npc:reputation-changed"    // Reputation update
+  | "npc:npc-message"           // NPC response (AI or scripted)
+  | "npc:npc-thinking";         // NPC is generating response
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;

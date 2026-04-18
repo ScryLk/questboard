@@ -6,6 +6,7 @@ import { useGameplayStore } from "@/lib/gameplay-store";
 import { ChatTab } from "./chat-tab";
 import { DiceTab } from "./dice-tab";
 import { CharacterSheetTab } from "./character-sheet-tab";
+import { GmConversationMonitor } from "@/components/npc-conversation/GmConversationMonitor";
 
 const TABS: { key: RightPanelTab; label: string; icon: typeof MessageCircle }[] = [
   { key: "chat", label: "Chat", icon: MessageCircle },
@@ -43,6 +44,9 @@ export function RightPanel() {
         {rightTab === "dice" && <DiceTab />}
         {rightTab === "sheet" && <CharacterSheetTab />}
       </div>
+
+      {/* Active NPC conversations monitor */}
+      <GmConversationMonitor />
     </div>
   );
 }

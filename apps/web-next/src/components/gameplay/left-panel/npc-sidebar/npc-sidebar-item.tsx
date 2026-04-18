@@ -5,6 +5,7 @@ import {
   Copy,
   Eye,
   MapPin,
+  MessageCircle,
   Pencil,
   PlusCircle,
   Star,
@@ -14,6 +15,7 @@ import type { NPCData } from "@/lib/npc-types";
 import { NPC_TYPE_CONFIG } from "@/lib/npc-types";
 import { useNPCStore } from "@/lib/npc-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useNpcConversationStore } from "@/lib/npc-conversation-store";
 import { AddToMapPopover } from "./add-to-map-popover";
 
 interface NPCSidebarItemProps {
@@ -35,6 +37,8 @@ export function NPCSidebarItem({
   const setNpcEditorTarget = useGameplayStore((s) => s.setNpcEditorTarget);
   const selectToken = useGameplayStore((s) => s.selectToken);
   const removeToken = useGameplayStore((s) => s.removeToken);
+  const getProfile = useNpcConversationStore((s) => s.getProfile);
+  const hasConversationProfile = !!getProfile(npc.id);
 
   const typeConfig = NPC_TYPE_CONFIG.find((c) => c.key === npc.type);
   const initials = npc.portrait || npc.name.slice(0, 2).toUpperCase();
@@ -83,6 +87,9 @@ export function NPCSidebarItem({
             </span>
             {npc.aiEnabled && (
               <span className="text-[8px] text-brand-accent">IA</span>
+            )}
+            {hasConversationProfile && (
+              <MessageCircle className="h-2.5 w-2.5 text-[#7c5cfc]" />
             )}
           </div>
           <div className="flex items-center gap-1 text-[9px] text-brand-muted">

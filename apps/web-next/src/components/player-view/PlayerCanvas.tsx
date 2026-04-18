@@ -10,6 +10,8 @@ import {
 } from "@/lib/gameplay-mock-data";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useNpcConversationStore } from "@/lib/npc-conversation-store";
+import { useNPCStore } from "@/lib/npc-store";
 import { getHPDescriptionColor } from "@/lib/visibility-filter";
 import { FogOverlay } from "../gameplay/map-canvas/overlays/fog-overlay";
 import { TerrainOverlay } from "../gameplay/map-canvas/overlays/terrain-overlay";
@@ -174,6 +176,38 @@ export function PlayerCanvas() {
     [visibleTokens, combat, isMyTurn, settings, scaledCell, gridCols, gridRows, cellSizeFt, moveMyToken, addMovementFt, dragPos],
   );
 
+  // NPC conversation
+  const getTokenNpcId = useNPCStore((s) => s.getTokenNpcId);
+  const npcStore = useNPCStore.getState;
+  const getProfile = useNpcConversationStore((s) => s.getProfile);
+  const startConversation = useNpcConversationStore((s) => s.startConversation);
+  const openPlayerConversation = useNpcConversationStore((s) => s.openPlayerConversation);
+  const playerName = usePlayerViewStore((s) => s.playerName);
+  const characterId = usePlayerViewStore((s) => s.characterId);
+
+  const handleTokenClick = useCallback(
+    (token: typeof visibleTokens[0]) => {
+      if (token.isMe) return;
+      const npcId = getTokenNpcId(token.id);
+      if (!npcId) return;
+      const profile = getProfile(npcId);
+      if (!profile) return;
+      const npc = npcStore().npcs.find((n) => n.id === npcId);
+      if (!npc) return;
+
+      const convId = startConversation({
+        npcId,
+        npcName: npc.name,
+        npcPortrait: npc.portrait,
+        npcPortraitColor: npc.portraitColor,
+        characterId: characterId ?? "p1",
+        characterName: playerName || "Jogador",
+      });
+      openPlayerConversation(convId);
+    },
+    [getTokenNpcId, getProfile, startConversation, openPlayerConversation, npcStore, playerName, characterId],
+  );
+
   // Hover tooltip
   const handleTokenEnter = useCallback((e: React.MouseEvent, token: typeof visibleTokens[0]) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -287,6 +321,7 @@ export function PlayerCanvas() {
                   : undefined,
                 ...(isBeingDragged ? { cursor: "grabbing" } : {}),
               }}
+              onClick={() => handleTokenClick(token)}
               onMouseDown={(e) => handleTokenMouseDown(e, token.id)}
               onMouseEnter={(e) => handleTokenEnter(e, token)}
               onMouseLeave={handleTokenLeave}

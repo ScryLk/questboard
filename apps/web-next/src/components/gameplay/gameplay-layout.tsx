@@ -29,6 +29,7 @@ import { PhaseModal } from "./PhaseModal";
 import { SceneCardIndicator } from "./toolbar/scene-card-indicator";
 import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
+import { NpcConversationSync } from "@/components/npc-conversation/NpcConversationSync";
 
 
 export function GameplayLayout() {
@@ -165,6 +166,9 @@ export function GameplayLayout() {
 
       {/* OA dramatic vignette */}
       <OAAlertVignette active={pendingReaction !== null} />
+
+      {/* NPC Conversation sync */}
+      <NpcConversationSync role="gm" />
     </div>
     </SFXProvider>
   );

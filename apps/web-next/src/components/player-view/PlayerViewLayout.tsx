@@ -14,6 +14,9 @@ import { ScreenShake } from "./effects/ScreenShake";
 import { NatCelebration } from "./effects/NatCelebration";
 import { QuickBar } from "@/app/play/[code]/_components/QuickBar";
 import { WhisperOverlay } from "@/app/play/[code]/_components/WhisperOverlay";
+import { NpcDialogueScreen } from "@/components/npc-conversation/NpcDialogueScreen";
+import { NpcConversationSync } from "@/components/npc-conversation/NpcConversationSync";
+import { useNpcConversationStore } from "@/lib/npc-conversation-store";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -23,6 +26,7 @@ export function PlayerViewLayout() {
   const combat = usePlayerViewStore((s) => s.combat);
   const screenShake = usePlayerViewStore((s) => s.screenShake);
   const pendingWhisper = usePlayerViewStore((s) => s.pendingWhisper);
+  const activePlayerConversationId = useNpcConversationStore((s) => s.activePlayerConversationId);
 
   // Transition to end screen when session ends
   useEffect(() => {
@@ -93,6 +97,12 @@ export function PlayerViewLayout() {
       {/* Modal overlays */}
       {activeScene && <SceneCardOverlay scene={activeScene} />}
       {sessionPaused && <SessionPausedOverlay />}
+
+      {/* NPC dialogue fullscreen */}
+      {activePlayerConversationId && <NpcDialogueScreen />}
+
+      {/* NPC conversation sync */}
+      <NpcConversationSync role="player" />
     </div>
   );
 }

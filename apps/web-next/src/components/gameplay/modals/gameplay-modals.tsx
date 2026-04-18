@@ -17,6 +17,7 @@ import { TokenEditorModal } from "./token-editor/token-editor-modal";
 import { EncounterGroupEditor } from "./encounter-group-editor";
 import { ObjectEditorModal } from "./object-editor/object-editor-modal";
 import { CharacterEditorModal } from "./character-editor/character-editor-modal";
+import { DialogueTreeEditor } from "@/components/npc-conversation/DialogueTreeEditor";
 
 export function GameplayModals() {
   const activeModal = useGameplayStore((s) => s.activeModal);
@@ -57,6 +58,8 @@ export function GameplayModals() {
       return <ObjectEditorModal onClose={closeModal} />;
     case "characterEditor":
       return <CharacterEditorModal onClose={closeModal} />;
+    case "dialogueTreeEditor":
+      return <DialogueTreeEditor onClose={closeModal} />;
     default:
       return null;
   }
