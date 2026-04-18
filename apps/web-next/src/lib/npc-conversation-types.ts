@@ -5,6 +5,59 @@ export type NpcMood = "FRIENDLY" | "NEUTRAL" | "SUSPICIOUS" | "HOSTILE" | "AFRAI
 export type MessageRole = "PLAYER" | "NPC" | "SYSTEM";
 export type SpeechStyle = "FORMAL" | "CASUAL" | "AGGRESSIVE" | "DECEPTIVE" | "PLEADING" | "JOKING" | "INTIMIDATING";
 
+// ── Voice / VAD Types ──
+
+export type PlayerEmotion = "ANGRY" | "FEARFUL" | "SAD" | "JOYFUL" | "CALM" | "NERVOUS" | "DESPERATE" | "CONTEMPTUOUS" | "NEUTRAL";
+export type VoiceVolume = "WHISPERING" | "NORMAL" | "LOUD";
+export type VoicePace = "SLOW" | "NORMAL" | "FAST";
+export type VoiceState = "idle" | "recording" | "processing";
+
+export const EMOTION_ICONS: Record<PlayerEmotion, string> = {
+  ANGRY: "😤",
+  FEARFUL: "😰",
+  SAD: "😢",
+  JOYFUL: "😊",
+  CALM: "😌",
+  NERVOUS: "😟",
+  DESPERATE: "🥺",
+  CONTEMPTUOUS: "😒",
+  NEUTRAL: "💬",
+};
+
+export const EMOTION_LABELS: Record<PlayerEmotion, string> = {
+  ANGRY: "Raivoso",
+  FEARFUL: "Com medo",
+  SAD: "Triste",
+  JOYFUL: "Alegre",
+  CALM: "Calmo",
+  NERVOUS: "Nervoso",
+  DESPERATE: "Desesperado",
+  CONTEMPTUOUS: "Desdenhoso",
+  NEUTRAL: "Neutro",
+};
+
+export const VOLUME_ICONS: Record<VoiceVolume, string> = {
+  WHISPERING: "🔇",
+  NORMAL: "🔊",
+  LOUD: "📢",
+};
+
+export const VOLUME_LABELS: Record<VoiceVolume, string> = {
+  WHISPERING: "Sussurro",
+  NORMAL: "Normal",
+  LOUD: "Gritando",
+};
+
+export interface GeminiVoiceResult {
+  playerText: string;
+  playerEmotion: PlayerEmotion;
+  playerVolume: VoiceVolume;
+  playerPace: VoicePace;
+  emotionIntensity: number;
+  npcResponse: string;
+  reputationDelta: number;
+}
+
 export const MOOD_LABELS: Record<NpcMood, string> = {
   FRIENDLY: "Amigável",
   NEUTRAL: "Neutro",
@@ -116,6 +169,12 @@ export interface NpcConversationMessage {
   detectedStyle?: SpeechStyle;
   reputationDelta: number;
   createdAt: string;
+  // Voice metadata (player messages only)
+  wasVoice?: boolean;
+  detectedEmotion?: PlayerEmotion;
+  detectedVolume?: VoiceVolume;
+  detectedPace?: VoicePace;
+  emotionIntensity?: number;
 }
 
 // ── Active Conversation State ──

@@ -27,6 +27,45 @@ export function NpcConversationSync({ role }: { role: "gm" | "player" }) {
             break;
           case "npc:conversation-ended":
             break;
+          case "npc:voice-recording":
+            setNpcThinking(convId, false);
+            break;
+          case "npc:voice-processing":
+            setNpcThinking(convId, true);
+            break;
+          case "npc:voice-result": {
+            const vr = payload as {
+              playerText: string;
+              playerEmotion: string;
+              playerVolume: string;
+              emotionIntensity: number;
+              npcResponse: string;
+              reputationDelta: number;
+            };
+            setNpcThinking(convId, false);
+            addMessage(convId, {
+              role: "PLAYER",
+              text: vr.playerText,
+              wasAI: false,
+              gmOverride: false,
+              reputationDelta: vr.reputationDelta,
+              wasVoice: true,
+              detectedEmotion: vr.playerEmotion as any,
+              detectedVolume: vr.playerVolume as any,
+              emotionIntensity: vr.emotionIntensity,
+            });
+            addMessage(convId, {
+              role: "NPC",
+              text: vr.npcResponse,
+              wasAI: true,
+              gmOverride: false,
+              reputationDelta: 0,
+            });
+            if (vr.reputationDelta !== 0) {
+              updateReputation(convId, vr.reputationDelta);
+            }
+            break;
+          }
         }
       }
 

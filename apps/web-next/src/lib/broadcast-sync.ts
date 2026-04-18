@@ -65,7 +65,11 @@ export type BroadcastMessageType =
   | "npc:mood-changed"          // GM changed NPC mood
   | "npc:reputation-changed"    // Reputation update
   | "npc:npc-message"           // NPC response (AI or scripted)
-  | "npc:npc-thinking";         // NPC is generating response
+  | "npc:npc-thinking"          // NPC is generating response
+  // NPC Voice — Player → GM
+  | "npc:voice-recording"       // Player started recording voice
+  | "npc:voice-processing"      // Voice audio sent for processing
+  | "npc:voice-result";         // Voice result (transcription + NPC response)
 
 export interface BroadcastMessage {
   type: BroadcastMessageType;

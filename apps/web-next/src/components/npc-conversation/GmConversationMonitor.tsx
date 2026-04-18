@@ -4,18 +4,22 @@ import { useState, useRef, useEffect } from "react";
 import {
   Eye,
   Send,
-  Settings,
   Square,
   MessageCircle,
   Brain,
   BookOpen,
   Shuffle,
+  Mic,
 } from "lucide-react";
 import { useNpcConversationStore } from "@/lib/npc-conversation-store";
 import {
   MOOD_LABELS,
   MOOD_COLORS,
   getReputationLabel,
+  EMOTION_ICONS,
+  EMOTION_LABELS,
+  VOLUME_ICONS,
+  VOLUME_LABELS,
 } from "@/lib/npc-conversation-types";
 import type { NpcConversation } from "@/lib/npc-conversation-types";
 
@@ -116,6 +120,9 @@ function ConversationListItem({
           </span>
           <span className="text-[9px]" style={{ color: modeConf.color }}>
             <ModeIcon className="inline h-2.5 w-2.5" /> {modeConf.label}
+            {conv.messages.some((m) => m.wasVoice) && (
+              <span className="text-[#FF4444]"> + VOZ</span>
+            )}
           </span>
         </div>
         {lastMsg && (
@@ -203,8 +210,17 @@ function ConversationDetail({
             ) : (
               <>
                 <span className={msg.role === "NPC" ? "font-semibold text-[#7c5cfc]" : "font-semibold text-[#74B9FF]"}>
+                  {msg.wasVoice && <Mic className="mr-0.5 inline h-2.5 w-2.5 text-[#FF4444]" />}
                   [{msg.role === "NPC" ? conv.npcName : conv.characterName}]
                 </span>
+                {msg.wasVoice && msg.detectedEmotion && msg.emotionIntensity && msg.emotionIntensity > 0.3 && (
+                  <span className="ml-1 text-[9px] text-[#A29BFE]">
+                    {EMOTION_ICONS[msg.detectedEmotion]} {EMOTION_LABELS[msg.detectedEmotion]}
+                    {msg.detectedVolume && msg.detectedVolume !== "NORMAL" && (
+                      <> · {VOLUME_ICONS[msg.detectedVolume]} {VOLUME_LABELS[msg.detectedVolume]}</>
+                    )}
+                  </span>
+                )}
                 <span className="text-[#999]">: {msg.text}</span>
                 {msg.gmOverride && <span className="ml-1 text-[9px] text-[#E17055]">(GM)</span>}
               </>
