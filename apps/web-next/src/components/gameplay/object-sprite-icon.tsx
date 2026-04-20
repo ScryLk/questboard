@@ -1,8 +1,13 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { getObjectSpriteUrl } from "@questboard/constants";
+import {
+  getObjectSpriteMeta,
+  getObjectSpriteFrameUrls,
+  OBJECT_SPRITE_BASE,
+} from "@questboard/constants";
 import type { MapObjectType } from "@/lib/gameplay-mock-data";
+import { FireSpriteIcon } from "./fire-sprite-icon";
 
 interface Props {
   type: MapObjectType;
@@ -18,13 +23,9 @@ interface Props {
 
 /**
  * Renderiza o ícone de um objeto do mapa.
- * - Se `type` tem sprite pixel-art mapeado em `OBJECT_SPRITE_MAP`, usa `<img>`.
- * - Caso contrário, renderiza o ícone Lucide recebido em `fallback`.
- *
- * O sprite usa `imageRendering: pixelated` pra manter o pixel-art crisp.
- * `object-fit: contain` centraliza o sprite na caixa — sprites com aspect
- * ratio diferente de 1:1 (ex: tocha 14×23, caixa 16×32) ficam centralizados
- * em vez de esticados.
+ * - Tipo com sprite `motion: "fire"` → FireSpriteIcon (cicla frames + flicker).
+ * - Tipo com sprite estático → <img> pixelated.
+ * - Tipo sem sprite → ícone Lucide de fallback.
  */
 export function ObjectSpriteIcon({
   type,
@@ -34,12 +35,26 @@ export function ObjectSpriteIcon({
   className,
   title,
 }: Props) {
-  const spriteUrl = getObjectSpriteUrl(type);
+  const meta = getObjectSpriteMeta(type);
 
-  if (spriteUrl) {
+  if (meta) {
+    const frameUrls = getObjectSpriteFrameUrls(type);
+
+    if (meta.motion === "fire" && meta.frames.length > 1) {
+      return (
+        <FireSpriteIcon
+          frameUrls={frameUrls}
+          frameDurationMs={meta.frameDurationMs ?? 100}
+          size={size}
+          title={title}
+          className={className}
+        />
+      );
+    }
+
     return (
       <img
-        src={spriteUrl}
+        src={`${OBJECT_SPRITE_BASE}/${meta.frames[0]}`}
         alt={title ?? ""}
         width={size}
         height={size}
