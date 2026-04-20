@@ -39,6 +39,9 @@ import type {
   MapObjectCell,
 } from "@/lib/gameplay-mock-data";
 import { MAP_OBJECT_CATALOG } from "@/lib/gameplay-mock-data";
+import { ObjectSpriteIcon } from "@/components/gameplay/object-sprite-icon";
+import { getObjectSpriteUrl } from "@questboard/constants";
+import { HelpCircle } from "lucide-react";
 import {
   getNearestEdge,
   getWallRenderLine,
@@ -1383,24 +1386,27 @@ export default function MapEditorPage() {
                 ))}
               </div>
               <div className="mb-2 grid max-h-[300px] grid-cols-3 gap-1 overflow-y-auto">
-                {filteredObjects.map((obj) => {
-                  const ObjIcon = obj.icon;
-                  return (
-                    <button
-                      key={obj.type}
+                {filteredObjects.map((obj) => (
+                  <button
+                    key={obj.type}
+                    title={obj.label}
+                    onClick={() => setState((s) => ({ ...s, activeObjectType: obj.type }))}
+                    className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-1.5 transition-colors ${
+                      state.activeObjectType === obj.type
+                        ? "border-brand-accent bg-brand-accent/10"
+                        : "border-transparent hover:border-brand-border"
+                    }`}
+                  >
+                    <ObjectSpriteIcon
+                      type={obj.type}
+                      fallback={obj.icon}
+                      size={20}
                       title={obj.label}
-                      onClick={() => setState((s) => ({ ...s, activeObjectType: obj.type }))}
-                      className={`flex flex-col items-center gap-0.5 rounded border p-1.5 transition-colors ${
-                        state.activeObjectType === obj.type
-                          ? "border-brand-accent bg-brand-accent/10"
-                          : "border-transparent hover:border-brand-border"
-                      }`}
-                    >
-                      <ObjIcon className="h-4 w-4 text-brand-text" />
-                      <span className="w-full truncate text-center text-[7px] text-brand-muted">{obj.label}</span>
-                    </button>
-                  );
-                })}
+                      className="text-brand-text"
+                    />
+                    <span className="w-full truncate text-center text-[7px] text-brand-muted">{obj.label}</span>
+                  </button>
+                ))}
               </div>
               <div className="mb-2 h-px bg-brand-border" />
               <div className="flex flex-col gap-1 text-[9px] text-brand-muted">
@@ -1587,8 +1593,9 @@ export default function MapEditorPage() {
 
               {/* Map objects */}
               {state.mapObjects.map((obj) => {
-                const Icon = objectIconMap.get(obj.type);
-                const iconSize = Math.max(10, scaledCell * 0.5);
+                const fallback = objectIconMap.get(obj.type) ?? HelpCircle;
+                const hasSprite = getObjectSpriteUrl(obj.type) !== null;
+                const iconSize = hasSprite ? scaledCell : Math.max(10, scaledCell * 0.5);
                 return (
                   <div
                     key={obj.id}
@@ -1602,13 +1609,12 @@ export default function MapEditorPage() {
                       zIndex: 4,
                     }}
                   >
-                    {Icon ? (
-                      <Icon size={iconSize} className="select-none text-brand-text drop-shadow-md" />
-                    ) : (
-                      <span className="select-none drop-shadow-md" style={{ fontSize: iconSize, lineHeight: 1 }}>
-                        ?
-                      </span>
-                    )}
+                    <ObjectSpriteIcon
+                      type={obj.type}
+                      fallback={fallback}
+                      size={iconSize}
+                      className="select-none text-brand-text drop-shadow-md"
+                    />
                   </div>
                 );
               })}

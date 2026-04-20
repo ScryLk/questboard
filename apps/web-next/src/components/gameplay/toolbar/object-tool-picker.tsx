@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { MAP_OBJECT_CATALOG } from "@/lib/gameplay-mock-data";
 import type { MapObjectInfo } from "@/lib/gameplay-mock-data";
+import { ObjectSpriteIcon } from "@/components/gameplay/object-sprite-icon";
 
 const CATEGORIES = [
   { id: "all", label: "Todos" },
@@ -32,14 +33,14 @@ export function ObjectToolPicker() {
       : MAP_OBJECT_CATALOG.filter((o) => o.category === category);
 
   return (
-    <div className="absolute left-1/2 top-14 z-40 flex -translate-x-1/2 flex-col gap-2 rounded-lg border border-brand-border bg-[#111116] px-3 py-2 shadow-xl">
+    <div className="absolute left-1/2 top-14 z-40 flex w-60 min-w-60 max-w-60 -translate-x-1/2 flex-col gap-2 overflow-hidden rounded-lg border border-brand-border bg-[#111116] px-3 py-2 shadow-xl">
       {/* Category tabs */}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap">
         {CATEGORIES.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setCategory(id)}
-            className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
+            className={`shrink-0 rounded px-2 py-0.5 text-[10px] transition-colors ${
               category === id
                 ? "bg-white/10 font-semibold text-brand-text"
                 : "text-brand-muted hover:bg-white/[0.04] hover:text-brand-text"
@@ -57,13 +58,19 @@ export function ObjectToolPicker() {
             key={obj.type}
             title={obj.label}
             onClick={() => setActiveObjectType(obj.type)}
-            className={`flex h-10 w-10 flex-col items-center justify-center rounded transition-colors ${
+            className={`flex h-10 w-10 cursor-pointer flex-col items-center justify-center rounded transition-colors ${
               activeObjectType === obj.type
                 ? "bg-brand-accent/20 ring-1 ring-brand-accent"
                 : "bg-white/[0.03] hover:bg-white/[0.06]"
             }`}
           >
-            <span className="text-sm leading-none">{obj.icon}</span>
+            <ObjectSpriteIcon
+              type={obj.type}
+              fallback={obj.icon}
+              size={18}
+              title={obj.label}
+              className="text-brand-text"
+            />
             <span className="mt-0.5 text-[7px] leading-none text-brand-muted">
               {obj.label}
             </span>

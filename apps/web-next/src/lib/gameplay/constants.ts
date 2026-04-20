@@ -1,11 +1,13 @@
-// ═══ CONSTANTES IMUTÁVEIS DO GRID ═══
-// ESTES VALORES SÃO FIXOS E NUNCA MUDAM DURANTE O JOGO.
-// Zoom é feito via scale do WorldContainer, NÃO mudando CELL_SIZE.
+// Re-export das constantes canônicas de `@questboard/constants`.
+// Mantido por compat com imports antigos (`@/lib/gameplay/constants`).
+// Nunca redefinir CELL_SIZE localmente — regra de ouro #1 do CLAUDE.md.
 
-export const CELL_SIZE = 64; // pixels por célula (no espaço do world)
-export const DEFAULT_GRID_COLS = 25;
-export const DEFAULT_GRID_ROWS = 25;
-export const MIN_ZOOM = 0.3;
-export const MAX_ZOOM = 3.0;
-export const DEFAULT_ZOOM = 1.0;
-export const CELL_SIZE_FT = 5; // pés por célula (D&D 5e)
+export {
+  CELL_SIZE,
+  CELL_SIZE_FT,
+  DEFAULT_GRID_COLS,
+  DEFAULT_GRID_ROWS,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  DEFAULT_ZOOM,
+} from "@questboard/constants";
