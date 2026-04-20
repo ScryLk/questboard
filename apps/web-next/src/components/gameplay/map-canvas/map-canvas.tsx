@@ -76,6 +76,8 @@ export function MapCanvas() {
   const clearSelection = useGameplayStore((s) => s.clearSelection);
   const setHoveredToken = useGameplayStore((s) => s.setHoveredToken);
   const moveToken = useGameplayStore((s) => s.moveToken);
+  const wallEdges = useGameplayStore((s) => s.wallEdges);
+  const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
   const pushMovementHistory = useGameplayStore((s) => s.pushMovementHistory);
   const addMovementFt = useGameplayStore((s) => s.addMovementFt);
   const movementUsedFt = useGameplayStore((s) => s.movementUsedFt);
@@ -144,10 +146,11 @@ export function MapCanvas() {
     [layers],
   );
 
-  const { gridCols, gridRows, name } = MOCK_MAP;
+  const mapConfig = useGameplayStore((s) => s.mapConfig);
+  const { gridCols, gridRows, name } = mapConfig;
   // CELL_SIZE é FIXO (64px) e NUNCA muda — importado de gameplay/constants
   const scaledCell = CELL_SIZE;
-  const cellSizeFt = CELL_SIZE_FT;
+  const cellSizeFt = mapConfig.cellSizeFt || CELL_SIZE_FT;
   const canvasW = gridCols * CELL_SIZE;
   const canvasH = gridRows * CELL_SIZE;
   const onMapTokens = tokens.filter((t) => t.onMap);
@@ -426,6 +429,32 @@ export function MapCanvas() {
           let totalDist = 0;
           for (let i = 1; i < allPts.length; i++) {
             totalDist += gridDistance(allPts[i - 1].x, allPts[i - 1].y, allPts[i].x, allPts[i].y, cellSizeFt);
+          }
+
+          // ── Wall collision validation (CLAUDE.md §6.1, §10) ─────────
+          // GM/CO_GM bypassam. PLAYER passa por findPath em cada segmento.
+          const validationState = useGameplayStore.getState();
+          if (!validationState.currentUserIsGM) {
+            for (let i = 1; i < allPts.length; i++) {
+              const from = allPts[i - 1];
+              const to = allPts[i];
+              if (from.x === to.x && from.y === to.y) continue;
+              const segResult = findPath(
+                from.x, from.y, to.x, to.y,
+                validationState.wallEdges,
+                validationState.terrainCells,
+                gridCols, gridRows, cellSizeFt,
+                false,
+              );
+              if (!segResult.found) {
+                validationState.addToast("Parede bloqueia passagem");
+                dragRef.current = null;
+                setDragPos(null);
+                useGameplayStore.getState().clearDragWaypoints();
+                done();
+                return;
+              }
+            }
           }
 
           // Determine if this is the current turn's token

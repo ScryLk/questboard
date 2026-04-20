@@ -61,6 +61,8 @@ export function NewMapModal({ onClose, onCreated }: NewMapModalProps) {
       backgroundImage: null,
       backgroundOpacity: 0.5,
       stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
+      collectionId: null,
+      order: 0,
     });
     onCreated(id);
     onClose();

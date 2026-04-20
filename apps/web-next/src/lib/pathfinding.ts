@@ -49,6 +49,7 @@ export function findPath(
   gridCols: number,
   gridRows: number,
   cellSizeFt: number,
+  isGM = false,
 ): PathfindingResult {
   if (startX === endX && startY === endY) {
     return { path: [], totalCost: 0, found: true };
@@ -112,9 +113,9 @@ export function findPath(
       // Wall check
       const isDiag = dir.dx !== 0 && dir.dy !== 0;
       if (isDiag) {
-        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges)) continue;
+        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM)) continue;
       } else {
-        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges);
+        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM);
         if (!check.allowed) continue;
       }
 
@@ -172,6 +173,7 @@ export function getReachableCells(
   gridCols: number,
   gridRows: number,
   cellSizeFt: number,
+  isGM = false,
 ): Map<string, number> {
   const costs = new Map<string, number>();
   const startKey = nodeKey(startX, startY);
@@ -200,9 +202,9 @@ export function getReachableCells(
       // Wall check
       const isDiag = dir.dx !== 0 && dir.dy !== 0;
       if (isDiag) {
-        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges)) continue;
+        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM)) continue;
       } else {
-        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges);
+        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM);
         if (!check.allowed) continue;
       }
 

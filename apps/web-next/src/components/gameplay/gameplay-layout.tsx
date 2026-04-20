@@ -20,6 +20,7 @@ import { VisionPanel } from "./toolbar/vision-panel";
 import { LeftPanel } from "./left-panel/left-panel";
 import { RightPanel } from "./right-panel/right-panel";
 import { MapCanvas } from "./map-canvas/map-canvas";
+import { GameplayMapPicker } from "./gameplay-map-picker";
 import { ResizableDivider } from "./shared/resizable-divider";
 import { GameplayModals } from "./modals/gameplay-modals";
 import { ActionBar } from "./action-bar/action-bar";
@@ -112,7 +113,12 @@ export function GameplayLayout() {
         )}
 
         {/* Central canvas */}
-        <MapCanvas />
+        <div className="relative flex flex-1" style={{ minWidth: 0 }}>
+          <MapCanvas />
+          <div className="pointer-events-none absolute left-3 top-3 z-40">
+            <GameplayMapPicker />
+          </div>
+        </div>
 
         {/* Right resizable divider */}
         {rightPanelOpen && (

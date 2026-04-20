@@ -18,6 +18,9 @@ interface MapLibraryState {
   duplicateMap: (id: string) => string | null;
   importMap: (json: string) => string | null;
   migrateFromLegacy: () => void;
+  setMapCollection: (mapId: string, collectionId: string | null) => void;
+  reorderMapsInCollection: (collectionId: string, mapIds: string[]) => void;
+  clearCollectionFromMaps: (collectionId: string) => void;
 }
 
 function generateId(): string {
@@ -102,6 +105,58 @@ export const useMapLibraryStore = create<MapLibraryState>()(
         return id;
       },
 
+      setMapCollection: (mapId, collectionId) => {
+        set((s) => {
+          const existing = s.maps[mapId];
+          if (!existing) return s;
+          let nextOrder = 0;
+          if (collectionId !== null) {
+            const maxOrder = Object.values(s.maps)
+              .filter((m) => m.collectionId === collectionId)
+              .reduce((max, m) => Math.max(max, m.order ?? 0), 0);
+            nextOrder = maxOrder + 1;
+          }
+          return {
+            maps: {
+              ...s.maps,
+              [mapId]: {
+                ...existing,
+                collectionId,
+                order: nextOrder,
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        });
+      },
+
+      reorderMapsInCollection: (collectionId, mapIds) => {
+        set((s) => {
+          const next: Record<string, QuestBoardMap> = { ...s.maps };
+          const now = Date.now();
+          for (let i = 0; i < mapIds.length; i++) {
+            const id = mapIds[i];
+            const map = s.maps[id];
+            if (!map || map.collectionId !== collectionId) continue;
+            next[id] = { ...map, order: i + 1, updatedAt: now };
+          }
+          return { maps: next };
+        });
+      },
+
+      clearCollectionFromMaps: (collectionId) => {
+        set((s) => {
+          const next: Record<string, QuestBoardMap> = { ...s.maps };
+          const now = Date.now();
+          for (const [id, map] of Object.entries(s.maps)) {
+            if (map.collectionId === collectionId) {
+              next[id] = { ...map, collectionId: null, order: 0, updatedAt: now };
+            }
+          }
+          return { maps: next };
+        });
+      },
+
       migrateFromLegacy: () => {
         if (get()._migrated) return;
 
@@ -147,11 +202,27 @@ export const useMapLibraryStore = create<MapLibraryState>()(
     }),
     {
       name: "questboard-maps",
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         maps: state.maps,
         _migrated: state._migrated,
       }),
+      migrate: (persisted, fromVersion) => {
+        const state = persisted as { maps?: Record<string, Partial<QuestBoardMap>>; _migrated?: boolean } | undefined;
+        if (!state || !state.maps) return persisted;
+        if (fromVersion < 2) {
+          const upgraded: Record<string, QuestBoardMap> = {};
+          for (const [id, map] of Object.entries(state.maps)) {
+            upgraded[id] = {
+              ...(map as QuestBoardMap),
+              collectionId: (map as QuestBoardMap).collectionId ?? null,
+              order: (map as QuestBoardMap).order ?? 0,
+            };
+          }
+          return { ...state, maps: upgraded };
+        }
+        return persisted;
+      },
     },
   ),
 );

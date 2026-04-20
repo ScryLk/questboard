@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  BoxSelect,
   Check,
   Eraser,
   Eye,
@@ -20,6 +21,7 @@ import {
   Trash2,
   Undo2,
   Redo2,
+  Wand2,
   X,
   ZoomIn,
   ZoomOut,
@@ -75,6 +77,7 @@ interface EditorState {
   brushSize: 1 | 2 | 3;
   activeWallEdgeType: WallType;
   activeWallStyle: WallStyle;
+  activeWallLockDC: number;
   wallDrawMode: WallDrawMode;
   activeObjectType: MapObjectType;
   // Undo
@@ -104,6 +107,7 @@ function createInitialState(): EditorState {
     brushSize: 1,
     activeWallEdgeType: "wall",
     activeWallStyle: "stone",
+    activeWallLockDC: 15,
     wallDrawMode: "line",
     activeObjectType: "chest",
     history: [],
@@ -184,6 +188,12 @@ export default function MapEditorPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateCat, setTemplateCat] = useState("all");
   const [saveIndicator, setSaveIndicator] = useState<"saved" | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiUseArea, setAiUseArea] = useState(false);
+  const [aiAreaMode, setAiAreaMode] = useState(false);
+  const [aiAreaDrag, setAiAreaDrag] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -208,6 +218,103 @@ export default function MapEditorPage() {
       future: [],
     }));
   }, []);
+
+  const runAIGeneration = useCallback(
+    async (promptText: string, area: { x1: number; y1: number; x2: number; y2: number } | null) => {
+      setAiLoading(true);
+      try {
+        const res = await fetch("/api/ai/generate-map-structured", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: promptText,
+            gridCols: state.gridCols,
+            gridRows: state.gridRows,
+            ...(area ? { area } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? "Falha ao gerar mapa");
+        }
+        const result = (await res.json()) as {
+          terrain: { x: number; y: number; type: TerrainType }[];
+          walls: { x: number; y: number; side: "top" | "right" | "bottom" | "left"; type: WallType; style: WallStyle }[];
+          objects: { x: number; y: number; type: MapObjectType; rotation?: number }[];
+        };
+
+        pushSnapshot();
+        setState((s) => {
+          const now = Date.now();
+          const newObjects: MapObjectCell[] = result.objects.map((o, i) => ({
+            id: `obj_${now}_${i}_${Math.random().toString(36).slice(2, 5)}`,
+            x: o.x,
+            y: o.y,
+            type: o.type,
+            rotation: o.rotation ?? 0,
+          }));
+
+          if (area) {
+            const { x1, y1, x2, y2 } = area;
+            const inArea = (x: number, y: number) =>
+              x >= x1 && x <= x2 && y >= y1 && y <= y2;
+
+            const keptTerrain = s.terrainCells.filter((c) => !inArea(c.x, c.y));
+            const newTerrainMap = new Map<string, TerrainCell>();
+            for (const c of result.terrain) {
+              newTerrainMap.set(`${c.x},${c.y}`, { x: c.x, y: c.y, type: c.type });
+            }
+
+            const keptEdges: Record<string, WallData> = {};
+            for (const [key, data] of Object.entries(s.wallEdges)) {
+              const [a, b] = key.split(":");
+              const [ax, ay] = a.split(",").map(Number);
+              const [bx, by] = b.split(",").map(Number);
+              if (!inArea(ax, ay) && !inArea(bx, by)) keptEdges[key] = data;
+            }
+            for (const w of result.walls) {
+              const key = wallSideToEdgeKey(w.x, w.y, w.side);
+              keptEdges[key] = { type: w.type, style: w.style };
+            }
+
+            const keptObjects = s.mapObjects.filter((o) => !inArea(o.x, o.y));
+
+            return {
+              ...s,
+              terrainCells: [...keptTerrain, ...Array.from(newTerrainMap.values())],
+              wallEdges: keptEdges,
+              mapObjects: [...keptObjects, ...newObjects],
+            };
+          }
+
+          const terrainByCell = new Map<string, TerrainCell>();
+          for (const c of result.terrain) {
+            terrainByCell.set(`${c.x},${c.y}`, { x: c.x, y: c.y, type: c.type });
+          }
+          const nextEdges: Record<string, WallData> = {};
+          for (const w of result.walls) {
+            const key = wallSideToEdgeKey(w.x, w.y, w.side);
+            nextEdges[key] = { type: w.type, style: w.style };
+          }
+          return {
+            ...s,
+            terrainCells: Array.from(terrainByCell.values()),
+            wallEdges: nextEdges,
+            mapObjects: newObjects,
+          };
+        });
+
+        setAiOpen(false);
+        setAiPrompt("");
+        setAiUseArea(false);
+      } catch (err) {
+        alert(`Erro: ${err instanceof Error ? err.message : "Falha desconhecida"}`);
+      } finally {
+        setAiLoading(false);
+      }
+    },
+    [state.gridCols, state.gridRows, pushSnapshot],
+  );
 
   const undo = useCallback(() => {
     setState((s) => {
@@ -424,6 +531,47 @@ export default function MapEditorPage() {
         handlePanStart(e);
         return;
       }
+
+      // AI area selection mode (toggle button active)
+      if (aiAreaMode) {
+        const startCell = getGridCell(e);
+        if (!startCell) return;
+        const sx = startCell.x;
+        const sy = startCell.y;
+        setAiAreaDrag({ x1: sx, y1: sy, x2: sx, y2: sy });
+        function onAreaMove(ev: MouseEvent) {
+          if (!containerRef.current) return;
+          const rect = containerRef.current.getBoundingClientRect();
+          const px = ev.clientX - rect.left - panX;
+          const py = ev.clientY - rect.top - panY;
+          const cx = Math.max(0, Math.min(state.gridCols - 1, Math.floor(px / scaledCell)));
+          const cy = Math.max(0, Math.min(state.gridRows - 1, Math.floor(py / scaledCell)));
+          setAiAreaDrag({ x1: sx, y1: sy, x2: cx, y2: cy });
+        }
+        function onAreaUp(ev: MouseEvent) {
+          document.removeEventListener("mousemove", onAreaMove);
+          document.removeEventListener("mouseup", onAreaUp);
+          if (!containerRef.current) return;
+          const rect = containerRef.current.getBoundingClientRect();
+          const px = ev.clientX - rect.left - panX;
+          const py = ev.clientY - rect.top - panY;
+          const cx = Math.max(0, Math.min(state.gridCols - 1, Math.floor(px / scaledCell)));
+          const cy = Math.max(0, Math.min(state.gridRows - 1, Math.floor(py / scaledCell)));
+          const finalArea = {
+            x1: Math.min(sx, cx),
+            y1: Math.min(sy, cy),
+            x2: Math.max(sx, cx),
+            y2: Math.max(sy, cy),
+          };
+          setAiAreaDrag(null);
+          setAiAreaMode(false);
+          void runAIGeneration(aiPrompt.trim(), finalArea);
+        }
+        document.addEventListener("mousemove", onAreaMove);
+        document.addEventListener("mouseup", onAreaUp);
+        return;
+      }
+
       pushSnapshot();
 
       // Terrain tool
@@ -552,7 +700,9 @@ export default function MapEditorPage() {
             delete next[edge.key];
             return { ...s, wallEdges: next };
           }
-          return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: { type: s.activeWallEdgeType, style: s.activeWallStyle } } };
+          const nextData: WallData = { type: s.activeWallEdgeType, style: s.activeWallStyle };
+          if (s.activeWallEdgeType === "door-locked") nextData.lockDC = s.activeWallLockDC;
+          return { ...s, wallEdges: { ...s.wallEdges, [edge.key]: nextData } };
         });
 
         // Drag to add walls
@@ -563,7 +713,9 @@ export default function MapEditorPage() {
           painted.add(e2.key);
           setState((s) => {
             if (s.wallEdges[e2.key]) return s;
-            return { ...s, wallEdges: { ...s.wallEdges, [e2.key]: { type: s.activeWallEdgeType, style: s.activeWallStyle } } };
+            const d: WallData = { type: s.activeWallEdgeType, style: s.activeWallStyle };
+            if (s.activeWallEdgeType === "door-locked") d.lockDC = s.activeWallLockDC;
+            return { ...s, wallEdges: { ...s.wallEdges, [e2.key]: d } };
           });
         }
         function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
@@ -651,7 +803,7 @@ export default function MapEditorPage() {
         document.addEventListener("mouseup", onUp);
       }
     },
-    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallEdgeType, state.activeWallStyle, state.wallDrawMode, state.activeObjectType, getGridCell, getMouseEdge, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart],
+    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallEdgeType, state.activeWallStyle, state.wallDrawMode, state.activeObjectType, getGridCell, getMouseEdge, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart, aiAreaMode, aiPrompt, scaledCell, panX, panY, runAIGeneration],
   );
 
   const handleCanvasMouseMove = useCallback(
@@ -814,9 +966,19 @@ export default function MapEditorPage() {
     { type: "door-closed", label: "Porta" },
     { type: "window", label: "Janela" },
     { type: "half-wall", label: "Meia" },
-    { type: "secret", label: "Secreta" },
     { type: "portcullis", label: "Grade" },
+    { type: "secret", label: "Porta Secreta" },
+    { type: "illusory", label: "Ilusão" },
   ];
+
+  const DOOR_INITIAL_STATES: { type: WallType; label: string }[] = [
+    { type: "door-closed", label: "Fechada" },
+    { type: "door-locked", label: "Trancada" },
+    { type: "door-open", label: "Aberta" },
+  ];
+
+  const isDoorType = (t: WallType) =>
+    t === "door-closed" || t === "door-locked" || t === "door-open";
 
   const EDITOR_WALL_STYLES: { style: WallStyle; label: string; color: string }[] = [
     { style: "stone", label: "Pedra", color: "#777780" },
@@ -892,6 +1054,14 @@ export default function MapEditorPage() {
             }`}
           >
             <Hand className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => setAiOpen(true)}
+            title="Gerar mapa com IA"
+            className="flex h-7 w-7 items-center justify-center rounded text-brand-muted transition-colors hover:bg-brand-accent/15 hover:text-brand-accent"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
           </button>
 
           <div className="mx-1 h-5 w-px bg-brand-border" />
@@ -999,12 +1169,12 @@ export default function MapEditorPage() {
               <div className="mb-2 h-px bg-brand-border" />
 
               {/* Category tabs */}
-              <div className="mb-2 flex gap-0.5">
+              <div className="mb-2 flex min-w-0 gap-0.5 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
                 {[{ id: "all" as const, label: "Todos" }, ...TERRAIN_CATEGORIES.map((c) => ({ id: c.id, label: c.label }))].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setState((s) => ({ ...s, terrainCategory: tab.id }))}
-                    className={`flex-1 rounded px-1 py-0.5 text-[9px] transition-colors ${
+                    className={`shrink-0 rounded px-2 py-0.5 text-[9px] transition-colors ${
                       state.terrainCategory === tab.id
                         ? "bg-white/10 font-semibold text-brand-text"
                         : "text-brand-muted hover:bg-white/[0.04]"
@@ -1094,18 +1264,63 @@ export default function MapEditorPage() {
             <>
               <div className="mb-2 text-[9px] text-brand-muted">Tipo:</div>
               <div className="mb-2 flex flex-wrap gap-1">
-                {EDITOR_WALL_TYPES.map(({ type, label }) => (
-                  <button
-                    key={type}
-                    onClick={() => setState((s) => ({ ...s, activeWallEdgeType: type }))}
-                    className={`rounded px-2 py-1 text-[9px] transition-colors ${
-                      state.activeWallEdgeType === type ? "bg-brand-accent text-white font-semibold" : "text-brand-muted hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {EDITOR_WALL_TYPES.map(({ type, label }) => {
+                  const isActive =
+                    type === "door-closed"
+                      ? isDoorType(state.activeWallEdgeType)
+                      : state.activeWallEdgeType === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setState((s) => ({ ...s, activeWallEdgeType: type }))}
+                      className={`cursor-pointer rounded px-2 py-1 text-[9px] transition-colors ${
+                        isActive ? "bg-brand-accent text-white font-semibold" : "text-brand-muted hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
+
+              {isDoorType(state.activeWallEdgeType) && (
+                <div className="mb-2 space-y-2 rounded-md border border-brand-accent/20 bg-brand-accent/[0.03] p-2">
+                  <div className="text-[9px] text-brand-muted">Estado inicial:</div>
+                  <div className="flex gap-1">
+                    {DOOR_INITIAL_STATES.map(({ type, label }) => (
+                      <button
+                        key={type}
+                        onClick={() => setState((s) => ({ ...s, activeWallEdgeType: type }))}
+                        className={`flex-1 cursor-pointer rounded px-1 py-1 text-[9px] transition-colors ${
+                          state.activeWallEdgeType === type ? "bg-brand-accent text-white font-semibold" : "text-brand-muted hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {state.activeWallEdgeType === "door-locked" && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-[9px] text-brand-muted">DC:</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={30}
+                        value={state.activeWallLockDC}
+                        onChange={(e) => {
+                          const raw = Number(e.target.value);
+                          const clamped = Number.isFinite(raw)
+                            ? Math.max(5, Math.min(30, Math.round(raw)))
+                            : 15;
+                          setState((s) => ({ ...s, activeWallLockDC: clamped }));
+                        }}
+                        className="h-6 w-14 rounded border border-brand-border bg-brand-primary px-2 text-[10px] text-brand-text outline-none focus:border-brand-accent"
+                      />
+                      <span className="text-[9px] text-brand-muted">(5–30)</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mb-2 text-[9px] text-brand-muted">Estilo:</div>
               <div className="mb-2 flex gap-1">
                 {EDITOR_WALL_STYLES.map(({ style, label, color }) => (
@@ -1154,12 +1369,12 @@ export default function MapEditorPage() {
           {/* ── Objects palette ── */}
           {state.activeTool === "objects" && (
             <>
-              <div className="mb-2 flex gap-0.5">
+              <div className="mb-2 flex min-w-0 gap-0.5 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent">
                 {OBJ_CATEGORIES.map(({ id, label }) => (
                   <button
                     key={id}
                     onClick={() => setObjCategory(id)}
-                    className={`flex-1 rounded px-1 py-0.5 text-[9px] transition-colors ${
+                    className={`shrink-0 rounded px-2 py-0.5 text-[9px] transition-colors ${
                       objCategory === id ? "bg-white/10 font-semibold text-brand-text" : "text-brand-muted hover:bg-white/[0.04]"
                     }`}
                   >
@@ -1168,21 +1383,24 @@ export default function MapEditorPage() {
                 ))}
               </div>
               <div className="mb-2 grid max-h-[300px] grid-cols-3 gap-1 overflow-y-auto">
-                {filteredObjects.map((obj) => (
-                  <button
-                    key={obj.type}
-                    title={obj.label}
-                    onClick={() => setState((s) => ({ ...s, activeObjectType: obj.type }))}
-                    className={`flex flex-col items-center gap-0.5 rounded border p-1.5 transition-colors ${
-                      state.activeObjectType === obj.type
-                        ? "border-brand-accent bg-brand-accent/10"
-                        : "border-transparent hover:border-brand-border"
-                    }`}
-                  >
-                    <span className="text-sm">{obj.icon}</span>
-                    <span className="w-full truncate text-center text-[7px] text-brand-muted">{obj.label}</span>
-                  </button>
-                ))}
+                {filteredObjects.map((obj) => {
+                  const ObjIcon = obj.icon;
+                  return (
+                    <button
+                      key={obj.type}
+                      title={obj.label}
+                      onClick={() => setState((s) => ({ ...s, activeObjectType: obj.type }))}
+                      className={`flex flex-col items-center gap-0.5 rounded border p-1.5 transition-colors ${
+                        state.activeObjectType === obj.type
+                          ? "border-brand-accent bg-brand-accent/10"
+                          : "border-transparent hover:border-brand-border"
+                      }`}
+                    >
+                      <ObjIcon className="h-4 w-4 text-brand-text" />
+                      <span className="w-full truncate text-center text-[7px] text-brand-muted">{obj.label}</span>
+                    </button>
+                  );
+                })}
               </div>
               <div className="mb-2 h-px bg-brand-border" />
               <div className="flex flex-col gap-1 text-[9px] text-brand-muted">
@@ -1369,7 +1587,8 @@ export default function MapEditorPage() {
 
               {/* Map objects */}
               {state.mapObjects.map((obj) => {
-                const icon = objectIconMap.get(obj.type) ?? "?";
+                const Icon = objectIconMap.get(obj.type);
+                const iconSize = Math.max(10, scaledCell * 0.5);
                 return (
                   <div
                     key={obj.id}
@@ -1383,15 +1602,19 @@ export default function MapEditorPage() {
                       zIndex: 4,
                     }}
                   >
-                    <span className="select-none drop-shadow-md" style={{ fontSize: Math.max(10, scaledCell * 0.5), lineHeight: 1 }}>
-                      {icon}
-                    </span>
+                    {Icon ? (
+                      <Icon size={iconSize} className="select-none text-brand-text drop-shadow-md" />
+                    ) : (
+                      <span className="select-none drop-shadow-md" style={{ fontSize: iconSize, lineHeight: 1 }}>
+                        ?
+                      </span>
+                    )}
                   </div>
                 );
               })}
 
               {/* Hover cell highlight */}
-              {hoverCell && state.activeTool !== "wall" && (
+              {hoverCell && state.activeTool !== "wall" && !aiAreaMode && (
                 <div
                   className="pointer-events-none absolute border border-white/20"
                   style={{
@@ -1403,6 +1626,21 @@ export default function MapEditorPage() {
                   }}
                 />
               )}
+
+              {/* AI area: drag preview */}
+              {aiAreaDrag && (
+                <div
+                  className="pointer-events-none absolute border-2 border-dashed border-brand-accent bg-brand-accent/10"
+                  style={{
+                    left: Math.min(aiAreaDrag.x1, aiAreaDrag.x2) * scaledCell,
+                    top: Math.min(aiAreaDrag.y1, aiAreaDrag.y2) * scaledCell,
+                    width: (Math.abs(aiAreaDrag.x2 - aiAreaDrag.x1) + 1) * scaledCell,
+                    height: (Math.abs(aiAreaDrag.y2 - aiAreaDrag.y1) + 1) * scaledCell,
+                    zIndex: 20,
+                  }}
+                />
+              )}
+
             </div>
 
           {/* Background image controls */}
@@ -1449,6 +1687,131 @@ export default function MapEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* ── AI Map Generation Modal ─────────────────────────────────── */}
+      {aiOpen && aiAreaMode && (
+        <div className="pointer-events-none fixed inset-x-0 top-16 z-[200] flex justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-brand-accent bg-[#111116]/95 px-4 py-2 shadow-xl backdrop-blur-sm">
+            <BoxSelect className="h-4 w-4 text-brand-accent" />
+            <span className="text-xs text-brand-text">Arraste no canvas para selecionar a área</span>
+            <button
+              onClick={() => setAiAreaMode(false)}
+              className="pointer-events-auto text-[11px] text-brand-muted transition-colors hover:text-brand-text"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {aiOpen && !aiAreaMode && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !aiLoading) setAiOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-xl border border-brand-border bg-[#111116] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-brand-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-brand-accent" />
+                <h2 className="text-sm font-semibold text-brand-text">Gerar mapa com IA</h2>
+              </div>
+              <button
+                onClick={() => {
+                  if (aiLoading) return;
+                  setAiOpen(false);
+                  setAiUseArea(false);
+                }}
+                disabled={aiLoading}
+                className="rounded p-1 text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text disabled:opacity-50"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <label className="mb-2 block text-xs text-brand-muted">
+                Descreva o mapa que deseja gerar
+              </label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Ex.: masmorra com sala do trono, corredor e duas câmaras laterais com baús"
+                rows={4}
+                disabled={aiLoading}
+                className="w-full resize-none rounded-md border border-brand-border bg-[#0A0A0F] p-3 text-sm text-brand-text placeholder-brand-muted outline-none focus:border-brand-accent disabled:opacity-50"
+                autoFocus
+              />
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={aiUseArea}
+                disabled={aiLoading}
+                onClick={() => setAiUseArea((v) => !v)}
+                className="mt-3 flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-brand-border bg-[#0A0A0F] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2">
+                  <BoxSelect className="h-3.5 w-3.5 text-brand-muted" />
+                  <span className="text-xs text-brand-text">Restringir a uma área específica</span>
+                </div>
+                <span
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                    aiUseArea ? "bg-brand-accent" : "bg-white/10"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      aiUseArea ? "translate-x-[18px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+
+              <p className="mt-2 text-[10px] text-brand-muted">
+                {aiUseArea
+                  ? "Ao clicar Gerar, você vai desenhar a área no canvas (o resto do mapa é preservado)."
+                  : `A IA vai gerar terreno, paredes e objetos em um mapa ${state.gridCols}x${state.gridRows}.`}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-brand-border px-4 py-3">
+              <button
+                onClick={() => {
+                  setAiOpen(false);
+                  setAiUseArea(false);
+                }}
+                disabled={aiLoading}
+                className="rounded-md px-3 py-1.5 text-xs text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!aiPrompt.trim() || aiLoading) return;
+                  if (aiUseArea) {
+                    setAiAreaMode(true);
+                  } else {
+                    void runAIGeneration(aiPrompt.trim(), null);
+                  }
+                }}
+                disabled={!aiPrompt.trim() || aiLoading}
+                className="flex items-center gap-1.5 rounded-md bg-brand-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-accent/80 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {aiUseArea ? <BoxSelect className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
+                {aiLoading
+                  ? "Gerando..."
+                  : aiUseArea
+                    ? "Selecionar Área"
+                    : "Gerar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -15,6 +15,7 @@ export type MapCategory = "dungeon" | "outdoor" | "city" | "cave" | "custom";
 export interface WallSaveData {
   type: string;
   style: string;
+  lockDC?: number;
 }
 
 export interface MapObjectSaveData {
@@ -48,6 +49,17 @@ export interface QuestBoardMap {
     wallCount: number;
     objectCount: number;
   };
+  collectionId: string | null;
+  order: number;
+}
+
+export interface MapCollection {
+  id: string;
+  name: string;
+  description: string | null;
+  coverMapId: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // ── Conversion helpers ──
@@ -72,7 +84,11 @@ export function wallEdgesToSaveData(
 ): Record<string, WallSaveData> {
   const result: Record<string, WallSaveData> = {};
   for (const [key, data] of Object.entries(edges)) {
-    result[key] = { type: data.type, style: data.style };
+    result[key] = {
+      type: data.type,
+      style: data.style,
+      ...(data.lockDC !== undefined ? { lockDC: data.lockDC } : {}),
+    };
   }
   return result;
 }
@@ -82,7 +98,11 @@ export function saveDataToWallEdges(
 ): Record<string, WallData> {
   const result: Record<string, WallData> = {};
   for (const [key, d] of Object.entries(data)) {
-    result[key] = { type: d.type, style: d.style } as WallData;
+    result[key] = {
+      type: d.type,
+      style: d.style,
+      ...(typeof d.lockDC === "number" ? { lockDC: d.lockDC } : {}),
+    } as WallData;
   }
   return result;
 }
@@ -141,6 +161,8 @@ export function editorStateToMapData(state: {
       wallCount: Object.keys(walls).length,
       objectCount: objects.length,
     },
+    collectionId: null,
+    order: 0,
   };
 }
 
@@ -227,5 +249,7 @@ export function migrateSavedMap(old: SavedMap): QuestBoardMap {
       wallCount: Object.keys(walls).length,
       objectCount: objects.length,
     },
+    collectionId: null,
+    order: 0,
   };
 }

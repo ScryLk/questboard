@@ -348,6 +348,7 @@ export type WallStyle = "stone" | "wood" | "metal" | "magic" | "natural" | "bric
 export interface WallData {
   type: WallType;
   style: WallStyle;
+  lockDC?: number;
 }
 
 export type WallDrawMode = "line" | "rectangle" | "erase";
@@ -434,45 +435,73 @@ export interface MapObjectCell {
   rotation: number;
 }
 
+import {
+  Armchair,
+  Bed,
+  Box,
+  BookOpen,
+  CircleDot,
+  Columns3,
+  Crown,
+  FlaskConical,
+  Flag,
+  Flame,
+  Grid3x3,
+  Hammer,
+  Leaf,
+  Mountain,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  Square,
+  Swords,
+  Table2,
+  TreePine,
+  User,
+  Wine,
+  Droplets,
+  type LucideIcon,
+} from "lucide-react";
+
 export interface MapObjectInfo {
   type: MapObjectType;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   category: "furniture" | "container" | "decoration" | "nature" | "light";
 }
 
 export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
   // Furniture
-  { type: "table", label: "Mesa", icon: "🪑", category: "furniture" },
-  { type: "chair", label: "Cadeira", icon: "💺", category: "furniture" },
-  { type: "bed", label: "Cama", icon: "🛏️", category: "furniture" },
-  { type: "throne", label: "Trono", icon: "👑", category: "furniture" },
-  { type: "bookshelf", label: "Estante", icon: "📚", category: "furniture" },
-  { type: "weapon_rack", label: "Rack de Armas", icon: "⚔️", category: "furniture" },
+  { type: "table", label: "Mesa", icon: Table2, category: "furniture" },
+  { type: "chair", label: "Cadeira", icon: Armchair, category: "furniture" },
+  { type: "bed", label: "Cama", icon: Bed, category: "furniture" },
+  { type: "throne", label: "Trono", icon: Crown, category: "furniture" },
+  { type: "bookshelf", label: "Estante", icon: BookOpen, category: "furniture" },
+  { type: "weapon_rack", label: "Rack de Armas", icon: Swords, category: "furniture" },
   // Containers
-  { type: "chest", label: "Bau", icon: "📦", category: "container" },
-  { type: "barrel", label: "Barril", icon: "🛢️", category: "container" },
-  { type: "crate", label: "Caixote", icon: "📥", category: "container" },
-  { type: "sack", label: "Saco", icon: "👝", category: "container" },
-  { type: "cage", label: "Jaula", icon: "🗑️", category: "container" },
-  { type: "cart", label: "Carrinho", icon: "🛒", category: "container" },
+  { type: "chest", label: "Bau", icon: Package, category: "container" },
+  { type: "barrel", label: "Barril", icon: Wine, category: "container" },
+  { type: "crate", label: "Caixote", icon: Box, category: "container" },
+  { type: "sack", label: "Saco", icon: ShoppingBag, category: "container" },
+  { type: "cage", label: "Jaula", icon: Grid3x3, category: "container" },
+  { type: "cart", label: "Carrinho", icon: ShoppingCart, category: "container" },
   // Decoration
-  { type: "statue", label: "Estatua", icon: "🗿", category: "decoration" },
-  { type: "pillar", label: "Pilar", icon: "🏛️", category: "decoration" },
-  { type: "fountain", label: "Fonte", icon: "⛲", category: "decoration" },
-  { type: "banner", label: "Bandeira", icon: "🚩", category: "decoration" },
-  { type: "rug", label: "Tapete", icon: "🟫", category: "decoration" },
-  { type: "well", label: "Poco", icon: "🕳️", category: "decoration" },
-  { type: "anvil", label: "Bigorna", icon: "🔨", category: "decoration" },
-  { type: "cauldron", label: "Caldeirao", icon: "🫕", category: "decoration" },
+  { type: "statue", label: "Estatua", icon: User, category: "decoration" },
+  { type: "pillar", label: "Pilar", icon: Columns3, category: "decoration" },
+  { type: "fountain", label: "Fonte", icon: Droplets, category: "decoration" },
+  { type: "banner", label: "Bandeira", icon: Flag, category: "decoration" },
+  { type: "rug", label: "Tapete", icon: Square, category: "decoration" },
+  { type: "well", label: "Poco", icon: CircleDot, category: "decoration" },
+  { type: "anvil", label: "Bigorna", icon: Hammer, category: "decoration" },
+  { type: "cauldron", label: "Caldeirao", icon: FlaskConical, category: "decoration" },
   // Nature
-  { type: "tree", label: "Arvore", icon: "🌳", category: "nature" },
-  { type: "bush", label: "Arbusto", icon: "🌿", category: "nature" },
-  { type: "rock_large", label: "Pedra Grande", icon: "🪨", category: "nature" },
-  { type: "rock_small", label: "Pedra Peq.", icon: "🪨", category: "nature" },
+  { type: "tree", label: "Arvore", icon: TreePine, category: "nature" },
+  { type: "bush", label: "Arbusto", icon: Leaf, category: "nature" },
+  { type: "rock_large", label: "Pedra Grande", icon: Mountain, category: "nature" },
+  { type: "rock_small", label: "Pedra Peq.", icon: Mountain, category: "nature" },
   // Light
-  { type: "torch_stand", label: "Tocha", icon: "🔥", category: "light" },
-  { type: "campfire", label: "Fogueira", icon: "🏕️", category: "light" },
+  { type: "torch_stand", label: "Tocha", icon: Flame, category: "light" },
+  { type: "campfire", label: "Fogueira", icon: Flame, category: "light" },
 ];
 
 export interface LightSourceFixed {

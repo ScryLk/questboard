@@ -143,6 +143,8 @@ export function wallBlocksVision(wall: WallData | undefined): boolean {
 /**
  * Check if a token can move between two adjacent cells, considering wall edges.
  * wallEdges is the Record<string, WallData> from the store.
+ *
+ * GM e CO_GM bypassam qualquer parede/porta (CLAUDE.md §10).
  */
 export function canTokenMove(
   fromX: number,
@@ -156,6 +158,7 @@ export function canTokenMove(
   const wall = wallEdges[key];
 
   if (!wall) return { allowed: true };
+  if (isGM) return { allowed: true };
 
   switch (wall.type) {
     case "wall": return { allowed: false, reason: "Parede bloqueia passagem" };
@@ -164,10 +167,7 @@ export function canTokenMove(
     case "door-open": return { allowed: true };
     case "window": return { allowed: false, reason: "Janela bloqueia passagem" };
     case "half-wall": return { allowed: false, reason: "Meia-parede bloqueia passagem" };
-    case "secret":
-      return isGM
-        ? { allowed: true }
-        : { allowed: false, reason: "Parede bloqueia passagem" };
+    case "secret": return { allowed: false, reason: "Parede bloqueia passagem" };
     case "illusory": return { allowed: true };
     case "portcullis": return { allowed: false, reason: "Grade bloqueia passagem" };
     default: return { allowed: true };

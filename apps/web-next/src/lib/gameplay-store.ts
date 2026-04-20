@@ -47,6 +47,8 @@ import {
 import type { TerrainCategoryId } from "./terrain-catalog";
 import type { RoomTemplate } from "./room-templates";
 import { wallSideToEdgeKey } from "./wall-helpers";
+import { useMapLibraryStore } from "./map-library-store";
+import { mapToEditorState } from "./map-types";
 import { playSFXSync } from "./audio/sfx-triggers";
 import { broadcastSend } from "./broadcast-sync";
 import type { SceneCard as PlayerSceneCard } from "./player-view-store";
@@ -416,6 +418,17 @@ interface GameplayState {
   clearFog: () => void;
   clearRecentlyRevealed: (keys: string[]) => void;
   clearRecentlyCovered: (keys: string[]) => void;
+
+  // Map config (grid dims, cell size in ft, active map id)
+  mapConfig: { gridCols: number; gridRows: number; cellSizeFt: number; name: string };
+  activeMapId: string | null;
+  setMapConfig: (cfg: Partial<{ gridCols: number; gridRows: number; cellSizeFt: number; name: string }>) => void;
+  loadMapFromLibrary: (mapId: string) => { ok: true } | { error: string };
+
+  // Current user role (for GM bypass on walls, permissions, etc)
+  // TODO: when multiplayer is wired, sync from session presence
+  currentUserIsGM: boolean;
+  setCurrentUserIsGM: (isGM: boolean) => void;
 
   // Map
   zoom: number;
@@ -1209,6 +1222,44 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setZoom: (z) => set({ zoom: Math.max(50, Math.min(200, z)) }),
   gridVisible: true,
   toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
+
+  mapConfig: {
+    gridCols: MOCK_MAP.gridCols,
+    gridRows: MOCK_MAP.gridRows,
+    cellSizeFt: MOCK_MAP.cellSizeFt,
+    name: MOCK_MAP.name,
+  },
+  activeMapId: null,
+  setMapConfig: (cfg) => set((s) => ({ mapConfig: { ...s.mapConfig, ...cfg } })),
+  loadMapFromLibrary: (mapId) => {
+    const map = useMapLibraryStore.getState().maps[mapId];
+    if (!map) return { error: "Mapa não encontrado na biblioteca." };
+
+    const editorLike = mapToEditorState(map);
+    const wallEdges: Record<string, WallData> = {};
+    for (const [key, data] of Object.entries(editorLike.wallEdges)) {
+      wallEdges[key] = data as WallData;
+    }
+    set({
+      mapConfig: {
+        gridCols: map.width,
+        gridRows: map.height,
+        cellSizeFt: map.cellSizeFt ?? MOCK_MAP.cellSizeFt,
+        name: map.name,
+      },
+      activeMapId: map.id,
+      wallEdges,
+      terrainCells: editorLike.terrainCells,
+      mapObjects: editorLike.mapObjects,
+      mapBackgroundImage: map.backgroundImage,
+      mapBackgroundOpacity: map.backgroundOpacity,
+    });
+    return { ok: true };
+  },
+
+  currentUserIsGM: true,
+  setCurrentUserIsGM: (isGM) => set({ currentUserIsGM: isGM }),
+
   mapBackgroundImage: null,
   mapBackgroundOpacity: 0.5,
   mapGridOffsetX: 0,
