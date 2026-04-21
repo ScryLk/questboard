@@ -4,7 +4,7 @@ import { HelpCircle } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { MAP_OBJECT_CATALOG } from "@/lib/gameplay-mock-data";
 import { ObjectSpriteIcon } from "@/components/gameplay/object-sprite-icon";
-import { getObjectSpriteUrl } from "@questboard/constants";
+import { hasObjectSprite } from "@questboard/constants";
 
 interface ObjectOverlayProps {
   scaledCell: number;
@@ -25,8 +25,9 @@ export function ObjectOverlay({ scaledCell }: ObjectOverlayProps) {
         const fallback = objectIconMap.get(obj.type) ?? HelpCircle;
         // Sprites ocupam a célula inteira (scaledCell). Lucide fica menor (50%)
         // pra não parecer vetor gigante e manter o look existente.
-        const hasSprite = getObjectSpriteUrl(obj.type) !== null;
-        const renderSize = hasSprite ? scaledCell : Math.max(10, scaledCell * 0.5);
+        const renderSize = hasObjectSprite(obj.type)
+          ? scaledCell
+          : Math.max(10, scaledCell * 0.5);
 
         return (
           <div

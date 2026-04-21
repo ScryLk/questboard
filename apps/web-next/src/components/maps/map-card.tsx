@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Copy, Download, Folder, FolderInput, Map, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, Folder, FolderInput, Map, MoreVertical, Pencil, Play, Trash2 } from "lucide-react";
 import type { QuestBoardMap } from "@/lib/map-types";
 import { useMapCollectionsStore } from "@/lib/map-collections-store";
 
@@ -12,6 +12,7 @@ interface MapCardProps {
   onDelete: (id: string) => void;
   onExport: (id: string) => void;
   onMoveToCollection?: (id: string) => void;
+  onPlay?: (id: string) => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -41,6 +42,7 @@ export function MapCard({
   onDelete,
   onExport,
   onMoveToCollection,
+  onPlay,
 }: MapCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -79,31 +81,41 @@ export function MapCard({
         )}
 
         <div className="absolute inset-0 flex items-end justify-center gap-1 bg-black/0 p-2 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+          {onPlay && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPlay(map.id); }}
+              title="Abrir no gameplay"
+              className="flex h-7 cursor-pointer items-center gap-1 rounded-md bg-brand-accent px-2 text-[10px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-brand-accent/80"
+            >
+              <Play className="h-3 w-3 fill-current" />
+              Jogar
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(map.id); }}
             title="Editar"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDuplicate(map.id); }}
             title="Duplicar"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onExport(map.id); }}
             title="Exportar"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-accent"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(map.id); }}
             title="Excluir"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-danger"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-brand-danger"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -158,9 +170,12 @@ export function MapCard({
             </span>
           )}
         </div>
-        <p className="mt-1.5 text-[10px] text-brand-muted">
-          Editado {relativeTime(map.updatedAt)}
-        </p>
+        <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-brand-muted">
+          <span className="truncate">
+            {map.stats.wallCount} paredes · {map.stats.objectCount} objetos
+          </span>
+          <span className="shrink-0">{relativeTime(map.updatedAt)}</span>
+        </div>
       </div>
     </div>
   );

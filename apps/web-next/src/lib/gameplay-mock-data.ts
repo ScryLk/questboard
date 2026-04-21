@@ -425,7 +425,13 @@ export type MapObjectType =
   | "sack"
   | "weapon_rack"
   | "anvil"
-  | "cauldron";
+  | "cauldron"
+  | "skull_pile"
+  | "spider_web"
+  | "flask_monster"
+  | "rotating_blades"
+  | "guillotine"
+  | "bomb";
 
 export interface MapObjectCell {
   id: string;
@@ -438,21 +444,26 @@ export interface MapObjectCell {
 import {
   Armchair,
   Bed,
+  Bomb,
   Box,
   BookOpen,
   CircleDot,
   Columns3,
   Crown,
+  Disc3,
   FlaskConical,
   Flag,
   Flame,
   Grid3x3,
   Hammer,
+  Hexagon,
   Leaf,
   Mountain,
   Package,
+  Scissors,
   ShoppingBag,
   ShoppingCart,
+  Skull,
   Square,
   Swords,
   Table2,
@@ -502,6 +513,13 @@ export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
   // Light
   { type: "torch_stand", label: "Tocha", icon: Flame, category: "light" },
   { type: "campfire", label: "Fogueira", icon: Flame, category: "light" },
+  // New sprite-backed types (no Lucide equivalent; icons are approximations)
+  { type: "skull_pile", label: "Crânios", icon: Skull, category: "decoration" },
+  { type: "spider_web", label: "Teia", icon: Hexagon, category: "decoration" },
+  { type: "flask_monster", label: "Frasco", icon: FlaskConical, category: "decoration" },
+  { type: "rotating_blades", label: "Lâminas", icon: Disc3, category: "decoration" },
+  { type: "guillotine", label: "Guilhotina", icon: Scissors, category: "decoration" },
+  { type: "bomb", label: "Bomba", icon: Bomb, category: "decoration" },
 ];
 
 export interface LightSourceFixed {

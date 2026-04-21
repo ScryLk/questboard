@@ -42,8 +42,12 @@ export const aiMapWallTypeSchema = z.enum([
   "wall",
   "door-closed",
   "door-open",
+  "door-locked",
   "window",
   "half-wall",
+  "secret",
+  "illusory",
+  "portcullis",
 ]);
 
 export const aiMapWallStyleSchema = z.enum([
@@ -98,6 +102,8 @@ export const aiMapWallSchema = z.object({
   side: aiMapWallSideSchema,
   type: aiMapWallTypeSchema,
   style: aiMapWallStyleSchema,
+  /** DC de arrombamento; só faz sentido em type === "door-locked". */
+  lockDC: z.number().int().min(5).max(30).optional(),
 });
 
 export const aiMapObjectSchema = z.object({

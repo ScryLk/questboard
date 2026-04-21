@@ -1,38 +1,92 @@
 // ═══ CATÁLOGO DE SPRITES DE OBJETOS ═══
-// Mapa de tipos de objeto do mapa para metadata de PNG pixel-art.
-// Fonte: pack de sprites em apps/web-next/public/items/*.png.
-// Tipos sem sprite mapeado caem no fallback Lucide (vide ObjectSpriteIcon.tsx).
+// Fonte: /apps/web-next/public/items/*.png
+// Dois formatos suportados:
+//   1) PNGs individuais (pack 0x72 original) → kind "file" / "file-anim"
+//   2) Spritesheets (packs novos) → kind "sheet" / "sheet-anim"
+// Tipos sem sprite mapeado caem no fallback Lucide em ObjectSpriteIcon.
 
 /**
  * Caminho base dos sprites. Sempre relativo ao host Next (public/).
  */
 export const OBJECT_SPRITE_BASE = "/items" as const;
 
-export interface SpriteMeta {
-  /** Nomes dos arquivos PNG. 1 item = estático. N itens = animado (cicla frames). */
-  frames: string[];
-  /** Duração de cada frame em ms. Só relevante quando frames.length > 1. */
-  frameDurationMs?: number;
-  /**
-   * Tratamento especial de movimento sobreposto à animação de frames.
-   * - "fire": flicker de alpha (soma de senos 3Hz+7Hz) + scaleY "respira" (5Hz ±2%).
-   * Tipos sem `motion` rodam apenas o ciclo de frames (se houver).
-   */
-  motion?: "fire";
+export interface SpriteRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /**
- * Mapa de MapObjectType → SpriteMeta.
- * Tipos não listados aqui não têm sprite e renderizam com ícone Lucide.
+ * Dimensões totais de cada spritesheet. Usado pra calcular
+ * `background-size` do CSS no componente de render.
+ */
+export const OBJECT_SPRITE_SHEETS: Record<
+  string,
+  { filename: string; width: number; height: number }
+> = {
+  scull: { filename: "scull.png", width: 96, height: 144 },
+  web: { filename: "web.png", width: 240, height: 192 },
+  blades: { filename: "Rotating_blades.png", width: 48, height: 192 },
+  bomb: { filename: "Bomb.png", width: 576, height: 48 },
+  guillotine: { filename: "Guillotine.png", width: 576, height: 48 },
+  flasks: { filename: "Flasks_monsters.png", width: 144, height: 384 },
+};
+
+/**
+ * Metadata do sprite de um tipo de objeto. União discriminada pra refletir
+ * os formatos suportados.
+ */
+export type SpriteMeta =
+  | { kind: "file"; file: string }
+  | {
+      kind: "file-anim";
+      files: string[];
+      frameDurationMs: number;
+      motion?: "fire";
+    }
+  | { kind: "sheet"; sheet: string; region: SpriteRegion }
+  | {
+      kind: "sheet-anim";
+      sheet: string;
+      regions: SpriteRegion[];
+      frameDurationMs: number;
+    };
+
+/** Helper pra construir N regiões horizontais (x crescente) a partir do 0. */
+function horizontalStrip(count: number, frameSize: number): SpriteRegion[] {
+  return Array.from({ length: count }, (_, i) => ({
+    x: i * frameSize,
+    y: 0,
+    w: frameSize,
+    h: frameSize,
+  }));
+}
+
+/** Helper pra construir N regiões verticais (y crescente) a partir do 0. */
+function verticalStrip(count: number, frameSize: number): SpriteRegion[] {
+  return Array.from({ length: count }, (_, i) => ({
+    x: 0,
+    y: i * frameSize,
+    w: frameSize,
+    h: frameSize,
+  }));
+}
+
+/**
+ * Mapa MapObjectType → SpriteMeta.
+ * Tipos não listados aqui não têm sprite (fallback Lucide).
  */
 export const OBJECT_SPRITE_MAP: Record<string, SpriteMeta> = {
-  chest: { frames: ["chest_closed.png"] },
-  crate: { frames: ["box.png"] },
-  pillar: { frames: ["column.png"] },
-  statue: { frames: ["gargoyle_top_1.png"] },
-  banner: { frames: ["wall_flag_red.png"] },
+  // ── PNGs individuais (pack 0x72) ──
+  chest: { kind: "file", file: "chest_closed.png" },
+  crate: { kind: "file", file: "box.png" },
+  pillar: { kind: "file", file: "column.png" },
+  statue: { kind: "file", file: "gargoyle_top_1.png" },
+  banner: { kind: "file", file: "wall_flag_red.png" },
   torch_stand: {
-    frames: [
+    kind: "file-anim",
+    files: [
       "torch_1.png",
       "torch_2.png",
       "torch_3.png",
@@ -45,6 +99,43 @@ export const OBJECT_SPRITE_MAP: Record<string, SpriteMeta> = {
     frameDurationMs: 100,
     motion: "fire",
   },
+
+  // ── Sheets novos — estáticos (pegam o primeiro tile) ──
+  skull_pile: {
+    kind: "sheet",
+    sheet: "scull",
+    region: { x: 0, y: 0, w: 48, h: 48 },
+  },
+  spider_web: {
+    kind: "sheet",
+    sheet: "web",
+    region: { x: 0, y: 0, w: 48, h: 48 },
+  },
+  flask_monster: {
+    kind: "sheet",
+    sheet: "flasks",
+    region: { x: 0, y: 0, w: 36, h: 64 },
+  },
+
+  // ── Sheets novos — animados (ciclam regiões) ──
+  rotating_blades: {
+    kind: "sheet-anim",
+    sheet: "blades",
+    regions: verticalStrip(4, 48),
+    frameDurationMs: 80,
+  },
+  guillotine: {
+    kind: "sheet-anim",
+    sheet: "guillotine",
+    regions: horizontalStrip(12, 48),
+    frameDurationMs: 80,
+  },
+  bomb: {
+    kind: "sheet-anim",
+    sheet: "bomb",
+    regions: horizontalStrip(12, 48),
+    frameDurationMs: 100,
+  },
 };
 
 /**
@@ -54,21 +145,37 @@ export function getObjectSpriteMeta(type: string): SpriteMeta | null {
   return OBJECT_SPRITE_MAP[type] ?? null;
 }
 
+/** True se o tipo tem sprite (qualquer formato). */
+export function hasObjectSprite(type: string): boolean {
+  return type in OBJECT_SPRITE_MAP;
+}
+
 /**
- * Retorna o URL do PRIMEIRO frame do sprite (compat com consumidores que só
- * precisam de imagem estática — ex: cover em card). Null se não tem sprite.
+ * Retorna o URL da imagem (PNG ou spritesheet). Pra `file` é o arquivo do
+ * tipo, pra `file-anim` é o primeiro frame, pra `sheet`/`sheet-anim` é a
+ * spritesheet inteira. Útil pra pré-carregar; NÃO é o URL de um frame
+ * recortado (pra isso use os componentes de render).
  */
 export function getObjectSpriteUrl(type: string): string | null {
   const meta = OBJECT_SPRITE_MAP[type];
   if (!meta) return null;
-  return `${OBJECT_SPRITE_BASE}/${meta.frames[0]}`;
+  if (meta.kind === "file") return `${OBJECT_SPRITE_BASE}/${meta.file}`;
+  if (meta.kind === "file-anim") return `${OBJECT_SPRITE_BASE}/${meta.files[0]}`;
+  const sheet = OBJECT_SPRITE_SHEETS[meta.sheet];
+  return sheet ? `${OBJECT_SPRITE_BASE}/${sheet.filename}` : null;
 }
 
 /**
- * Retorna URLs completos de todos os frames do sprite.
+ * Retorna URLs completos de todos os frames (para `file-anim`).
+ * Para sheets, retorna array vazio — a renderização é feita via
+ * CSS background-image no componente, não por URLs individuais.
  */
 export function getObjectSpriteFrameUrls(type: string): string[] {
   const meta = OBJECT_SPRITE_MAP[type];
   if (!meta) return [];
-  return meta.frames.map((f) => `${OBJECT_SPRITE_BASE}/${f}`);
+  if (meta.kind === "file") return [`${OBJECT_SPRITE_BASE}/${meta.file}`];
+  if (meta.kind === "file-anim") {
+    return meta.files.map((f) => `${OBJECT_SPRITE_BASE}/${f}`);
+  }
+  return [];
 }

@@ -9,7 +9,10 @@ import {
   Eraser,
   Eye,
   Fence,
+  Copy,
   Hand,
+  MousePointer2,
+  RotateCw,
   ImageIcon,
   Mountain,
   Package,
@@ -40,7 +43,8 @@ import type {
 } from "@/lib/gameplay-mock-data";
 import { MAP_OBJECT_CATALOG } from "@/lib/gameplay-mock-data";
 import { ObjectSpriteIcon } from "@/components/gameplay/object-sprite-icon";
-import { getObjectSpriteUrl } from "@questboard/constants";
+import { ObjectActionToolbar, TOOLBAR_HEIGHT } from "@/components/gameplay/object-action-toolbar";
+import { hasObjectSprite } from "@questboard/constants";
 import { HelpCircle } from "lucide-react";
 import {
   getNearestEdge,
@@ -73,7 +77,7 @@ interface EditorState {
   wallEdges: Record<string, WallData>;
   mapObjects: MapObjectCell[];
   // Active selections
-  activeTool: "terrain" | "wall" | "objects" | "eraser" | "hand";
+  activeTool: "pointer" | "terrain" | "wall" | "objects" | "eraser" | "hand";
   terrainEditorTool: TerrainEditorTool;
   activeTerrainType: TerrainType;
   terrainCategory: TerrainCategoryId | "all";
@@ -92,6 +96,8 @@ interface EditorState {
   // Meta
   mapName: string;
   savedMapId: string | null;
+  // Selection (objects tool)
+  selectedObjectId: string | null;
 }
 
 function createInitialState(): EditorState {
@@ -119,6 +125,7 @@ function createInitialState(): EditorState {
     backgroundOpacity: 0.5,
     mapName: "Novo Mapa",
     savedMapId: null,
+    selectedObjectId: null,
   };
 }
 
@@ -180,6 +187,7 @@ const objectIconMap = new Map(MAP_OBJECT_CATALOG.map((o) => [o.type, o.icon]));
 export default function MapEditorPage() {
   const searchParams = useSearchParams();
   const mapIdParam = searchParams.get("id");
+  const aiAutoOpenParam = searchParams.get("ai");
 
   const addMap = useMapLibraryStore((s) => s.addMap);
   const updateMap = useMapLibraryStore((s) => s.updateMap);
@@ -242,7 +250,14 @@ export default function MapEditorPage() {
         }
         const result = (await res.json()) as {
           terrain: { x: number; y: number; type: TerrainType }[];
-          walls: { x: number; y: number; side: "top" | "right" | "bottom" | "left"; type: WallType; style: WallStyle }[];
+          walls: {
+            x: number;
+            y: number;
+            side: "top" | "right" | "bottom" | "left";
+            type: WallType;
+            style: WallStyle;
+            lockDC?: number;
+          }[];
           objects: { x: number; y: number; type: MapObjectType; rotation?: number }[];
         };
 
@@ -277,7 +292,11 @@ export default function MapEditorPage() {
             }
             for (const w of result.walls) {
               const key = wallSideToEdgeKey(w.x, w.y, w.side);
-              keptEdges[key] = { type: w.type, style: w.style };
+              const data: WallData = { type: w.type, style: w.style };
+              if (w.type === "door-locked" && typeof w.lockDC === "number") {
+                data.lockDC = w.lockDC;
+              }
+              keptEdges[key] = data;
             }
 
             const keptObjects = s.mapObjects.filter((o) => !inArea(o.x, o.y));
@@ -297,7 +316,11 @@ export default function MapEditorPage() {
           const nextEdges: Record<string, WallData> = {};
           for (const w of result.walls) {
             const key = wallSideToEdgeKey(w.x, w.y, w.side);
-            nextEdges[key] = { type: w.type, style: w.style };
+            const data: WallData = { type: w.type, style: w.style };
+            if (w.type === "door-locked" && typeof w.lockDC === "number") {
+              data.lockDC = w.lockDC;
+            }
+            nextEdges[key] = data;
           }
           return {
             ...s,
@@ -381,6 +404,12 @@ export default function MapEditorPage() {
       }
       if (e.key === "h" || e.key === "H") {
         setState((s) => ({ ...s, activeTool: s.activeTool === "hand" ? "terrain" : "hand" }));
+      }
+      if (e.key === "v" || e.key === "V") {
+        setState((s) => ({
+          ...s,
+          activeTool: s.activeTool === "pointer" ? "terrain" : "pointer",
+        }));
       }
     }
     function onKeyUp(e: KeyboardEvent) {
@@ -727,29 +756,60 @@ export default function MapEditorPage() {
         return;
       }
 
+      // Pointer tool: só seleciona/deseleciona (nunca coloca nem apaga)
+      if (state.activeTool === "pointer") {
+        const cell = getGridCell(e);
+        if (!cell) return;
+        const existingAtCell = state.mapObjects.find(
+          (o) => o.x === cell.x && o.y === cell.y,
+        );
+        setState((s) => ({
+          ...s,
+          selectedObjectId: existingAtCell ? existingAtCell.id : null,
+        }));
+        return;
+      }
+
       // Objects tool
       if (state.activeTool === "objects") {
         const cell = getGridCell(e);
         if (!cell) return;
-        if (e.shiftKey) {
-          setState((s) => ({ ...s, mapObjects: s.mapObjects.filter((o) => !(o.x === cell.x && o.y === cell.y)) }));
-        } else {
-          setState((s) => {
-            const existing = s.mapObjects.findIndex((o) => o.x === cell.x && o.y === cell.y);
-            if (existing >= 0) {
-              const updated = [...s.mapObjects];
-              updated[existing] = { ...updated[existing], type: s.activeObjectType };
-              return { ...s, mapObjects: updated };
-            }
-            return {
-              ...s,
-              mapObjects: [
-                ...s.mapObjects,
-                { id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, x: cell.x, y: cell.y, type: s.activeObjectType, rotation: 0 },
-              ],
-            };
-          });
+        const existingAtCell = state.mapObjects.find(
+          (o) => o.x === cell.x && o.y === cell.y,
+        );
+
+        // Shift+click em objeto = remove direto (poweruser)
+        if (e.shiftKey && existingAtCell) {
+          setState((s) => ({
+            ...s,
+            mapObjects: s.mapObjects.filter((o) => o.id !== existingAtCell.id),
+            selectedObjectId:
+              s.selectedObjectId === existingAtCell.id ? null : s.selectedObjectId,
+          }));
+          return;
         }
+
+        // Click em objeto existente = seleciona
+        if (existingAtCell) {
+          setState((s) => ({ ...s, selectedObjectId: existingAtCell.id }));
+          return;
+        }
+
+        // Click em célula vazia = coloca (e limpa seleção prévia)
+        setState((s) => ({
+          ...s,
+          mapObjects: [
+            ...s.mapObjects,
+            {
+              id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+              x: cell.x,
+              y: cell.y,
+              type: s.activeObjectType,
+              rotation: 0,
+            },
+          ],
+          selectedObjectId: null,
+        }));
         return;
       }
 
@@ -806,7 +866,7 @@ export default function MapEditorPage() {
         document.addEventListener("mouseup", onUp);
       }
     },
-    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallEdgeType, state.activeWallStyle, state.wallDrawMode, state.activeObjectType, getGridCell, getMouseEdge, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart, aiAreaMode, aiPrompt, scaledCell, panX, panY, runAIGeneration],
+    [state.activeTool, state.terrainEditorTool, state.brushSize, state.gridCols, state.gridRows, state.activeWallEdgeType, state.activeWallStyle, state.wallDrawMode, state.activeObjectType, state.mapObjects, state.selectedObjectId, getGridCell, getMouseEdge, pushSnapshot, paintTerrainCells, eraseTerrainCells, fillTerrain, spaceHeld, handlePanStart, aiAreaMode, aiPrompt, scaledCell, panX, panY, runAIGeneration],
   );
 
   const handleCanvasMouseMove = useCallback(
@@ -888,6 +948,11 @@ export default function MapEditorPage() {
       future: [],
     }));
   }, [mapIdParam]);
+
+  // Auto-abrir modal IA quando chega com ?ai=1 (vem de "Gerar com IA" em /maps)
+  useEffect(() => {
+    if (aiAutoOpenParam === "1") setAiOpen(true);
+  }, [aiAutoOpenParam]);
 
   // Auto-save with 2s debounce (only if map was already saved once)
   useEffect(() => {
@@ -1004,6 +1069,122 @@ export default function MapEditorPage() {
   const [objCategory, setObjCategory] = useState<string>("all");
   const filteredObjects = objCategory === "all" ? MAP_OBJECT_CATALOG : MAP_OBJECT_CATALOG.filter((o) => o.category === objCategory);
 
+  // ── Selected-object actions ───────────────────────────────────────
+  const rotateSelectedObject = useCallback(() => {
+    pushSnapshot();
+    setState((s) => {
+      if (!s.selectedObjectId) return s;
+      return {
+        ...s,
+        mapObjects: s.mapObjects.map((o) =>
+          o.id === s.selectedObjectId
+            ? { ...o, rotation: (o.rotation + 90) % 360 }
+            : o,
+        ),
+      };
+    });
+  }, [pushSnapshot]);
+
+  const deleteSelectedObject = useCallback(() => {
+    pushSnapshot();
+    setState((s) => {
+      if (!s.selectedObjectId) return s;
+      return {
+        ...s,
+        mapObjects: s.mapObjects.filter((o) => o.id !== s.selectedObjectId),
+        selectedObjectId: null,
+      };
+    });
+  }, [pushSnapshot]);
+
+  const duplicateSelectedObject = useCallback(() => {
+    pushSnapshot();
+    setState((s) => {
+      if (!s.selectedObjectId) return s;
+      const src = s.mapObjects.find((o) => o.id === s.selectedObjectId);
+      if (!src) return s;
+      const occupied = new Set(s.mapObjects.map((o) => `${o.x},${o.y}`));
+      const neighbors: [number, number][] = [
+        [src.x + 1, src.y],
+        [src.x, src.y + 1],
+        [src.x - 1, src.y],
+        [src.x, src.y - 1],
+      ];
+      for (const [nx, ny] of neighbors) {
+        if (nx < 0 || ny < 0 || nx >= s.gridCols || ny >= s.gridRows) continue;
+        if (occupied.has(`${nx},${ny}`)) continue;
+        const newId = `obj_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+        return {
+          ...s,
+          mapObjects: [
+            ...s.mapObjects,
+            { ...src, id: newId, x: nx, y: ny },
+          ],
+          selectedObjectId: newId,
+        };
+      }
+      return s; // sem célula adjacente livre
+    });
+  }, [pushSnapshot]);
+
+  // ── Keyboard shortcuts (objects tool + selection) ─────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      )
+        return;
+
+      const canSelect = state.activeTool === "objects" || state.activeTool === "pointer";
+      if (!canSelect) return;
+
+      if (e.key === "Escape") {
+        if (state.selectedObjectId) {
+          e.preventDefault();
+          setState((s) => ({ ...s, selectedObjectId: null }));
+        }
+        return;
+      }
+
+      if (!state.selectedObjectId) return;
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteSelectedObject();
+        return;
+      }
+      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        rotateSelectedObject();
+        return;
+      }
+      if ((e.key === "d" || e.key === "D") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        duplicateSelectedObject();
+        return;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    state.activeTool,
+    state.selectedObjectId,
+    rotateSelectedObject,
+    deleteSelectedObject,
+    duplicateSelectedObject,
+  ]);
+
+  // ── Limpa seleção ao sair do modo "objects" ───────────────────────
+  useEffect(() => {
+    const canSelect = state.activeTool === "objects" || state.activeTool === "pointer";
+    if (!canSelect && state.selectedObjectId !== null) {
+      setState((s) => ({ ...s, selectedObjectId: null }));
+    }
+  }, [state.activeTool, state.selectedObjectId]);
+
   return (
     <div className="-m-6 flex h-[calc(100vh-64px)] flex-col overflow-hidden">
       {/* Top bar */}
@@ -1048,9 +1229,26 @@ export default function MapEditorPage() {
           </button>
 
           <button
+            onClick={() =>
+              setState((s) => ({
+                ...s,
+                activeTool: s.activeTool === "pointer" ? "terrain" : "pointer",
+              }))
+            }
+            title="Selecionar objetos (V)"
+            className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded transition-colors ${
+              state.activeTool === "pointer"
+                ? "bg-brand-accent text-white"
+                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+            }`}
+          >
+            <MousePointer2 className="h-3.5 w-3.5" />
+          </button>
+
+          <button
             onClick={() => setState((s) => ({ ...s, activeTool: s.activeTool === "hand" ? "terrain" : "hand" }))}
             title="Mover canvas (H)"
-            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+            className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded transition-colors ${
               state.activeTool === "hand"
                 ? "bg-brand-accent text-white"
                 : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
@@ -1441,6 +1639,109 @@ export default function MapEditorPage() {
               </button>
             </div>
           )}
+
+          {/* ── Pointer info ── */}
+          {state.activeTool === "pointer" && (() => {
+            const sel = state.selectedObjectId
+              ? state.mapObjects.find((o) => o.id === state.selectedObjectId)
+              : null;
+            const selInfo = sel
+              ? MAP_OBJECT_CATALOG.find((c) => c.type === sel.type)
+              : null;
+            return (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 text-[11px] text-brand-text">
+                  <MousePointer2 className="h-3.5 w-3.5 text-brand-accent" />
+                  <span className="font-semibold">Seleção</span>
+                </div>
+
+                {sel ? (
+                  <div className="rounded-md border border-brand-accent/20 bg-brand-accent/[0.03] p-2.5">
+                    <div className="flex items-center gap-2">
+                      <ObjectSpriteIcon
+                        type={sel.type}
+                        fallback={objectIconMap.get(sel.type) ?? HelpCircle}
+                        size={24}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] text-brand-text">
+                          {selInfo?.label ?? sel.type}
+                        </div>
+                        <div className="text-[9px] text-brand-muted">
+                          ({sel.x}, {sel.y}) · {sel.rotation}°
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-1">
+                      <button
+                        onClick={rotateSelectedObject}
+                        title="Rotacionar (R)"
+                        className="flex cursor-pointer items-center justify-center gap-1 rounded py-1.5 text-[9px] text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+                      >
+                        <RotateCw className="h-3 w-3" />
+                        Girar
+                      </button>
+                      <button
+                        onClick={duplicateSelectedObject}
+                        title="Duplicar (Ctrl+D)"
+                        className="flex cursor-pointer items-center justify-center gap-1 rounded py-1.5 text-[9px] text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+                      >
+                        <Copy className="h-3 w-3" />
+                        Dupl.
+                      </button>
+                      <button
+                        onClick={deleteSelectedObject}
+                        title="Deletar (Del)"
+                        className="flex cursor-pointer items-center justify-center gap-1 rounded py-1.5 text-[9px] text-red-400 transition-colors hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-brand-border p-3 text-[10px] text-brand-muted">
+                    Click em um objeto no canvas para selecioná-lo.
+                  </div>
+                )}
+
+                <div className="h-px bg-brand-border" />
+                <div className="flex flex-col gap-1 text-[9px] text-brand-muted">
+                  <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand-muted/80">
+                    Atalhos
+                  </div>
+                  <ShortcutRow keys="V" label="Modo seleção" />
+                  <ShortcutRow keys="R" label="Rotacionar 90°" />
+                  <ShortcutRow keys="Ctrl+D" label="Duplicar" />
+                  <ShortcutRow keys="Del" label="Excluir" />
+                  <ShortcutRow keys="Esc" label="Limpar seleção" />
+                  <ShortcutRow keys="H" label="Mover canvas" />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Hand info ── */}
+          {state.activeTool === "hand" && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-[11px] text-brand-text">
+                <Hand className="h-3.5 w-3.5 text-brand-accent" />
+                <span className="font-semibold">Mover Canvas</span>
+              </div>
+              <div className="rounded-md border border-dashed border-brand-border p-3 text-[10px] text-brand-muted">
+                Arraste o canvas com o mouse para navegar pelo mapa. O zoom é controlado pelos botões no topo ou pela roda do mouse.
+              </div>
+              <div className="h-px bg-brand-border" />
+              <div className="flex flex-col gap-1 text-[9px] text-brand-muted">
+                <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand-muted/80">
+                  Atalhos
+                </div>
+                <ShortcutRow keys="H" label="Alternar Mover" />
+                <ShortcutRow keys="Espaço" label="Pan temporário" />
+                <ShortcutRow keys="V" label="Modo seleção" />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Canvas area */}
@@ -1594,8 +1895,9 @@ export default function MapEditorPage() {
               {/* Map objects */}
               {state.mapObjects.map((obj) => {
                 const fallback = objectIconMap.get(obj.type) ?? HelpCircle;
-                const hasSprite = getObjectSpriteUrl(obj.type) !== null;
-                const iconSize = hasSprite ? scaledCell : Math.max(10, scaledCell * 0.5);
+                const iconSize = hasObjectSprite(obj.type)
+                  ? scaledCell
+                  : Math.max(10, scaledCell * 0.5);
                 return (
                   <div
                     key={obj.id}
@@ -1618,6 +1920,43 @@ export default function MapEditorPage() {
                   </div>
                 );
               })}
+
+              {/* Selected object: bounding box + floating toolbar */}
+              {(() => {
+                const canShowSelection =
+                  state.activeTool === "objects" || state.activeTool === "pointer";
+                if (!canShowSelection || !state.selectedObjectId) return null;
+                const sel = state.mapObjects.find((o) => o.id === state.selectedObjectId);
+                if (!sel) return null;
+
+                const flipBelow = sel.y * scaledCell < TOOLBAR_HEIGHT + 12;
+                const toolbarTop = flipBelow
+                  ? (sel.y + 1) * scaledCell + 8
+                  : sel.y * scaledCell - TOOLBAR_HEIGHT - 8;
+                const toolbarLeft = sel.x * scaledCell + scaledCell / 2;
+
+                return (
+                  <>
+                    <div
+                      className="pointer-events-none absolute rounded-sm ring-2 ring-brand-accent ring-offset-1 ring-offset-[#0A0A0F]"
+                      style={{
+                        left: sel.x * scaledCell,
+                        top: sel.y * scaledCell,
+                        width: scaledCell,
+                        height: scaledCell,
+                        zIndex: 10,
+                      }}
+                    />
+                    <ObjectActionToolbar
+                      left={toolbarLeft}
+                      top={toolbarTop}
+                      onRotate={() => rotateSelectedObject()}
+                      onDuplicate={() => duplicateSelectedObject()}
+                      onDelete={() => deleteSelectedObject()}
+                    />
+                  </>
+                );
+              })()}
 
               {/* Hover cell highlight */}
               {hoverCell && state.activeTool !== "wall" && !aiAreaMode && (
@@ -1819,6 +2158,19 @@ export default function MapEditorPage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ── Shortcut row (sidebar info) ──
+
+function ShortcutRow({ keys, label }: { keys: string; label: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span>{label}</span>
+      <kbd className="rounded border border-brand-border bg-brand-primary px-1.5 py-0.5 font-mono text-[9px] text-brand-text">
+        {keys}
+      </kbd>
     </div>
   );
 }

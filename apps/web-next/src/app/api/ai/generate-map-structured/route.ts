@@ -18,7 +18,17 @@ const TERRAIN_TYPES = [
   "dense_trees", "light_trees",
 ];
 
-const WALL_TYPES = ["wall", "door-closed", "door-open", "window", "half-wall"];
+const WALL_TYPES = [
+  "wall",
+  "door-closed",
+  "door-open",
+  "door-locked",
+  "window",
+  "half-wall",
+  "secret",
+  "illusory",
+  "portcullis",
+];
 const WALL_STYLES = ["stone", "wood", "metal", "magic", "natural", "brick"];
 const WALL_SIDES = ["top", "right", "bottom", "left"];
 const OBJECT_TYPES = [
@@ -54,6 +64,7 @@ function buildGeminiSchema() {
             side: { type: "STRING", enum: WALL_SIDES },
             type: { type: "STRING", enum: WALL_TYPES },
             style: { type: "STRING", enum: WALL_STYLES },
+            lockDC: { type: "INTEGER" },
           },
           required: ["x", "y", "side", "type", "style"],
         },
@@ -117,12 +128,21 @@ REGRAS DE GERAÇÃO:
 5. COERÊNCIA: o terreno deve fazer sentido com o ambiente descrito (masmorra = stone_floor + dungeon_wall style; floresta = grass/forest_floor + tree objects; etc).
 6. DENSIDADE: preencha o mapa — não deixe a maioria das células vazias. Objetos com moderação (10-40 objetos em mapa médio).
 
+TIPOS ESPECIAIS DE PAREDE (use com PARCIMÔNIA — só quando a descrição justifica):
+- "door-locked" (porta trancada): use APENAS quando a descrição mencionar explicitamente "trancada", "cadeado", "chave", "senha" ou contexto óbvio (cofre, tesouro, cela). Inclua o campo "lockDC" entre 12 (simples) e 20 (complexa). Default 15 se não houver indicação de dificuldade. NO MÁXIMO 2 portas trancadas por mapa.
+- "secret" (porta/passagem secreta): use APENAS quando a descrição mencionar "secreta", "escondida", "passagem oculta", "armadilha". Parece uma parede normal até ser revelada. NO MÁXIMO 1 por mapa — são raras e narrativas.
+- "illusory" (parede ilusória): use APENAS quando a descrição mencionar "ilusão", "magia", "parede falsa" ou ambientes mágicos. Parece parede mas não bloqueia movimento. NO MÁXIMO 1 por mapa.
+- "portcullis" (grade): use em calabouços, masmorras, entradas de prisão, arenas. Bloqueia movimento mas visão passa. Pode ter 1-3 num mapa de masmorra.
+
+Quando em dúvida, prefira "door-closed" comum. NÃO encha o mapa de variações especiais só porque pode.
+
 ESTILOS DE PAREDE sugeridos:
 - Masmorra/dungeon → style "stone"
 - Casa/taberna → style "wood"
 - Castelo/templo → style "brick" ou "stone"
 - Floresta natural → style "natural"
 - Cripta mágica → style "magic"
+- Grade (portcullis) → style "metal"
 
 Retorne APENAS o JSON no schema definido.`;
 }
@@ -243,14 +263,24 @@ function clampToGrid(
 
   return {
     terrain: result.terrain.filter((c) => inBounds(c.x, c.y)),
-    walls: result.walls.filter((w) => {
-      if (!inBounds(w.x, w.y)) return false;
-      if (w.side === "top" && w.y === 0) return false;
-      if (w.side === "bottom" && w.y === gridRows - 1) return false;
-      if (w.side === "left" && w.x === 0) return false;
-      if (w.side === "right" && w.x === gridCols - 1) return false;
-      return true;
-    }),
+    walls: result.walls
+      .filter((w) => {
+        if (!inBounds(w.x, w.y)) return false;
+        if (w.side === "top" && w.y === 0) return false;
+        if (w.side === "bottom" && w.y === gridRows - 1) return false;
+        if (w.side === "left" && w.x === 0) return false;
+        if (w.side === "right" && w.x === gridCols - 1) return false;
+        return true;
+      })
+      .map((w) => {
+        // Normaliza lockDC: mantém só em door-locked; default 15 se veio sem DC.
+        if (w.type === "door-locked") {
+          return { ...w, lockDC: w.lockDC ?? 15 };
+        }
+        const { lockDC: _drop, ...rest } = w;
+        void _drop;
+        return rest;
+      }),
     objects: result.objects.filter((o) => inBounds(o.x, o.y)),
   };
 }

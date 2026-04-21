@@ -8,6 +8,7 @@ import {
 } from "@questboard/constants";
 import type { MapObjectType } from "@/lib/gameplay-mock-data";
 import { FireSpriteIcon } from "./fire-sprite-icon";
+import { SheetSprite, AnimatedSheetSprite } from "./sheet-sprite";
 
 interface Props {
   type: MapObjectType;
@@ -22,10 +23,12 @@ interface Props {
 }
 
 /**
- * Renderiza o ícone de um objeto do mapa.
- * - Tipo com sprite `motion: "fire"` → FireSpriteIcon (cicla frames + flicker).
- * - Tipo com sprite estático → <img> pixelated.
- * - Tipo sem sprite → ícone Lucide de fallback.
+ * Renderiza o ícone de um objeto do mapa, escolhendo o modo certo:
+ * - `file` (PNG individual estático) → <img> pixelated.
+ * - `file-anim` com motion "fire" → FireSpriteIcon (ciclo + flicker).
+ * - `sheet` (recorte estático de spritesheet) → SheetSprite.
+ * - `sheet-anim` (ciclo de recortes) → AnimatedSheetSprite.
+ * - sem sprite → ícone Lucide de fallback.
  */
 export function ObjectSpriteIcon({
   type,
@@ -37,24 +40,21 @@ export function ObjectSpriteIcon({
 }: Props) {
   const meta = getObjectSpriteMeta(type);
 
-  if (meta) {
-    const frameUrls = getObjectSpriteFrameUrls(type);
+  if (!meta) {
+    return (
+      <FallbackIcon
+        size={size}
+        color={color}
+        className={className}
+        aria-label={title}
+      />
+    );
+  }
 
-    if (meta.motion === "fire" && meta.frames.length > 1) {
-      return (
-        <FireSpriteIcon
-          frameUrls={frameUrls}
-          frameDurationMs={meta.frameDurationMs ?? 100}
-          size={size}
-          title={title}
-          className={className}
-        />
-      );
-    }
-
+  if (meta.kind === "file") {
     return (
       <img
-        src={`${OBJECT_SPRITE_BASE}/${meta.frames[0]}`}
+        src={`${OBJECT_SPRITE_BASE}/${meta.file}`}
         alt={title ?? ""}
         width={size}
         height={size}
@@ -70,12 +70,58 @@ export function ObjectSpriteIcon({
     );
   }
 
+  if (meta.kind === "file-anim") {
+    if (meta.motion === "fire") {
+      return (
+        <FireSpriteIcon
+          frameUrls={getObjectSpriteFrameUrls(type)}
+          frameDurationMs={meta.frameDurationMs}
+          size={size}
+          title={title}
+          className={className}
+        />
+      );
+    }
+    // file-anim without motion: render first frame statically
+    return (
+      <img
+        src={`${OBJECT_SPRITE_BASE}/${meta.files[0]}`}
+        alt={title ?? ""}
+        width={size}
+        height={size}
+        title={title}
+        className={className}
+        style={{
+          imageRendering: "pixelated",
+          objectFit: "contain",
+          display: "block",
+        }}
+        draggable={false}
+      />
+    );
+  }
+
+  if (meta.kind === "sheet") {
+    return (
+      <SheetSprite
+        sheet={meta.sheet}
+        region={meta.region}
+        size={size}
+        title={title}
+        className={className}
+      />
+    );
+  }
+
+  // sheet-anim
   return (
-    <FallbackIcon
+    <AnimatedSheetSprite
+      sheet={meta.sheet}
+      regions={meta.regions}
+      frameDurationMs={meta.frameDurationMs}
       size={size}
-      color={color}
+      title={title}
       className={className}
-      aria-label={title}
     />
   );
 }

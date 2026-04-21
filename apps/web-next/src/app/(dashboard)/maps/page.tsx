@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderPlus, Map, Plus, Search, Upload } from "lucide-react";
+import { FolderPlus, Map, Plus, Search, Sparkles, Upload } from "lucide-react";
 import { useMapLibraryStore } from "@/lib/map-library-store";
 import { useMapCollectionsStore } from "@/lib/map-collections-store";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import type { MapCategory } from "@/lib/map-types";
 import { MapCard } from "@/components/maps/map-card";
 import { MapCollectionCard } from "@/components/maps/map-collection-card";
@@ -38,7 +39,9 @@ export default function MapsPage() {
   const migrateFromLegacy = useMapLibraryStore((s) => s.migrateFromLegacy);
   const deleteMap = useMapLibraryStore((s) => s.deleteMap);
   const duplicateMap = useMapLibraryStore((s) => s.duplicateMap);
+  const addMap = useMapLibraryStore((s) => s.addMap);
   const clearCollectionFromMaps = useMapLibraryStore((s) => s.clearCollectionFromMaps);
+  const loadMapFromLibrary = useGameplayStore((s) => s.loadMapFromLibrary);
 
   const collections = useMapCollectionsStore((s) => s.collections);
   const deleteCollection = useMapCollectionsStore((s) => s.deleteCollection);
@@ -138,6 +141,38 @@ export default function MapsPage() {
     router.push(`/maps/editor?id=${id}`);
   };
 
+  const handleCreateWithAI = () => {
+    const id = addMap({
+      version: 1,
+      name: "Mapa IA",
+      description: "",
+      tags: [],
+      category: "custom",
+      thumbnail: null,
+      width: 25,
+      height: 25,
+      cellSizeFt: 5,
+      terrain: {},
+      walls: {},
+      objects: [],
+      backgroundImage: null,
+      backgroundOpacity: 0.5,
+      stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
+      collectionId: null,
+      order: 0,
+    });
+    router.push(`/maps/editor?id=${id}&ai=1`);
+  };
+
+  const handlePlay = (id: string) => {
+    const result = loadMapFromLibrary(id);
+    if ("error" in result) {
+      window.alert(result.error);
+      return;
+    }
+    router.push(`/gameplay/local`);
+  };
+
   const handleRenameCollection = (id: string) => {
     const current = collections[id];
     if (!current) return;
@@ -181,6 +216,11 @@ export default function MapsPage() {
 
   const hasAnyCollection = visibleCollections.length > 0;
 
+  const totalMaps = allMaps.length;
+  const totalCollections = Object.keys(collections).length;
+  const totalObjects = allMaps.reduce((acc, m) => acc + (m.stats?.objectCount ?? 0), 0);
+  const totalWalls = allMaps.reduce((acc, m) => acc + (m.stats?.wallCount ?? 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -189,25 +229,45 @@ export default function MapsPage() {
           <p className="mt-1 text-sm text-gray-400">
             Crie e gerencie seus mapas de batalha.
           </p>
+          {totalMaps > 0 && (
+            <p className="mt-1.5 text-[11px] text-brand-muted">
+              {totalMaps} {totalMaps === 1 ? "mapa" : "mapas"}
+              {totalCollections > 0 && (
+                <>
+                  {" · "}
+                  {totalCollections} {totalCollections === 1 ? "coleção" : "coleções"}
+                </>
+              )}
+              {" · "}
+              {totalWalls} paredes · {totalObjects} objetos
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowCreateCollectionModal(true)}
-            className="flex items-center gap-2 rounded-lg border border-brand-border px-4 py-2.5 text-sm text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-4 py-2.5 text-sm text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
           >
             <FolderPlus className="h-4 w-4" />
             Nova Coleção
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 rounded-lg border border-brand-border px-4 py-2.5 text-sm text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-4 py-2.5 text-sm text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
           >
             <Upload className="h-4 w-4" />
             Importar
           </button>
           <button
+            onClick={handleCreateWithAI}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-accent/30 bg-brand-accent/10 px-4 py-2.5 text-sm font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+          >
+            <Sparkles className="h-4 w-4" />
+            Gerar com IA
+          </button>
+          <button
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accent/80"
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accent/80"
           >
             <Plus className="h-4 w-4" />
             Novo Mapa
@@ -292,27 +352,50 @@ export default function MapsPage() {
                 onDelete={handleDelete}
                 onExport={(id) => setExportMapId(id)}
                 onMoveToCollection={(id) => setMoveMapId(id)}
+                onPlay={handlePlay}
               />
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl border border-dashed border-white/10 py-16">
-            <div className="text-center">
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-white/10 px-6 py-16">
+            <div className="max-w-xl text-center">
               <Map className="mx-auto h-12 w-12 text-gray-600" />
-              <p className="mt-3 text-gray-500">
+              <p className="mt-3 text-gray-400">
                 {search || category !== "all"
                   ? "Nenhum mapa encontrado"
                   : hasAnyCollection
                     ? "Nenhum mapa solto — todos estão em coleções."
-                    : "Nenhum mapa criado ainda"}
+                    : "Comece sua jornada"}
               </p>
               {!search && category === "all" && !hasAnyCollection && (
-                <button
-                  onClick={() => setShowNewModal(true)}
-                  className="mt-3 inline-block rounded-lg bg-white/5 px-4 py-2 text-sm text-gray-400 hover:bg-white/10"
-                >
-                  Criar seu primeiro mapa
-                </button>
+                <>
+                  <p className="mt-2 text-sm text-brand-muted">
+                    Crie seu primeiro mapa do zero, gere com IA a partir de uma descrição, ou importe um JSON exportado.
+                  </p>
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowNewModal(true)}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-accent/80"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Criar do zero
+                    </button>
+                    <button
+                      onClick={handleCreateWithAI}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-accent/30 bg-brand-accent/10 px-4 py-2 text-sm font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Gerar com IA
+                    </button>
+                    <button
+                      onClick={() => setShowImportModal(true)}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-border px-4 py-2 text-sm text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Importar JSON
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
