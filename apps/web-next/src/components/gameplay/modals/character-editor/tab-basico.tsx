@@ -27,18 +27,19 @@ export function TabBasico({ form, onUpdate }: TabBasicoProps) {
         <div className="flex gap-2">
           {(["npc", "creature"] as const).map((cat) => {
             const cfg = CHAR_CATEGORY_CONFIG[cat];
+            const Icon = cfg.icon;
             const active = form.category === cat;
             return (
               <button
                 key={cat}
                 onClick={() => onUpdate({ category: cat })}
-                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium transition-colors ${
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium transition-colors ${
                   active
                     ? "border-brand-accent/30 bg-brand-accent/10 text-brand-accent"
                     : "border-brand-border text-brand-muted hover:text-brand-text"
                 }`}
               >
-                <span className="text-base">{cfg.emoji}</span>
+                <Icon className="h-4 w-4" />
                 {cfg.label}
               </button>
             );

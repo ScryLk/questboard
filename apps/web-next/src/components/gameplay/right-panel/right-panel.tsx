@@ -1,16 +1,18 @@
 "use client";
 
-import { Dices, MessageCircle, User } from "lucide-react";
+import { Dices, MessageCircle, Target } from "lucide-react";
 import type { RightPanelTab } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { ChatTab } from "./chat-tab";
 import { DiceTab } from "./dice-tab";
-import { CharacterSheetTab } from "./character-sheet-tab";
+import { TargetPanel } from "./target-panel";
 
+// "sheet" é mantido como chave interna pra não quebrar callsites (store +
+// menu contextual setRightTab("sheet")); só o label/ícone viraram "Alvo".
 const TABS: { key: RightPanelTab; label: string; icon: typeof MessageCircle }[] = [
   { key: "chat", label: "Chat", icon: MessageCircle },
   { key: "dice", label: "Dados", icon: Dices },
-  { key: "sheet", label: "Ficha", icon: User },
+  { key: "sheet", label: "Alvo", icon: Target },
 ];
 
 export function RightPanel() {
@@ -41,7 +43,7 @@ export function RightPanel() {
       <div className="flex-1 overflow-hidden">
         {rightTab === "chat" && <ChatTab />}
         {rightTab === "dice" && <DiceTab />}
-        {rightTab === "sheet" && <CharacterSheetTab />}
+        {rightTab === "sheet" && <TargetPanel />}
       </div>
     </div>
   );

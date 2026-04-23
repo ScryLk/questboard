@@ -70,30 +70,6 @@ export function TabDialogo({ form, onUpdate }: TabDialogoProps) {
               Essas notas sao visiveis apenas para o Mestre
             </p>
           </section>
-
-          {/* Narrative links */}
-          <section>
-            <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-brand-accent">
-              Vinculos Narrativos
-            </h3>
-            <input
-              type="text"
-              value={form.linkedNarrativeNodeIds.join(", ")}
-              onChange={(e) =>
-                onUpdate({
-                  linkedNarrativeNodeIds: e.target.value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })
-              }
-              placeholder="IDs de eventos narrativos (separados por virgula)"
-              className="h-7 w-full rounded-md border border-brand-border bg-brand-primary px-2 text-[11px] text-brand-text outline-none placeholder:text-brand-muted/40 focus:border-brand-accent/40"
-            />
-            <p className="mt-1 text-[9px] text-brand-muted">
-              Vincular a eventos da historia para acompanhar progresso
-            </p>
-          </section>
         </>
       )}
     </div>

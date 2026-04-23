@@ -15,3 +15,4 @@ export * from "./audio";
 export * from "./campaign";
 export * from "./feed";
 export * from "./narrative";
+export * from "./search";

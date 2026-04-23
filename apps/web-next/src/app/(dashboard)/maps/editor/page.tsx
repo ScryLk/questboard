@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { DesktopOnlyNotice } from "@/components/layout/desktop-only-notice";
 import {
   ArrowLeft,
   BoxSelect,
@@ -188,6 +189,8 @@ export default function MapEditorPage() {
   const searchParams = useSearchParams();
   const mapIdParam = searchParams.get("id");
   const aiAutoOpenParam = searchParams.get("ai");
+  const aiRegionParam = searchParams.get("region");
+  const aiPromptParam = searchParams.get("prompt");
 
   const addMap = useMapLibraryStore((s) => s.addMap);
   const updateMap = useMapLibraryStore((s) => s.updateMap);
@@ -232,6 +235,19 @@ export default function MapEditorPage() {
 
   const runAIGeneration = useCallback(
     async (promptText: string, area: { x1: number; y1: number; x2: number; y2: number } | null) => {
+      // Schema da API cap em 60 células — se o mapa foi criado maior
+      // (antes do cap ou em edição manual), aborta com mensagem clara
+      // em vez de deixar cair no 400 silencioso.
+      if (state.gridCols > 60 || state.gridRows > 60) {
+        alert(
+          `IA só gera mapas até 60x60 células. Este mapa é ${state.gridCols}x${state.gridRows}. Redimensione ou use o modo "Selecionar região" (60x60 max).`,
+        );
+        return;
+      }
+      if (promptText.trim().length < 10 && !area) {
+        alert("Descrição precisa de ao menos 10 caracteres.");
+        return;
+      }
       setAiLoading(true);
       try {
         const res = await fetch("/api/ai/generate-map-structured", {
@@ -883,22 +899,27 @@ export default function MapEditorPage() {
   );
 
   // ── Wheel zoom ────────────────────────────────────────────────────
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // React onWheel é passivo por default (React 17+) — preventDefault
+  // dentro gera warning no Chrome. Registramos nativo com passive:false.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
-        // Zoom
         const delta = e.deltaY > 0 ? -10 : 10;
-        setState((s) => ({ ...s, zoom: Math.max(25, Math.min(300, s.zoom + delta)) }));
+        setState((s) => ({
+          ...s,
+          zoom: Math.max(25, Math.min(300, s.zoom + delta)),
+        }));
       } else {
-        // Pan — regular scroll moves the canvas
         setPanX((p) => p - e.deltaX);
         setPanY((p) => p - e.deltaY);
       }
-    },
-    [],
-  );
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // ── Save / Load ────────────────────────────────────────────────────
 
@@ -949,10 +970,28 @@ export default function MapEditorPage() {
     }));
   }, [mapIdParam]);
 
-  // Auto-abrir modal IA quando chega com ?ai=1 (vem de "Gerar com IA" em /maps)
+  // Auto-IA quando chega com ?ai=1 (vem de "Gerar com IA" em /maps):
+  //   - region=1   → abre modo de seleção de área (user desenha antes)
+  //   - prompt=X   → executa geração direto, sem abrir o modal
+  //   - só ai=1    → abre o modal vazio (legacy / botão dentro do editor)
+  // Guard com ref pra não reexecutar se runAIGeneration for recriado.
+  const aiAutoRanRef = useRef(false);
   useEffect(() => {
-    if (aiAutoOpenParam === "1") setAiOpen(true);
-  }, [aiAutoOpenParam]);
+    if (aiAutoRanRef.current) return;
+    if (aiAutoOpenParam !== "1") return;
+    aiAutoRanRef.current = true;
+
+    if (aiRegionParam === "1") {
+      setAiOpen(true);
+      setAiAreaMode(true);
+    } else if (aiPromptParam) {
+      // Dispara geração imediatamente — descrição já foi dada no
+      // modal anterior, sem sentido perguntar de novo.
+      void runAIGeneration(aiPromptParam, null);
+    } else {
+      setAiOpen(true);
+    }
+  }, [aiAutoOpenParam, aiRegionParam, aiPromptParam, runAIGeneration]);
 
   // Auto-save with 2s debounce (only if map was already saved once)
   useEffect(() => {
@@ -1186,6 +1225,7 @@ export default function MapEditorPage() {
   }, [state.activeTool, state.selectedObjectId]);
 
   return (
+    <DesktopOnlyNotice featureName="O editor de mapas">
     <div className="-m-6 flex h-[calc(100vh-64px)] flex-col overflow-hidden">
       {/* Top bar */}
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-brand-border bg-[#0D0D12] px-3">
@@ -1599,6 +1639,7 @@ export default function MapEditorPage() {
                       type={obj.type}
                       fallback={obj.icon}
                       size={20}
+                      fit="contain"
                       title={obj.label}
                       className="text-brand-text"
                     />
@@ -1662,6 +1703,7 @@ export default function MapEditorPage() {
                         type={sel.type}
                         fallback={objectIconMap.get(sel.type) ?? HelpCircle}
                         size={24}
+                        fit="contain"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[11px] text-brand-text">
@@ -1749,7 +1791,6 @@ export default function MapEditorPage() {
           ref={containerRef}
           className={`relative flex-1 bg-[#0A0A0F] ${isPanning ? "cursor-grabbing" : spaceHeld || state.activeTool === "hand" ? "cursor-grab" : "cursor-crosshair"}`}
           style={{ overflow: "hidden" }}
-          onWheel={handleWheel}
           onMouseDown={(e) => {
             // Middle-click anywhere in the container pans
             if (e.button === 1) {
@@ -2159,6 +2200,7 @@ export default function MapEditorPage() {
       )}
 
     </div>
+    </DesktopOnlyNotice>
   );
 }
 

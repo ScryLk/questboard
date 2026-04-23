@@ -33,8 +33,11 @@ export type BroadcastMessageType =
   | "gm:session-end"         // Session ended
   | "gm:damage-applied"      // Damage applied to token
   | "gm:heal-applied"        // Heal applied to token
+  | "gm:move-approved"       // GM aprovou pedido de movimento do player
+  | "gm:move-rejected"       // GM rejeitou pedido de movimento do player
   // Player → GM
-  | "player:move"            // Player moves token
+  | "player:move"            // Player moves token (legado: move direto)
+  | "player:move-request"    // Player pede pro GM aprovar um movimento
   | "player:chat"            // Player chat message
   | "player:roll"            // Player rolled dice
   | "player:end-turn"        // Player ends turn

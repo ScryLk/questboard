@@ -68,6 +68,7 @@ export function ObjectToolPicker() {
               type={obj.type}
               fallback={obj.icon}
               size={18}
+              fit="contain"
               title={obj.label}
               className="text-brand-text"
             />

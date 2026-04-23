@@ -11,6 +11,7 @@ import type {
   TokenAlignment,
 } from "./gameplay-mock-data";
 import { MOCK_SESSION_MAPS } from "./gameplay-mock-data";
+import { getZoomInLevel, getZoomOutLevel } from "./map-scale";
 
 // ── Player-visible token (filtered info) ──────────────────────
 
@@ -238,6 +239,9 @@ interface PlayerViewState {
   // Connection
   setSessionCode: (code: string) => void;
   setPlayerName: (name: string) => void;
+  /** Seta o id do jogador atual. Usado pelo `useIdentityFromUrl` pra
+   *  alinhar com `?as=p1|p2|p3` (e com `token.playerId` do GM). */
+  setPlayerId: (id: string) => void;
   joinSession: (code: string, name: string) => void;
   setJoinStep: (step: "enter-code" | "waiting-gm" | "playing" | "ended") => void;
   setConnected: (v: boolean) => void;
@@ -288,13 +292,63 @@ interface PlayerViewState {
   setSessionSummary: (summary: SessionSummary | null) => void;
 
   // Whisper
-  pendingWhisper: { fromName: string; message: string; fromId: string } | null;
-  showWhisper: (whisper: { fromName: string; message: string; fromId: string }) => void;
+  pendingWhisper: {
+    fromName: string;
+    message: string;
+    fromId: string;
+    imageUrl?: string;
+  } | null;
+  showWhisper: (whisper: {
+    fromName: string;
+    message: string;
+    fromId: string;
+    imageUrl?: string;
+  }) => void;
   dismissWhisper: () => void;
 
   // Signal
   playerSignal: string | null;
   sendSignal: (type: string) => void;
+
+  // Focus-self trigger — incrementar faz o PlayerCanvas centralizar
+  // no próprio token. Padrão "counter" evita guardar ação no store.
+  focusSelfTick: number;
+  requestFocusSelf: () => void;
+
+  // Movimento com aprovação do GM. Fluxo:
+  //  1. Player clica célula → stagedMove { toX, toY, awaitingGM: false }
+  //  2. Player confirma → awaitingGM vira true, broadcast pro GM
+  //  3. GM aprova → token move via sync, stagedMove some
+  //  4. GM rejeita → stagedMove some, toast opcional
+  stagedMove: {
+    toX: number;
+    toY: number;
+    awaitingGM: boolean;
+    /** Timestamp de quando o staged entrou neste estado (pré-confirm
+     *  ou aguardando). Usado pra timer/countdown no UI. */
+    stateStartedAt: number;
+  } | null;
+  stageMove: (toX: number, toY: number) => void;
+  confirmStagedMove: () => void;
+  clearStagedMove: () => void;
+
+  // Zoom do player canvas (separado do GM/camera-store). Snap nos
+  // mesmos 7 níveis discretos do `map-scale`. Default 1.0 = 100%.
+  playerZoom: number;
+  playerZoomIn: () => void;
+  playerZoomOut: () => void;
+  resetPlayerZoom: () => void;
+
+  /** Modo do canvas do player:
+   *  - "pan" = mão — arrastar para panning + wheel zooma sem modifier
+   *  - "action" = ponteiro — clique stageia movimento, drag move token */
+  canvasTool: "pan" | "action";
+  setCanvasTool: (tool: "pan" | "action") => void;
+
+  /** Token atualmente focado na aba "Alvo". Setado ao short-tap num
+   *  token que não é o próprio. Null = aba vazia/empty state. */
+  targetTokenId: string | null;
+  setTargetTokenId: (id: string | null) => void;
 }
 
 // ── Payload from GM sync ──────────────────────────────────────
@@ -381,6 +435,7 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
 
   setSessionCode: (code) => set({ sessionCode: code }),
   setPlayerName: (name) => set({ playerName: name }),
+  setPlayerId: (id) => set({ playerId: id }),
   joinSession: (code, name) =>
     set({ sessionCode: code.toUpperCase(), playerName: name, joinStep: "waiting-gm" }),
   setJoinStep: (step) => set({ joinStep: step }),
@@ -466,4 +521,44 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
     set({ playerSignal: type });
     setTimeout(() => set({ playerSignal: null }), 3000);
   },
+
+  focusSelfTick: 0,
+  requestFocusSelf: () => set((s) => ({ focusSelfTick: s.focusSelfTick + 1 })),
+
+  stagedMove: null,
+  stageMove: (toX, toY) =>
+    set({
+      stagedMove: {
+        toX,
+        toY,
+        awaitingGM: false,
+        stateStartedAt: Date.now(),
+      },
+    }),
+  confirmStagedMove: () =>
+    set((s) =>
+      s.stagedMove
+        ? {
+            stagedMove: {
+              ...s.stagedMove,
+              awaitingGM: true,
+              stateStartedAt: Date.now(),
+            },
+          }
+        : s,
+    ),
+  clearStagedMove: () => set({ stagedMove: null }),
+
+  playerZoom: 1.0,
+  playerZoomIn: () =>
+    set((s) => ({ playerZoom: getZoomInLevel(s.playerZoom) })),
+  playerZoomOut: () =>
+    set((s) => ({ playerZoom: getZoomOutLevel(s.playerZoom) })),
+  resetPlayerZoom: () => set({ playerZoom: 1.0 }),
+
+  canvasTool: "action",
+  setCanvasTool: (tool) => set({ canvasTool: tool }),
+
+  targetTokenId: null,
+  setTargetTokenId: (id) => set({ targetTokenId: id }),
 }));

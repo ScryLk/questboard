@@ -1,10 +1,20 @@
 "use client";
 
-import { Copy, Eye, MapPin, Pencil, Star, X } from "lucide-react";
+import { Copy, Eye, HelpCircle, Pencil, Star, X } from "lucide-react";
 import type { CampaignObject } from "@/types/object";
 import { CATEGORY_CONFIG, RARITY_CONFIG } from "@/types/object";
 import { useObjectStore } from "@/stores/objectStore";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { ObjectSpriteIcon } from "@/components/gameplay/object-sprite-icon";
+import {
+  MAP_OBJECT_CATALOG,
+  type MapObjectType,
+} from "@/lib/gameplay-mock-data";
+import { hasObjectSprite } from "@questboard/constants";
+
+const mapObjectIconByType = new Map(
+  MAP_OBJECT_CATALOG.map((o) => [o.type, o.icon]),
+);
 
 interface ObjectLibraryItemProps {
   object: CampaignObject;
@@ -14,6 +24,7 @@ interface ObjectLibraryItemProps {
 export function ObjectLibraryItem({ object, isOnMap }: ObjectLibraryItemProps) {
   const toggleFavorite = useObjectStore((s) => s.toggleFavorite);
   const duplicateObject = useObjectStore((s) => s.duplicateObject);
+  const removeInstance = useObjectStore((s) => s.removeInstance);
   const openModal = useGameplayStore((s) => s.openModal);
   const setObjectEditorTarget = useGameplayStore(
     (s) => s.setObjectEditorTarget,
@@ -22,6 +33,13 @@ export function ObjectLibraryItem({ object, isOnMap }: ObjectLibraryItemProps) {
   function handleEdit() {
     setObjectEditorTarget(object.id);
     openModal("objectEditor");
+  }
+
+  function handleRemoveFromMap() {
+    const instances = useObjectStore
+      .getState()
+      .mapInstances.filter((i) => i.objectId === object.id);
+    instances.forEach((i) => removeInstance(i.id));
   }
 
   return (
@@ -37,12 +55,23 @@ export function ObjectLibraryItem({ object, isOnMap }: ObjectLibraryItemProps) {
         }}
         className="flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03] active:cursor-grabbing"
       >
-        {/* Sprite / Emoji avatar */}
+        {/* Sprite avatar — prioriza sprite do catálogo, depois AI/url, por fim emoji */}
         <div
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded"
+          className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded"
           style={{ backgroundColor: object.spriteColor + "25" }}
         >
-          {object.spriteUrl ? (
+          {object.spriteType && hasObjectSprite(object.spriteType) ? (
+            <ObjectSpriteIcon
+              type={object.spriteType as MapObjectType}
+              fallback={
+                mapObjectIconByType.get(object.spriteType as MapObjectType) ??
+                HelpCircle
+              }
+              size={20}
+              fit="contain"
+              className="text-brand-text"
+            />
+          ) : object.spriteUrl ? (
             <img
               src={object.spriteUrl}
               alt=""
@@ -108,15 +137,12 @@ export function ObjectLibraryItem({ object, isOnMap }: ObjectLibraryItemProps) {
             <ActionBtn
               icon={X}
               title="Remover do mapa"
-              onClick={() => {
-                /* handled by map canvas */
-              }}
+              onClick={handleRemoveFromMap}
               danger
             />
           </>
         ) : (
           <>
-            <ActionBtn icon={MapPin} title="Colocar no mapa" onClick={() => {}} />
             <ActionBtn icon={Pencil} title="Editar" onClick={handleEdit} />
             <ActionBtn
               icon={Copy}

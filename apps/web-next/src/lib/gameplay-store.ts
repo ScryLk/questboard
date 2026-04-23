@@ -40,10 +40,13 @@ import {
   MOCK_COMBAT,
   MOCK_TOKENS,
   MOCK_MESSAGES,
+  MOCK_PLAYERS,
+  ALL_CONDITIONS,
   DEFAULT_FOG_SETTINGS,
   DEFAULT_VISION,
   MOCK_MAP,
 } from "./gameplay-mock-data";
+import { feed, isRecordingEnabled } from "./action-feed-store";
 import type { TerrainCategoryId } from "./terrain-catalog";
 import type { RoomTemplate } from "./room-templates";
 import { wallSideToEdgeKey } from "./wall-helpers";
@@ -53,6 +56,19 @@ import { playSFXSync } from "./audio/sfx-triggers";
 import { broadcastSend } from "./broadcast-sync";
 import type { SceneCard as PlayerSceneCard } from "./player-view-store";
 
+
+// ── Pedido de movimento do jogador ──
+
+export interface PendingPlayerMove {
+  requestId: string;
+  tokenId: string;
+  playerId: string;
+  playerName: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+}
 
 // ── Path Planning Types ──
 
@@ -180,7 +196,7 @@ export interface MovementHistoryEntry {
   positions: { x: number; y: number }[];
 }
 
-interface GameplayState {
+export interface GameplayState {
   // Tools
   activeTool: MapTool;
   setActiveTool: (tool: MapTool) => void;
@@ -210,6 +226,10 @@ interface GameplayState {
   nextTurn: () => void;
   prevTurn: () => void;
   endCombat: () => void;
+  /** Atalho de teste: inicia combate se inativo, inclui o token no order
+   *  se faltar, e seta este token como o turno atual. Usado pelo menu
+   *  contextual ("Definir turno") pra testar o fluxo na visão do player. */
+  setCurrentTurn: (tokenId: string) => void;
   movementUsedFt: number;
   resetMovement: () => void;
   addMovementFt: (ft: number) => void;
@@ -232,6 +252,12 @@ interface GameplayState {
   useReactionFor: (tokenId: string) => void;
   pendingReaction: import("./reactions").PendingReaction | null;
   setPendingReaction: (r: import("./reactions").PendingReaction | null) => void;
+
+  // Pedido de movimento do jogador esperando aprovação do GM.
+  pendingPlayerMove: PendingPlayerMove | null;
+  setPendingPlayerMove: (req: PendingPlayerMove | null) => void;
+  approvePendingMove: () => void;
+  rejectPendingMove: () => void;
 
   // Token ↔ Creature mapping (for AI features)
   tokenCreatureMap: Record<string, string>;
@@ -256,6 +282,13 @@ interface GameplayState {
   setTokenVisibility: (id: string, vis: TokenVisibility) => void;
   setTokenAlignment: (id: string, alignment: TokenAlignment) => void;
   setTokenSize: (id: string, size: number) => void;
+  // Toggle "voando": sem elevation = no chão; com elevation = voando.
+  // Passar undefined/null pra pousar, ou número (ft) pra elevar.
+  setTokenElevation: (id: string, elevation: number | null) => void;
+  // Atribui (ou remove) o token a um jogador. `playerId = null` volta a
+  // ser NPC. A player view filtra pelo `playerId` pra decidir se o token
+  // é "meu" (aparece na aba Ficha, permite drag).
+  setTokenPlayerId: (id: string, playerId: string | null) => void;
 
   // Movement history (undo)
   movementHistory: MovementHistoryEntry[];
@@ -429,6 +462,11 @@ interface GameplayState {
   // TODO: when multiplayer is wired, sync from session presence
   currentUserIsGM: boolean;
   setCurrentUserIsGM: (isGM: boolean) => void;
+  // Id do usuário atual — compara com token.playerId pra distinguir
+  // "meu token" vs "token de outro jogador" na matriz de permissões.
+  // null = ainda não sabido (single-user mock).
+  currentUserId: string | null;
+  setCurrentUserId: (id: string | null) => void;
 
   // Map
   zoom: number;
@@ -521,10 +559,13 @@ interface GameplayState {
   // Map objects
   mapObjects: MapObjectCell[];
   activeObjectType: MapObjectType;
+  selectedMapObjectId: string | null;
   setActiveObjectType: (type: MapObjectType) => void;
   placeObject: (x: number, y: number) => void;
   removeObject: (id: string) => void;
   rotateObject: (id: string) => void;
+  moveObject: (id: string, x: number, y: number) => void;
+  selectMapObject: (id: string | null) => void;
   clearObjects: () => void;
 
   // Terrain undo/redo
@@ -573,6 +614,23 @@ const DEFAULT_CONTEXT_MENU: ContextMenuState = {
   x: 0,
   y: 0,
 };
+
+// ─── Action feed helper ─────────────────────────────────────────────
+// `getActor` roda em runtime dentro dos setters patcheados pra descobrir
+// quem está agindo (GM, player1, etc). Lê `currentUserId`/`currentUserIsGM`
+// do próprio store via getState — setters chamam só depois do create.
+function getActor(): {
+  actorId: string;
+  actorName: string;
+  actorRole: "GM" | "PLAYER";
+} {
+  const state = useGameplayStore.getState();
+  const isGM = state.currentUserIsGM;
+  const id = state.currentUserId ?? (isGM ? "gm" : "anon");
+  const player = MOCK_PLAYERS.find((p) => p.id === id);
+  const name = isGM ? "Mestre" : (player?.name ?? "Jogador");
+  return { actorId: id, actorName: name, actorRole: isGM ? "GM" : "PLAYER" };
+}
 
 export const useGameplayStore = create<GameplayState>((set, get) => ({
   activeTool: "pointer",
@@ -653,6 +711,30 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     });
     get().addToast("Combate encerrado. Clique na fase para alterar.");
   },
+  setCurrentTurn: (tokenId) => {
+    set((s) => {
+      const existing = s.combat.order.find((c) => c.tokenId === tokenId);
+      const order = existing
+        ? s.combat.order
+        : [
+            ...s.combat.order,
+            { tokenId, initiative: 10, status: "active" as const },
+          ];
+      const turnIndex = order.findIndex((c) => c.tokenId === tokenId);
+      return {
+        combat: {
+          ...s.combat,
+          active: true,
+          round: s.combat.round || 1,
+          order,
+          turnIndex,
+        },
+        movementUsedFt: 0,
+        turnActions: { ...DEFAULT_TURN_ACTIONS },
+      };
+    });
+    playSFXSync("combat:turn_change");
+  },
   movementUsedFt: 0,
   resetMovement: () => set({ movementUsedFt: 0 }),
   addMovementFt: (ft) => set((s) => ({ movementUsedFt: s.movementUsedFt + ft })),
@@ -688,6 +770,44 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     set((s) => ({ reactionUsedMap: { ...s.reactionUsedMap, [tokenId]: true } })),
   pendingReaction: null,
   setPendingReaction: (r) => set({ pendingReaction: r }),
+
+  // Pedido de movimento do jogador
+  pendingPlayerMove: null,
+  setPendingPlayerMove: (req) => set({ pendingPlayerMove: req }),
+  approvePendingMove: () => {
+    const req = get().pendingPlayerMove;
+    if (!req) return;
+    // Move o token no mapa — player vê via sync automático.
+    get().moveToken(req.tokenId, req.toX, req.toY);
+    // Notifica o player (broadcast cross-tab) — mesma aba recebe via
+    // próprio sync + limpa stagedMove quando chega.
+    import("./broadcast-sync").then(({ broadcastSend }) => {
+      broadcastSend(
+        "gm:move-approved",
+        {
+          requestId: req.requestId,
+          playerId: req.playerId,
+          tokenId: req.tokenId,
+          toX: req.toX,
+          toY: req.toY,
+        },
+        "gm",
+      );
+    });
+    set({ pendingPlayerMove: null });
+  },
+  rejectPendingMove: () => {
+    const req = get().pendingPlayerMove;
+    if (!req) return;
+    import("./broadcast-sync").then(({ broadcastSend }) => {
+      broadcastSend(
+        "gm:move-rejected",
+        { requestId: req.requestId, playerId: req.playerId },
+        "gm",
+      );
+    });
+    set({ pendingPlayerMove: null });
+  },
 
   // Token ↔ Creature mapping
   tokenCreatureMap: {
@@ -727,17 +847,38 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   clearSelection: () => set({ selectedTokenIds: [] }),
   setHoveredToken: (id) => set({ hoveredTokenId: id }),
   moveToken: (id, x, y) => {
+    const prev = get().tokens.find((t) => t.id === id);
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, x, y } : t)),
     }));
+    // Registra no feed só se posição mudou (não-op não polui feed).
+    if (prev && (prev.x !== x || prev.y !== y) && isRecordingEnabled()) {
+      const actor = getActor();
+      feed.tokenMoved({
+        ...actor,
+        tokenId: id,
+        tokenName: prev.name,
+        fromX: prev.x,
+        fromY: prev.y,
+        toX: x,
+        toY: y,
+      });
+    }
   },
   removeToken: (id) => {
+    const removed = get().tokens.find((t) => t.id === id);
     set((s) => ({
       tokens: s.tokens.filter((t) => t.id !== id),
       selectedTokenIds: s.selectedTokenIds.filter((i) => i !== id),
     }));
+    if (removed && isRecordingEnabled()) {
+      const actor = getActor();
+      feed.tokenRemoved({ ...actor, token: removed });
+    }
   },
-  duplicateToken: (id) =>
+  duplicateToken: (id) => {
+    let createdId: string | null = null;
+    let originalName: string | null = null;
     set((s) => {
       const original = s.tokens.find((t) => t.id === id);
       if (!original) return s;
@@ -748,19 +889,45 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
         x: original.x + 1,
         y: original.y,
       };
+      createdId = clone.id;
+      originalName = original.name;
       return { tokens: [...s.tokens, clone] };
-    }),
-  updateTokenHp: (id, hp) =>
+    });
+    if (createdId && originalName && isRecordingEnabled()) {
+      const actor = getActor();
+      feed.tokenDuplicated({
+        ...actor,
+        originalName,
+        newTokenId: createdId,
+      });
+    }
+  },
+  updateTokenHp: (id, hp) => {
+    const prev = get().tokens.find((t) => t.id === id);
     set((s) => ({
       tokens: s.tokens.map((t) =>
         t.id === id ? { ...t, hp: Math.max(0, Math.min(t.maxHp, hp)) } : t,
       ),
-    })),
+    }));
+    const after = get().tokens.find((t) => t.id === id);
+    if (prev && after && prev.hp !== after.hp && isRecordingEnabled()) {
+      const actor = getActor();
+      feed.hpChanged({
+        ...actor,
+        tokenId: id,
+        tokenName: prev.name,
+        previousHp: prev.hp,
+        newHp: after.hp,
+      });
+    }
+  },
   updateTokenAc: (id, ac) =>
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, ac } : t)),
     })),
-  toggleTokenCondition: (id, cond) =>
+  toggleTokenCondition: (id, cond) => {
+    const prev = get().tokens.find((t) => t.id === id);
+    const had = prev?.conditions.includes(cond) ?? false;
     set((s) => ({
       tokens: s.tokens.map((t) => {
         if (t.id !== id) return t;
@@ -772,7 +939,20 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
             : [...t.conditions, cond],
         };
       }),
-    })),
+    }));
+    if (prev && isRecordingEnabled()) {
+      const actor = getActor();
+      const condMeta = ALL_CONDITIONS.find((c) => c.key === cond);
+      feed.conditionToggled({
+        ...actor,
+        tokenId: id,
+        tokenName: prev.name,
+        condition: cond,
+        added: !had,
+        label: condMeta?.label ?? cond,
+      });
+    }
+  },
   setTokenVisibility: (id, vis) =>
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, visibility: vis } : t)),
@@ -786,6 +966,22 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   setTokenSize: (id, size) =>
     set((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...t, size } : t)),
+    })),
+  setTokenElevation: (id, elevation) =>
+    set((s) => ({
+      tokens: s.tokens.map((t) =>
+        t.id === id
+          ? { ...t, elevation: elevation === null ? undefined : elevation }
+          : t,
+      ),
+    })),
+  setTokenPlayerId: (id, playerId) =>
+    set((s) => ({
+      tokens: s.tokens.map((t) =>
+        t.id === id
+          ? { ...t, playerId: playerId === null ? undefined : playerId }
+          : t,
+      ),
     })),
 
   movementHistory: [],
@@ -1259,6 +1455,8 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
 
   currentUserIsGM: true,
   setCurrentUserIsGM: (isGM) => set({ currentUserIsGM: isGM }),
+  currentUserId: null,
+  setCurrentUserId: (id) => set({ currentUserId: id }),
 
   mapBackgroundImage: null,
   mapBackgroundOpacity: 0.5,
@@ -1458,6 +1656,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   // Map objects
   mapObjects: [] as MapObjectCell[],
   activeObjectType: "chest" as MapObjectType,
+  selectedMapObjectId: null as string | null,
   setActiveObjectType: (type) => set({ activeObjectType: type }),
   placeObject: (x, y) =>
     set((s) => {
@@ -1485,14 +1684,32 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       };
     }),
   removeObject: (id) =>
-    set((s) => ({ mapObjects: s.mapObjects.filter((o) => o.id !== id) })),
+    set((s) => ({
+      mapObjects: s.mapObjects.filter((o) => o.id !== id),
+      selectedMapObjectId:
+        s.selectedMapObjectId === id ? null : s.selectedMapObjectId,
+    })),
   rotateObject: (id) =>
     set((s) => ({
       mapObjects: s.mapObjects.map((o) =>
         o.id === id ? { ...o, rotation: (o.rotation + 90) % 360 } : o,
       ),
     })),
-  clearObjects: () => set({ mapObjects: [] }),
+  moveObject: (id, x, y) =>
+    set((s) => {
+      // Don't allow moving onto a cell occupied by another object
+      const occupied = s.mapObjects.some(
+        (o) => o.id !== id && o.x === x && o.y === y,
+      );
+      if (occupied) return s;
+      return {
+        mapObjects: s.mapObjects.map((o) =>
+          o.id === id ? { ...o, x, y } : o,
+        ),
+      };
+    }),
+  selectMapObject: (id) => set({ selectedMapObjectId: id }),
+  clearObjects: () => set({ mapObjects: [], selectedMapObjectId: null }),
 
   // Terrain undo/redo
   terrainHistory: [] as TerrainCell[][],

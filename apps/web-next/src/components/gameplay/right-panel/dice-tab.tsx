@@ -5,6 +5,8 @@ import { Dices, Eye, EyeOff } from "lucide-react";
 import type { DieType } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { playSFX } from "@/lib/audio/sfx-triggers";
+import { useDiceAnimationStore } from "@/lib/dice-animation-store";
+import { usePlayerSettings } from "@/lib/player-settings-store";
 
 const DICE: { type: DieType; sides: number; label: string }[] = [
   { type: "d4", sides: 4, label: "D4" },
@@ -78,9 +80,27 @@ export function DiceTab() {
           rollFormula: formula,
           rollResult: sum,
           rollDetails: details,
-          isNat20: qty === 1 && sides === 20 && rolls[0] === 20,
-          isNat1: qty === 1 && sides === 20 && rolls[0] === 1,
+          rollSides: sides,
+          isNat20,
+          isNat1,
         });
+
+        // Nível 2 — dispara central em crítico/falha se setting permitir.
+        // Secret nunca dispara (nem msg no chat, nem animação).
+        const animMode = usePlayerSettings.getState().diceAnimation;
+        if ((isNat20 || isNat1) && animMode === "full") {
+          useDiceAnimationStore.getState().show({
+            id: `msg_${Date.now()}`,
+            sides,
+            result: sum,
+            formula,
+            details,
+            actorName: "GM",
+            isNat20,
+            isNat1,
+            kind: isNat20 ? "crit" : "fumble",
+          });
+        }
       }
     },
     [secret, addMessage],

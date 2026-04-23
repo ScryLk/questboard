@@ -14,6 +14,13 @@ interface SheetSpriteProps {
   region: SpriteRegion;
   /** Tamanho renderizado em pixels (largura e altura do quadro). */
   size: number;
+  /**
+   * "width" (default): escala pela largura, altura livre — permite sprites
+   * altos "projetarem" acima da célula no mapa.
+   * "contain": cabe inteiro numa caixa size×size — usado em pickers/listas
+   * onde o overflow atrapalha a grade.
+   */
+  fit?: "width" | "contain";
   title?: string;
   className?: string;
 }
@@ -30,14 +37,25 @@ export function SheetSprite({
   sheet,
   region,
   size,
+  fit = "width",
   title,
   className,
 }: SheetSpriteProps) {
   const sheetDef = OBJECT_SPRITE_SHEETS[sheet];
   if (!sheetDef) return null;
 
-  const scale = size / region.w;
+  // "contain" escala pela maior dimensão pra caber em size×size.
+  // "width" escala só pela largura, altura fica livre.
+  const scale =
+    fit === "contain"
+      ? size / Math.max(region.w, region.h)
+      : size / region.w;
+  const renderedWidth = region.w * scale;
   const renderedHeight = region.h * scale;
+  // Filename absoluto ("/sprites/foo.png") pula o prefixo /items.
+  const url = sheetDef.filename.startsWith("/")
+    ? sheetDef.filename
+    : `${OBJECT_SPRITE_BASE}/${sheetDef.filename}`;
 
   return (
     <div
@@ -46,9 +64,9 @@ export function SheetSprite({
       title={title}
       className={className}
       style={{
-        width: size,
+        width: renderedWidth,
         height: renderedHeight,
-        backgroundImage: `url(${OBJECT_SPRITE_BASE}/${sheetDef.filename})`,
+        backgroundImage: `url(${url})`,
         backgroundPosition: `-${region.x * scale}px -${region.y * scale}px`,
         backgroundSize: `${sheetDef.width * scale}px ${sheetDef.height * scale}px`,
         backgroundRepeat: "no-repeat",
@@ -64,6 +82,7 @@ interface AnimatedSheetSpriteProps {
   regions: SpriteRegion[];
   frameDurationMs: number;
   size: number;
+  fit?: "width" | "contain";
   title?: string;
   className?: string;
 }
@@ -79,6 +98,7 @@ export function AnimatedSheetSprite({
   regions,
   frameDurationMs,
   size,
+  fit = "width",
   title,
   className,
 }: AnimatedSheetSpriteProps) {
@@ -110,6 +130,7 @@ export function AnimatedSheetSprite({
       sheet={sheet}
       region={region}
       size={size}
+      fit={fit}
       title={title}
       className={className}
     />

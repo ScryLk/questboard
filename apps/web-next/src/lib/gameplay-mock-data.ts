@@ -162,9 +162,15 @@ export interface ChatMessage {
   rollFormula?: string;
   rollResult?: number;
   rollDetails?: string;
+  /** Número de lados do dado principal (20, 6, 100). Opcional pra
+   *  compatibilidade; novas rolagens devem setar pra animar corretamente. */
+  rollSides?: number;
   isNat20?: boolean;
   isNat1?: boolean;
   whisperTo?: string;
+  /** Data URL de imagem anexada (frontend-only). Quando backend subir,
+   *  trocar por URL do R2 e subir antes de enviar a mensagem. */
+  imageUrl?: string;
 }
 
 export interface MapConfig {
@@ -543,7 +549,50 @@ export const MOCK_SESSION: SessionInfo = {
   status: "live",
 };
 
-export const MOCK_PLAYERS: GamePlayer[] = [];
+// Jogadores mock pra dev — ids `p1/p2/p3` batem com o default do
+// player-view-store (`playerId: "p1"`) e com o seletor do DevIdentityBadge.
+// Quando o backend subir, isso vira dado real de `CampaignMember`.
+export const MOCK_PLAYERS: GamePlayer[] = [
+  {
+    id: "p1",
+    name: "Lucas Kepler",
+    character: "Elara",
+    class: "Mago",
+    level: 5,
+    hp: 28,
+    maxHp: 28,
+    ac: 13,
+    status: "online",
+    avatarInitials: "LK",
+    color: "#6C5CE7",
+  },
+  {
+    id: "p2",
+    name: "Maria Santos",
+    character: "Thorin",
+    class: "Guerreiro",
+    level: 5,
+    hp: 48,
+    maxHp: 48,
+    ac: 18,
+    status: "online",
+    avatarInitials: "MS",
+    color: "#00B894",
+  },
+  {
+    id: "p3",
+    name: "Pedro Costa",
+    character: "Lyra",
+    class: "Ladina",
+    level: 5,
+    hp: 32,
+    maxHp: 32,
+    ac: 15,
+    status: "online",
+    avatarInitials: "PC",
+    color: "#FDCB6E",
+  },
+];
 
 export const MOCK_TOKENS: GameToken[] = [];
 

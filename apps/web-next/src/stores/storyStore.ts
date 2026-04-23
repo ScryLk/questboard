@@ -8,7 +8,13 @@ import type {
 } from "@/types/story";
 import { calcCampaignProgress } from "@/types/story";
 
-export type StoryView = "roadmap" | "timeline" | "kanban" | "list" | "branching";
+export type StoryView =
+  | "roadmap"
+  | "timeline"
+  | "kanban"
+  | "list"
+  | "branching"
+  | "encounters";
 
 interface StoryStore {
   arcs: StoryArc[];

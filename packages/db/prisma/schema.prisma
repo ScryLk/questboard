@@ -151,6 +151,25 @@ enum LayerType {
   EFFECTS
 }
 
+enum MapVisibility {
+  PUBLIC
+  GM_ONLY
+}
+
+enum NoteVisibility {
+  PUBLIC
+  GM_ONLY
+  PRIVATE
+}
+
+enum NoteCategory {
+  PLOT
+  ITEM
+  NPC
+  GENERAL
+  LOCATION
+}
+
 // ─── User ────────────────────────────────────────────────
 
 model User {
@@ -201,6 +220,7 @@ model User {
   postReposts      PostRepost[]
   followers        UserFollow[]      @relation("UserFollowing")
   following        UserFollow[]      @relation("UserFollowers")
+  notes            Note[]
 
   @@index([externalId])
   @@index([email])
@@ -314,6 +334,7 @@ model Campaign {
   sessions       Session[]
   characters     Character[]
   narrativeNodes NarrativeNode[]
+  notes          Note[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -455,11 +476,12 @@ model Map {
   tileSize    Int      @default(70)
   gridScale   String   @default("5 pés")
 
-  biome       String  @default("dungeon")
-  ambiance    String  @default("dark")
-  description String  @default("")
-  isActive    Boolean @default(false)
-  order       Int     @default(0)
+  biome       String        @default("dungeon")
+  ambiance    String        @default("dark")
+  description String        @default("")
+  isActive    Boolean       @default(false)
+  order       Int           @default(0)
+  visibility  MapVisibility @default(GM_ONLY)
 
   settings  Json @default("{}")
   layerData Json @default("{}")
@@ -661,6 +683,7 @@ model Character {
   notes      String?  @db.Text
 
   isPublic  Boolean   @default(false)
+  hidden    Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -683,6 +706,29 @@ model CharacterTemplate {
   characters Character[]
 
   @@unique([system, name])
+}
+
+// ─── Notes ───────────────────────────────────────────────
+
+model Note {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+
+  title      String         @db.VarChar(200)
+  content    String         @db.Text
+  category   NoteCategory   @default(GENERAL)
+  visibility NoteVisibility @default(GM_ONLY)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([campaignId])
+  @@index([authorId])
+  @@index([campaignId, visibility])
 }
 
 // ─── Combat ──────────────────────────────────────────────

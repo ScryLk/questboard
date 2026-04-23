@@ -1,20 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, X, Loader2 } from "lucide-react";
+import {
+  Building2,
+  Castle,
+  Church,
+  Flame,
+  Gamepad2,
+  Loader2,
+  Sparkles,
+  Trees,
+  Waves,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { AIGeneratedLayer } from "@/lib/gameplay-store";
 import { buildMapGenerationPrompt, calculatePromptDimensions } from "@/lib/ai-map-prompt";
 
 const CELL_SIZE = 64;
 
-const QUICK_REFS: { emoji: string; label: string; text: string }[] = [
-  { emoji: "🏰", label: "Masmorra", text: "masmorra subterrânea, pedras úmidas, tochas, grades de ferro, névoa baixa" },
-  { emoji: "🌲", label: "Floresta", text: "floresta densa, árvores antigas, raízes expostas, luz filtrada, cogumelos" },
-  { emoji: "🏙️", label: "Cidade", text: "rua de cidade medieval, paralelepípedos, casas de madeira, lampiões, mercado" },
-  { emoji: "⛪", label: "Templo", text: "templo sagrado, colunas de pedra, altar central, velas, vitrais quebrados" },
-  { emoji: "🌊", label: "Submerso", text: "ambiente submerso, pedras com algas, coral, luz azulada, bolhas de ar" },
-  { emoji: "🔥", label: "Vulcão", text: "caverna vulcânica, rochas de lava, poças de magma, fumaça, plataformas de pedra" },
+const QUICK_REFS: { icon: LucideIcon; label: string; text: string }[] = [
+  { icon: Castle, label: "Masmorra", text: "masmorra subterrânea, pedras úmidas, tochas, grades de ferro, névoa baixa" },
+  { icon: Trees, label: "Floresta", text: "floresta densa, árvores antigas, raízes expostas, luz filtrada, cogumelos" },
+  { icon: Building2, label: "Cidade", text: "rua de cidade medieval, paralelepípedos, casas de madeira, lampiões, mercado" },
+  { icon: Church, label: "Templo", text: "templo sagrado, colunas de pedra, altar central, velas, vitrais quebrados" },
+  { icon: Waves, label: "Submerso", text: "ambiente submerso, pedras com algas, coral, luz azulada, bolhas de ar" },
+  { icon: Flame, label: "Vulcão", text: "caverna vulcânica, rochas de lava, poças de magma, fumaça, plataformas de pedra" },
 ];
 
 export function AIGenerationPanel() {
@@ -122,7 +134,7 @@ export function AIGenerationPanel() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-brand-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-400" />
+          <Sparkles className="h-4 w-4 text-brand-accent" />
           <span className="text-sm font-semibold text-brand-text">Gerar com IA</span>
         </div>
         <button
@@ -160,7 +172,7 @@ export function AIGenerationPanel() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Sala do Trono"
             disabled={isGenerating}
-            className="w-full rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text placeholder:text-brand-muted/50 outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className="w-full rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text placeholder:text-brand-muted/50 outline-none focus:border-brand-accent/50 disabled:opacity-50"
           />
         </div>
 
@@ -175,7 +187,7 @@ export function AIGenerationPanel() {
             rows={4}
             placeholder="Sala de trono medieval, pedra escura, tapete vermelho central, tochas nas paredes, trono imponente ao fundo..."
             disabled={isGenerating}
-            className="w-full resize-none rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text placeholder:text-brand-muted/50 outline-none focus:border-amber-500/50 disabled:opacity-50"
+            className="w-full resize-none rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text placeholder:text-brand-muted/50 outline-none focus:border-brand-accent/50 disabled:opacity-50"
           />
           <div className="mt-1 text-right text-[10px] text-brand-muted">
             {description.length}/300
@@ -188,7 +200,8 @@ export function AIGenerationPanel() {
             Estilo
           </label>
           <div className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-muted">
-            🎮 Pixel Art — Top Down
+            <Gamepad2 className="h-3.5 w-3.5" />
+            Pixel Art — Top Down
           </div>
         </div>
 
@@ -198,16 +211,20 @@ export function AIGenerationPanel() {
             Referências Rápidas
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_REFS.map((ref) => (
-              <button
-                key={ref.label}
-                onClick={() => handleQuickRef(ref.text)}
-                disabled={isGenerating}
-                className="cursor-pointer rounded-lg border border-brand-border bg-brand-primary px-2.5 py-1.5 text-[11px] text-brand-muted transition-colors hover:border-amber-500/30 hover:bg-amber-500/5 hover:text-brand-text disabled:opacity-50"
-              >
-                {ref.emoji} {ref.label}
-              </button>
-            ))}
+            {QUICK_REFS.map((ref) => {
+              const Icon = ref.icon;
+              return (
+                <button
+                  key={ref.label}
+                  onClick={() => handleQuickRef(ref.text)}
+                  disabled={isGenerating}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-border bg-brand-primary px-2.5 py-1.5 text-[11px] text-brand-muted transition-colors hover:border-brand-accent/30 hover:bg-brand-accent/5 hover:text-brand-text disabled:opacity-50"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {ref.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -217,7 +234,7 @@ export function AIGenerationPanel() {
         <button
           onClick={handleGenerate}
           disabled={!canGenerate}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isGenerating ? (
             <>

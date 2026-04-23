@@ -63,8 +63,8 @@ export function LobbyLayout({ sessionId }: { sessionId: string }) {
         </span>
       </header>
 
-      {/* Content — 2-column layout */}
-      <div className="mx-auto flex w-full max-w-5xl flex-1 gap-6 p-6">
+      {/* Content — empilha em mobile, 2 colunas em md+ */}
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 md:flex-row md:gap-6 md:p-6">
         {/* Left column — Session info + Players */}
         <div className="flex flex-1 flex-col gap-4">
           <LobbyHeader session={sessionInfo} />
@@ -83,9 +83,9 @@ export function LobbyLayout({ sessionId }: { sessionId: string }) {
           </div>
         </div>
 
-        {/* Right column — Chat + Config */}
-        <div className="flex w-80 flex-shrink-0 flex-col gap-4">
-          <div className="flex-1 rounded-xl border border-brand-border bg-white/[0.02] p-4">
+        {/* Right column — Chat + Config. Em mobile, largura total. */}
+        <div className="flex w-full flex-col gap-4 md:w-80 md:flex-shrink-0">
+          <div className="min-h-[280px] rounded-xl border border-brand-border bg-white/[0.02] p-4 md:flex-1">
             <LobbyChat />
           </div>
           <LobbyConfig />

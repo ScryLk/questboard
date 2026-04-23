@@ -16,6 +16,13 @@ interface Props {
   fallback: LucideIcon;
   /** Tamanho renderizado em pixels (largura e altura). Default 32. */
   size?: number;
+  /**
+   * "width" (default): preserva aspect-ratio escalando pela largura — sprites
+   * altos projetam acima da célula no mapa.
+   * "contain": força o sprite inteiro numa caixa size×size, sem overflow —
+   * usar em pickers/listas onde uniformidade visual importa mais que fidelidade.
+   */
+  fit?: "width" | "contain";
   /** Cor aplicada ao ícone Lucide fallback. Sprites PNG ignoram. */
   color?: string;
   className?: string;
@@ -34,6 +41,7 @@ export function ObjectSpriteIcon({
   type,
   fallback: FallbackIcon,
   size = 32,
+  fit = "width",
   color,
   className,
   title,
@@ -51,20 +59,28 @@ export function ObjectSpriteIcon({
     );
   }
 
+  // Base style — inline width/height override Tailwind's preflight
+  // `img { height: auto; max-width: 100%; }` (which otherwise forces
+  // natural aspect and breaks fixed-size tiles). "contain" fits the
+  // sprite inside a size×size box; "width" lets tall sprites overflow
+  // vertically (intentional for map tokens like pillars/towers).
+  const imgStyle: React.CSSProperties = {
+    width: size,
+    height: fit === "contain" ? size : "auto",
+    maxWidth: "none",
+    imageRendering: "pixelated",
+    objectFit: "contain",
+    display: "block",
+  };
+
   if (meta.kind === "file") {
     return (
       <img
         src={`${OBJECT_SPRITE_BASE}/${meta.file}`}
         alt={title ?? ""}
-        width={size}
-        height={size}
         title={title}
         className={className}
-        style={{
-          imageRendering: "pixelated",
-          objectFit: "contain",
-          display: "block",
-        }}
+        style={imgStyle}
         draggable={false}
       />
     );
@@ -87,15 +103,9 @@ export function ObjectSpriteIcon({
       <img
         src={`${OBJECT_SPRITE_BASE}/${meta.files[0]}`}
         alt={title ?? ""}
-        width={size}
-        height={size}
         title={title}
         className={className}
-        style={{
-          imageRendering: "pixelated",
-          objectFit: "contain",
-          display: "block",
-        }}
+        style={imgStyle}
         draggable={false}
       />
     );
@@ -107,6 +117,7 @@ export function ObjectSpriteIcon({
         sheet={meta.sheet}
         region={meta.region}
         size={size}
+        fit={fit}
         title={title}
         className={className}
       />
@@ -120,6 +131,7 @@ export function ObjectSpriteIcon({
       regions={meta.regions}
       frameDurationMs={meta.frameDurationMs}
       size={size}
+      fit={fit}
       title={title}
       className={className}
     />

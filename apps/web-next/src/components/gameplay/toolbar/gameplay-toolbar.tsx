@@ -28,6 +28,7 @@ import { useGameplayStore } from "@/lib/gameplay-store";
 import type { ModalName } from "@/lib/gameplay-store";
 import { GameTooltip } from "@/components/ui/game-tooltip";
 import { SessionNameWithProgress } from "./session-name-with-progress";
+import { GameplayGlobalSearch } from "./gameplay-global-search";
 
 interface GameplayToolbarProps {
   session: SessionInfo;
@@ -71,6 +72,7 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
   const activeTool = useGameplayStore((s) => s.activeTool);
   const setActiveTool = useGameplayStore((s) => s.setActiveTool);
   const toggleGrid = useGameplayStore((s) => s.toggleGrid);
+  const gridVisible = useGameplayStore((s) => s.gridVisible);
   const openModal = useGameplayStore((s) => s.openModal);
 
   const handleToolClick = useCallback(
@@ -134,14 +136,20 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
       {/* Center — Map tools (absolute center) */}
       <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-lg bg-white/[0.04] p-1">
         {MAP_TOOLS.map(({ tool, icon: Icon, label, shortcut }) => {
-          const isActive = tool !== "grid" && activeTool === tool;
+          // Grid é toggle (não é um modo de tool) — reflete gridVisible
+          // com um estilo mais neutro que os demais tools.
+          const isToggle = tool === "grid";
+          const isActive = isToggle ? gridVisible : activeTool === tool;
+          const activeClass = isToggle
+            ? "bg-white/10 text-brand-text"
+            : "bg-brand-accent text-white";
           return (
             <GameTooltip key={tool} label={label} shortcut={shortcut} side="bottom">
               <button
                 onClick={() => handleToolClick(tool)}
                 className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
                   isActive
-                    ? "bg-brand-accent text-white"
+                    ? activeClass
                     : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
                 }`}
               >
@@ -154,6 +162,8 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
 
       {/* Right — Session actions */}
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        <GameplayGlobalSearch />
+        <div className="mx-1 h-5 w-px bg-brand-border" />
         {SESSION_ACTIONS.map(({ icon: Icon, label, modal }) => (
           <GameTooltip key={label} label={label} side="bottom">
             <button

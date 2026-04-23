@@ -11,11 +11,18 @@ import {
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { getHPDescriptionColor } from "@/lib/visibility-filter";
+import { Map as MapIcon, UserX } from "lucide-react";
 import { FogOverlay } from "../gameplay/map-canvas/overlays/fog-overlay";
 import { TerrainOverlay } from "../gameplay/map-canvas/overlays/terrain-overlay";
 import { AOEOverlay } from "../gameplay/map-canvas/overlays/aoe-overlay";
 import { MarkersOverlay } from "../gameplay/map-canvas/overlays/markers-overlay";
 import { DamageFloatOverlay } from "../gameplay/map-canvas/overlays/damage-float-overlay";
+import { EmptyState } from "../shared/empty-state";
+import { ScaleBar } from "../gameplay/map-overlays/ScaleBar";
+import { VisionOverlay } from "./VisionOverlay";
+import { PlayerZoomControls } from "./PlayerZoomControls";
+import { PlayerToolToggle } from "./PlayerToolToggle";
+import { useRadialMenuStore } from "@/lib/radial-menu-store";
 
 export function PlayerCanvas() {
   const visibleTokens = usePlayerViewStore((s) => s.visibleTokens);
@@ -27,6 +34,7 @@ export function PlayerCanvas() {
   const settings = usePlayerViewStore((s) => s.settings);
   const moveMyToken = usePlayerViewStore((s) => s.moveMyToken);
   const addMovementFt = usePlayerViewStore((s) => s.addMovementFt);
+  const activeMapName = usePlayerViewStore((s) => s.activeMapName);
 
   // Read fog/terrain/aoe from GM store (shared state)
   const fogCells = useGameplayStore((s) => s.fogCells);
@@ -36,7 +44,9 @@ export function PlayerCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
 
   const { gridCols, gridRows, cellSize, cellSizeFt } = MOCK_MAP;
-  const scaledCell = cellSize;
+  const playerZoom = usePlayerViewStore((s) => s.playerZoom);
+  const canvasTool = usePlayerViewStore((s) => s.canvasTool);
+  const scaledCell = cellSize * playerZoom;
   const canvasW = gridCols * scaledCell;
   const canvasH = gridRows * scaledCell;
 
@@ -85,14 +95,142 @@ export function PlayerCanvas() {
     };
   }, []);
 
-  // Center on my token on mount
+  // Wheel zoom no player canvas — Ctrl+wheel (comum em editores) evita
+  // conflito com scroll padrão. Throttle simples via lastTrigger.
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let lastTrigger = 0;
+    const onWheel = (e: WheelEvent) => {
+      const store = usePlayerViewStore.getState();
+      const isPanTool = store.canvasTool === "pan";
+      const modifier = e.ctrlKey || e.metaKey;
+      // Pan tool: wheel zooma sem modifier. Action tool: precisa Ctrl/Cmd
+      // (mantém wheel padrão pra scrollar).
+      if (!isPanTool && !modifier) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastTrigger < 180) return;
+      lastTrigger = now;
+      if (e.deltaY < 0) store.playerZoomIn();
+      else store.playerZoomOut();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // Drag-to-pan no modo mão — ignora clique em token (dragRef já trata
+  // isso no seu próprio listener). Cursor vira `grabbing` enquanto arrasta.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let panning: { startX: number; startY: number; scrollLeft: number; scrollTop: number } | null = null;
+
+    const onDown = (e: MouseEvent) => {
+      const store = usePlayerViewStore.getState();
+      if (store.canvasTool !== "pan") return;
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-token-id]") || target.closest("button")) return;
+      panning = {
+        startX: e.clientX,
+        startY: e.clientY,
+        scrollLeft: el.scrollLeft,
+        scrollTop: el.scrollTop,
+      };
+      el.style.cursor = "grabbing";
+      e.preventDefault();
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!panning) return;
+      el.scrollLeft = panning.scrollLeft - (e.clientX - panning.startX);
+      el.scrollTop = panning.scrollTop - (e.clientY - panning.startY);
+    };
+    const onUp = () => {
+      if (!panning) return;
+      panning = null;
+      el.style.cursor = "";
+    };
+
+    el.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      el.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  // Cursor reflete a ferramenta atual
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.style.cursor = canvasTool === "pan" ? "grab" : "";
+  }, [canvasTool]);
+
+  // Centraliza a câmera no próprio token. Usado no mount e pelo botão
+  // "Focar em mim" + atalho F.
+  const focusSelf = useCallback(() => {
     if (!myToken || !scrollRef.current) return;
     const el = scrollRef.current;
-    const cx = myToken.x * scaledCell + scaledCell / 2 - el.clientWidth / 2;
-    const cy = myToken.y * scaledCell + scaledCell / 2 - el.clientHeight / 2;
-    el.scrollTo({ left: cx, top: cy, behavior: "smooth" });
-  }, [myToken?.x, myToken?.y, scaledCell]); // eslint-disable-line react-hooks/exhaustive-deps
+    el.scrollTo({
+      left: myToken.x * scaledCell + scaledCell / 2 - el.clientWidth / 2,
+      top: myToken.y * scaledCell + scaledCell / 2 - el.clientHeight / 2,
+      behavior: "smooth",
+    });
+  }, [myToken, scaledCell]);
+
+  // Center on my token on mount + quando token se move (GM move via sync).
+  useEffect(() => {
+    focusSelf();
+  }, [myToken?.x, myToken?.y]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Também foca quando o botão "Foco" da actions bar pede (via counter).
+  const focusSelfTick = usePlayerViewStore((s) => s.focusSelfTick);
+  useEffect(() => {
+    if (focusSelfTick === 0) return;
+    focusSelf();
+  }, [focusSelfTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Preserva o centro do viewport ao mudar zoom — evita "pulo" da câmera.
+  const prevZoomRef = useRef(playerZoom);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const prev = prevZoomRef.current;
+    if (!el || prev === playerZoom) return;
+    const factor = playerZoom / prev;
+    const centerX = el.scrollLeft + el.clientWidth / 2;
+    const centerY = el.scrollTop + el.clientHeight / 2;
+    el.scrollLeft = centerX * factor - el.clientWidth / 2;
+    el.scrollTop = centerY * factor - el.clientHeight / 2;
+    prevZoomRef.current = playerZoom;
+  }, [playerZoom]);
+
+  // Movimento com aprovação do GM — click em célula stageia, barra de
+  // confirmação aparece. Drag legado continua funcionando pra testes.
+  const stagedMove = usePlayerViewStore((s) => s.stagedMove);
+  const stageMove = usePlayerViewStore((s) => s.stageMove);
+
+  // Atalho F — focar câmera no próprio token.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Ignora se foco em input/textarea pra não atrapalhar chat.
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      )
+        return;
+      if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        focusSelf();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focusSelf]);
 
   const getGridCell = useCallback(
     (e: MouseEvent | React.MouseEvent) => {
@@ -110,10 +248,11 @@ export function PlayerCanvas() {
     [scaledCell, gridCols, gridRows],
   );
 
-  // Token drag (own token only)
+  // Token drag (own token only) — desabilitado em modo "pan"
   const handleTokenMouseDown = useCallback(
     (e: React.MouseEvent, tokenId: string) => {
       if (e.button !== 0) return;
+      if (canvasTool === "pan") return; // pan consome o drag
       const token = visibleTokens.find((t) => t.id === tokenId);
       if (!token || !token.isMe) return;
 
@@ -171,7 +310,7 @@ export function PlayerCanvas() {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [visibleTokens, combat, isMyTurn, settings, scaledCell, gridCols, gridRows, cellSizeFt, moveMyToken, addMovementFt, dragPos],
+    [visibleTokens, combat, isMyTurn, settings, scaledCell, gridCols, gridRows, cellSizeFt, moveMyToken, addMovementFt, dragPos, canvasTool],
   );
 
   // Hover tooltip
@@ -187,6 +326,68 @@ export function PlayerCanvas() {
     setTooltip(null);
   }, []);
 
+  // Short tap em token abre o RadialMenu. Pan mode ignora.
+  // TODO(prompt-2): `actions` aqui virá de uma fn real que consulta
+  // regras (alcance, turno, role). Por ora é stub.
+  const setTargetTokenId = usePlayerViewStore((s) => s.setTargetTokenId);
+  const setActiveTab = usePlayerViewStore((s) => s.setActiveTab);
+  const setPanelVisible = usePlayerViewStore((s) => s.setPanelVisible);
+
+  const openRadialAtToken = useCallback(
+    (clientX: number, clientY: number, token: typeof visibleTokens[0]) => {
+      if (canvasTool === "pan") return;
+      const dist =
+        myToken && myToken.id !== token.id
+          ? gridDistance(myToken.x, myToken.y, token.x, token.y, cellSizeFt) /
+            cellSizeFt
+          : undefined;
+      useRadialMenuStore.getState().openAt({
+        source: "player",
+        screenX: clientX,
+        screenY: clientY,
+        target: {
+          tokenId: token.id,
+          namePt: token.name,
+          hpText:
+            token.hp !== undefined && token.maxHp !== undefined
+              ? `HP ${token.hp}/${token.maxHp}`
+              : token.hpDescription,
+          distanceCells:
+            dist !== undefined ? Math.round(dist) : undefined,
+        },
+        actions: [
+          {
+            id: "attack",
+            labelPt: "Atacar",
+            enabled: !token.isMe,
+            disabledReasonPt: token.isMe ? "Não dá pra atacar a si mesmo" : undefined,
+          },
+          {
+            id: "converse",
+            labelPt: "Conversar",
+            enabled: (dist ?? 99) <= 6,
+            disabledReasonPt: (dist ?? 99) > 6 ? "Muito longe" : undefined,
+          },
+          { id: "test", labelPt: "Teste", enabled: true },
+          {
+            id: "move_to",
+            labelPt: "Mover até",
+            enabled: !token.isMe,
+            disabledReasonPt: token.isMe ? "Você já está aqui" : undefined,
+          },
+          { id: "inspect", labelPt: "Inspecionar", enabled: true },
+        ],
+      });
+
+      // Abre a aba "Ficha" em modo alvo (sub-toggle aparece dentro da
+      // aba quando targetTokenId é setado).
+      setTargetTokenId(token.id);
+      setActiveTab("ficha");
+      setPanelVisible(true);
+    },
+    [canvasTool, myToken, cellSizeFt, setTargetTokenId, setActiveTab, setPanelVisible],
+  );
+
   return (
     <div
       ref={scrollRef}
@@ -196,7 +397,27 @@ export function PlayerCanvas() {
         ref={canvasRef}
         className="relative"
         style={{ width: canvasW, height: canvasH }}
-        onClick={() => setTooltip(null)}
+        onClick={(e) => {
+          setTooltip(null);
+          // Click-to-stage só no modo "action" — no modo "pan" o clique
+          // é consumido pelo drag-to-pan e não deve stagear movimento.
+          if (canvasTool !== "action") return;
+          // Click-to-stage: se o player tem token e clicou num alvo que
+          // não é o próprio token nem está arrastando, stageia o
+          // movimento pra aprovação do GM.
+          if (!myToken || dragRef.current) return;
+          // Ignora clique em botões/UI filhos
+          const target = e.target as HTMLElement;
+          if (target.closest("[data-token-id]") || target.closest("button"))
+            return;
+          const cell = getGridCell(e);
+          if (!cell) return;
+          // Ignora se clicou no próprio token
+          if (cell.x === myToken.x && cell.y === myToken.y) return;
+          // Se já há um pedido aguardando GM, não sobrescreve.
+          if (stagedMove?.awaitingGM) return;
+          stageMove(cell.x, cell.y);
+        }}
       >
         {/* Grid */}
         {gridVisible && (
@@ -228,6 +449,36 @@ export function PlayerCanvas() {
               />
             ))}
           </svg>
+        )}
+
+        {/* Preview de movimento pendente (aguardando confirmação/GM) */}
+        {stagedMove && (
+          <div
+            className="pointer-events-none absolute"
+            style={{
+              left: stagedMove.toX * scaledCell,
+              top: stagedMove.toY * scaledCell,
+              width: scaledCell,
+              height: scaledCell,
+            }}
+          >
+            <div
+              className={`h-full w-full rounded-md border-2 border-dashed ${
+                stagedMove.awaitingGM
+                  ? "border-brand-warning bg-brand-warning/10"
+                  : "border-brand-accent bg-brand-accent/15"
+              }`}
+              style={{
+                animation: "qb-move-pulse 1.4s ease-in-out infinite",
+              }}
+            />
+            <style jsx>{`
+              @keyframes qb-move-pulse {
+                0%, 100% { opacity: 0.85; }
+                50% { opacity: 0.55; }
+              }
+            `}</style>
+          </div>
         )}
 
         {/* Terrain */}
@@ -270,6 +521,7 @@ export function PlayerCanvas() {
           return (
             <div
               key={token.id}
+              data-token-id={token.id}
               className={`absolute flex flex-col items-center justify-center transition-all ${
                 isBeingDragged ? "z-50 scale-110" : "z-10"
               } ${isDead ? "grayscale opacity-50" : ""}`}
@@ -287,7 +539,27 @@ export function PlayerCanvas() {
                   : undefined,
                 ...(isBeingDragged ? { cursor: "grabbing" } : {}),
               }}
-              onMouseDown={(e) => handleTokenMouseDown(e, token.id)}
+              onMouseDown={(e) => {
+                // Long-press inicia drag do próprio token (comportamento
+                // existente). Short tap dispara o radial — detectado via
+                // timeout local pra não precisar refatorar o handler.
+                const x = e.clientX;
+                const y = e.clientY;
+                const startTime = Date.now();
+                handleTokenMouseDown(e, token.id);
+                // Marca esse click pra avaliar ao soltar
+                const onUp = (ev: MouseEvent) => {
+                  const dx = Math.abs(ev.clientX - x);
+                  const dy = Math.abs(ev.clientY - y);
+                  const duration = Date.now() - startTime;
+                  window.removeEventListener("mouseup", onUp, true);
+                  // Short tap: <300ms + <8px de movimento → abre radial
+                  if (duration < 300 && dx < 8 && dy < 8) {
+                    openRadialAtToken(ev.clientX, ev.clientY, token);
+                  }
+                };
+                window.addEventListener("mouseup", onUp, true);
+              }}
               onMouseEnter={(e) => handleTokenEnter(e, token)}
               onMouseLeave={handleTokenLeave}
             >
@@ -450,6 +722,18 @@ export function PlayerCanvas() {
           viewportW={scrollState.w}
           viewportH={scrollState.h}
         />
+
+        {/* Vision overlay — escurece células fora do alcance do player.
+            Fica DEPOIS do fog pra somar sem conflito. */}
+        {myToken && (
+          <VisionOverlay
+            tokenX={myToken.x}
+            tokenY={myToken.y}
+            gridCols={gridCols}
+            gridRows={gridRows}
+            cellSize={scaledCell}
+          />
+        )}
       </div>
 
       {/* Token tooltip */}
@@ -471,23 +755,52 @@ export function PlayerCanvas() {
         </div>
       )}
 
-      {/* "Go to my token" button */}
-      {combat?.active && !isMyTurn && myToken && (
-        <button
-          onClick={() => {
-            if (!myToken || !scrollRef.current) return;
-            const el = scrollRef.current;
-            el.scrollTo({
-              left: myToken.x * scaledCell - el.clientWidth / 2,
-              top: myToken.y * scaledCell - el.clientHeight / 2,
-              behavior: "smooth",
-            });
-          }}
-          className="absolute bottom-3 right-3 z-30 rounded-lg border border-brand-border bg-brand-surface/90 px-3 py-1.5 text-xs font-medium text-brand-accent backdrop-blur-sm transition-colors hover:bg-brand-surface"
-        >
-          Ir pro meu token
-        </button>
+      {/* Foco agora vive na PlayerActionsBar (botão "Foco" + atalho F). */}
+
+      {/* Overlay: sem personagem atribuído — fixed cobre a tela inteira
+          (inclusive o painel direito), mantém pointer-events-none pra
+          não bloquear interação com chat/tabs através do blur. */}
+      {!myToken && (
+        <div className="pointer-events-none fixed inset-0 z-[45] flex items-center justify-center bg-[#0A0A0F]/60 backdrop-blur-[3px]">
+          <div className="pointer-events-auto w-full max-w-md rounded-xl border border-brand-border bg-brand-surface/95 p-6 shadow-2xl">
+            <EmptyState
+              icon={UserX}
+              title="Sem personagem atribuído"
+              description={
+                <>
+                  O mestre ainda não te conectou a um personagem. Aguarde —
+                  enquanto isso você pode assistir e usar o chat.
+                </>
+              }
+            />
+          </div>
+        </div>
       )}
+
+      {/* Overlay: sem mapa ativo — fullscreen, pointer-events-none no
+          backdrop pra manter chat/tabs clicáveis. */}
+      {myToken && !activeMapName && (
+        <div className="pointer-events-none fixed inset-0 z-[45] flex items-center justify-center bg-[#0A0A0F]/60 backdrop-blur-[3px]">
+          <div className="pointer-events-auto w-full max-w-md rounded-xl border border-brand-border bg-brand-surface/95 p-6 shadow-2xl">
+            <EmptyState
+              icon={MapIcon}
+              title="Sem mapa ativo"
+              description={
+                <>
+                  O mestre ainda não escolheu um mapa. Você verá o mapa
+                  aqui assim que uma cena for ativada.
+                </>
+              }
+              tone="accent"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Barra de escala + toggle de ferramenta + controles de zoom */}
+      <ScaleBar zoomOverride={playerZoom} />
+      <PlayerToolToggle />
+      <PlayerZoomControls />
     </div>
   );
 }

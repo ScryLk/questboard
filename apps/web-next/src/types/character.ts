@@ -1,5 +1,7 @@
 // ── Character System Types ──────────────────────────────────
 
+import { PawPrint, UserRound, type LucideIcon } from "lucide-react";
+
 export type CharacterCategory = "npc" | "creature";
 
 export type CharacterRole =
@@ -89,9 +91,6 @@ export interface CampaignCharacter {
   actions: CharacterAction[];
   traits?: string;
 
-  // Vinculo narrativo
-  linkedNarrativeNodeIds: string[];
-
   // Dialogo (para NPCs)
   dialogueEnabled: boolean;
   dialogueGreeting?: string;
@@ -111,10 +110,10 @@ export interface CampaignCharacter {
 
 export const CHAR_CATEGORY_CONFIG: Record<
   CharacterCategory,
-  { label: string; color: string; emoji: string }
+  { label: string; color: string; icon: LucideIcon }
 > = {
-  npc: { label: "NPC", color: "#74B9FF", emoji: "👤" },
-  creature: { label: "Criatura", color: "#FF4444", emoji: "🐉" },
+  npc: { label: "NPC", color: "#74B9FF", icon: UserRound },
+  creature: { label: "Criatura", color: "#FF4444", icon: PawPrint },
 };
 
 export const ROLE_CONFIG: Record<

@@ -38,7 +38,7 @@ export function CreateCollectionDialog({ onClose, onCreated }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-brand-border bg-[#111116] shadow-2xl">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-y-auto rounded-xl border border-brand-border bg-[#111116] shadow-2xl">
         <div className="flex items-center justify-between border-b border-brand-border px-4 py-3">
           <div className="flex items-center gap-2">
             <FolderPlus className="h-4 w-4 text-brand-accent" />

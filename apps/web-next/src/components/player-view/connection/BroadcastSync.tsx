@@ -51,6 +51,10 @@ export function BroadcastSync() {
   return null;
 }
 
+// Último sussurro entregue ao overlay — evita reabrir no mesmo msg
+// a cada re-sync. Vive em module-scope porque syncFromGMStore não é hook.
+let lastWhisperShown: string | null = null;
+
 /**
  * Read the GM's Zustand store directly (same tab / same window context)
  * and build the player view from it.
@@ -73,10 +77,17 @@ function syncFromGMStore() {
     settings,
   );
 
-  // Filter messages (no mesa-gm)
-  const filteredMessages = gmState.messages.filter(
-    (m) => m.channel !== "mesa-gm",
-  );
+  // Filter messages (no mesa-gm, e sussurros só pra quem é alvo/remetente)
+  const myPlayerId = playerState.playerId;
+  const filteredMessages = gmState.messages.filter((m) => {
+    if (m.channel === "mesa-gm") return false;
+    // Sussurro só visível pra destinatário ou remetente. Se whisperTo
+    // estiver ausente (legacy), mantém visível pra não quebrar histórico.
+    if (m.channel === "sussurro" && m.whisperTo) {
+      return m.whisperTo === myPlayerId || m.sender === myPlayerId;
+    }
+    return true;
+  });
 
   usePlayerViewStore.setState({
     visibleTokens: view.visibleTokens,
@@ -91,6 +102,25 @@ function syncFromGMStore() {
     messages: filteredMessages,
     fogSettings: gmState.fogSettings,
   });
+
+  // Dispara overlay do sussurro quando um novo chega pra mim.
+  const latestWhisper = [...filteredMessages]
+    .reverse()
+    .find(
+      (m) =>
+        m.channel === "sussurro" &&
+        m.whisperTo === myPlayerId &&
+        m.isGM,
+    );
+  if (latestWhisper && latestWhisper.id !== lastWhisperShown) {
+    lastWhisperShown = latestWhisper.id;
+    usePlayerViewStore.getState().showWhisper({
+      fromName: latestWhisper.sender,
+      message: latestWhisper.content,
+      fromId: "gm",
+      imageUrl: latestWhisper.imageUrl,
+    });
+  }
 }
 
 /**
@@ -145,6 +175,25 @@ function handleBroadcastMessage(msg: BroadcastMessage) {
       const myToken = usePlayerViewStore.getState().myToken;
       if (myToken && payload.tokenId === myToken.id) {
         usePlayerViewStore.getState().triggerHealGlow();
+      }
+      break;
+    }
+
+    case "gm:move-approved": {
+      const payload = msg.payload as { playerId: string };
+      const me = usePlayerViewStore.getState().playerId;
+      if (payload.playerId === me) {
+        // Token já moveu via sync do GM store; só limpa o staged.
+        usePlayerViewStore.getState().clearStagedMove();
+      }
+      break;
+    }
+
+    case "gm:move-rejected": {
+      const payload = msg.payload as { playerId: string };
+      const me = usePlayerViewStore.getState().playerId;
+      if (payload.playerId === me) {
+        usePlayerViewStore.getState().clearStagedMove();
       }
       break;
     }

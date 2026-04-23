@@ -9,11 +9,13 @@ import {
   Mail,
   Maximize2,
   MessageCircle,
+  Ruler,
   Send,
   X,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { QRCodeModal } from "@/components/qr/qr-code-modal";
+import { useMapScale, type UnitSystem } from "@/lib/map-scale-store";
 
 interface CreateSessionModalProps {
   open: boolean;
@@ -56,6 +58,9 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
   const [selectedMap, setSelectedMap] = useState("Torre de Ravenloft");
   const [notes, setNotes] = useState("");
   const [players, setPlayers] = useState(MOCK_PLAYERS);
+  const unitSystem = useMapScale((s) => s.unitSystem);
+  const unitsPerCell = useMapScale((s) => s.unitsPerCell);
+  const setScale = useMapScale((s) => s.setScale);
   const [generatedCode, setGeneratedCode] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -271,6 +276,75 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              {/* Escala do mapa — campanha-level, persiste em localStorage
+                  via map-scale-store (regra #6). Aplica a todos os mapas
+                  da campanha. Default IMPERIAL/5 = D&D 5e compat. */}
+              <div className="rounded-lg border border-brand-border bg-brand-primary/40 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-brand-accent" />
+                  <span className="text-sm font-medium text-brand-text">
+                    Escala do mapa
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs text-brand-muted">
+                      Sistema de unidade
+                    </label>
+                    <select
+                      value={unitSystem}
+                      onChange={(e) => {
+                        const next = e.target.value as UnitSystem;
+                        // Muda pra default sensato ao alternar sistema.
+                        const defaultValue =
+                          next === "IMPERIAL"
+                            ? 5
+                            : next === "METRIC"
+                              ? 1.5
+                              : 1;
+                        setScale(next, defaultValue);
+                      }}
+                      className="w-full rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
+                    >
+                      <option value="IMPERIAL">Imperial (ft)</option>
+                      <option value="METRIC">Métrico (m)</option>
+                      <option value="ABSTRACT">Abstrato (célula)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs text-brand-muted">
+                      Por célula
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={unitsPerCell}
+                        disabled={unitSystem === "ABSTRACT"}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          if (!Number.isFinite(v) || v <= 0) return;
+                          setScale(unitSystem, v);
+                        }}
+                        className="w-full rounded-lg border border-brand-border bg-brand-primary px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent disabled:opacity-40"
+                      />
+                      <span className="text-xs text-brand-muted">
+                        {unitSystem === "IMPERIAL"
+                          ? "ft"
+                          : unitSystem === "METRIC"
+                            ? "m"
+                            : "célula"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] italic text-brand-muted/70">
+                  D&amp;D 5e = 5ft · Tormenta 20 / CoC 7e = 1.5m · mapas de
+                  cidade podem usar 10m+
+                </p>
               </div>
 
               {/* Notes */}

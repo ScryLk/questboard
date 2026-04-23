@@ -32,10 +32,10 @@ export function AudioPanel() {
   return (
     <div className="border-b border-brand-border">
       {/* Header */}
-      <div className="flex items-center">
+      <div className="flex items-center transition-colors hover:bg-white/[0.02]">
         <button
           onClick={() => toggleSection("audio")}
-          className="flex flex-1 items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+          className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
         >
           {collapsed ? (
             <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
@@ -50,10 +50,10 @@ export function AudioPanel() {
         <GameTooltip label={muteAll ? "Ativar Som" : "Silenciar Tudo"} side="bottom">
           <button
             onClick={() => setMuteAll(!muteAll)}
-            className={`mr-2 flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            className={`mr-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg transition-colors ${
               muteAll
-                ? "text-red-400 hover:text-red-300"
-                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+                ? "text-red-400 hover:bg-red-400/10 hover:text-red-300"
+                : "text-brand-muted hover:bg-white/10 hover:text-brand-text"
             }`}
           >
             {muteAll ? (

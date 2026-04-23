@@ -34,10 +34,10 @@ export function TokenLibrarySection() {
   return (
     <div className="border-b border-brand-border">
       {/* Header */}
-      <div className="flex items-center">
+      <div className="flex items-center transition-colors hover:bg-white/[0.02]">
         <button
           onClick={() => toggleSection("tokens")}
-          className="flex flex-1 items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+          className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
         >
           {collapsed ? (
             <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
@@ -57,7 +57,7 @@ export function TokenLibrarySection() {
         <GameTooltip label="Criar Token" side="bottom">
           <button
             onClick={handleCreate}
-            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+            className="mr-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/10 hover:text-brand-text"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

@@ -37,9 +37,23 @@ export function WhisperOverlay() {
         </div>
 
         {/* Message */}
-        <p className="text-sm italic text-white/70">
-          &ldquo;{pendingWhisper.message}&rdquo;
-        </p>
+        {pendingWhisper.message && pendingWhisper.message !== "[imagem]" && (
+          <p className="text-sm italic text-white/70">
+            &ldquo;{pendingWhisper.message}&rdquo;
+          </p>
+        )}
+
+        {/* Imagem anexada (se houver) */}
+        {pendingWhisper.imageUrl && (
+          <div className="mt-2 overflow-hidden rounded-lg border border-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={pendingWhisper.imageUrl}
+              alt="Anexo do mestre"
+              className="max-h-64 w-full object-contain"
+            />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="mt-3 flex gap-2">

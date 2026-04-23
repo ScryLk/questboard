@@ -53,7 +53,7 @@ export function TerrainToolPicker() {
   const terrains = getTerrainsByCategory(category);
 
   return (
-    <div className="absolute left-1/2 top-14 z-40 flex w-[340px] -translate-x-1/2 flex-col gap-2 rounded-lg border border-brand-border bg-[#111116] p-3 shadow-xl">
+    <div className="absolute left-1/2 top-14 z-40 flex w-[420px] -translate-x-1/2 flex-col gap-2 rounded-lg border border-brand-border bg-[#111116] p-3 shadow-xl">
       {/* Editor tools */}
       <div className="flex items-center gap-1">
         {EDITOR_TOOLS.map(({ tool, icon: Icon, label }) => (

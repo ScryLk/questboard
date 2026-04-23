@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search, Star } from "lucide-react";
+import { Plus, Search, Sparkles, Star } from "lucide-react";
 import {
   useCharacterStore,
   createDefaultCharacter,
@@ -9,6 +9,7 @@ import {
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { CharacterCard } from "@/components/characters/character-card";
 import { CharacterEditorModal } from "@/components/gameplay/modals/character-editor/character-editor-modal";
+import { GenerateCharacterAIDialog } from "@/components/characters/generate-character-ai-dialog";
 import type { CharacterCategory } from "@/types/character";
 import { CHAR_CATEGORY_CONFIG } from "@/types/character";
 
@@ -24,6 +25,7 @@ export default function CharactersPage() {
   const [search, setSearch] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   const setCharacterEditorTarget = useGameplayStore(
     (s) => s.setCharacterEditorTarget,
@@ -84,13 +86,22 @@ export default function CharactersPage() {
             criaturas
           </p>
         </div>
-        <button
-          onClick={() => openEditor(null)}
-          className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accent/80"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Personagem
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAiDialogOpen(true)}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-brand-accent/30 bg-brand-accent/10 px-4 py-2.5 text-sm font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+          >
+            <Sparkles className="h-4 w-4" />
+            Gerar com IA
+          </button>
+          <button
+            onClick={() => openEditor(null)}
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accent/80"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Personagem
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -169,6 +180,15 @@ export default function CharactersPage() {
 
       {/* Editor Modal */}
       {editorOpen && <CharacterEditorModal onClose={closeEditor} />}
+      {aiDialogOpen && (
+        <GenerateCharacterAIDialog
+          onClose={() => setAiDialogOpen(false)}
+          onCreated={(id) => {
+            setAiDialogOpen(false);
+            openEditor(id);
+          }}
+        />
+      )}
     </div>
   );
 }

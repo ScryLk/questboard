@@ -30,7 +30,6 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
     const combatLayerRef = useRef<Container | null>(null);
     const engineRef = useRef<CombatAnimationEngine | null>(null);
     const readyRef = useRef(false);
-    const destroyedRef = useRef(false);
 
     // Settings para combat engine
     const appearance = useSettingsStore((s) => s.appearance);
@@ -51,10 +50,15 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
     useEffect(() => {
       if (!containerRef.current) return;
 
+      // Local flag (not a ref) — each effect invocation has its own, so a
+      // leftover init() from a cleaned-up mount can't be "reset" back to false
+      // by a subsequent mount in React Strict Mode (which would leak a second
+      // canvas into the DOM).
+      let destroyed = false;
+
       const app = new Application();
       appRef.current = app;
       readyRef.current = false;
-      destroyedRef.current = false;
 
       const container = containerRef.current;
 
@@ -65,7 +69,7 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       }).then(() => {
-        if (destroyedRef.current) {
+        if (destroyed) {
           app.destroy(true, { children: true });
           return;
         }
@@ -140,7 +144,7 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
       });
 
       return () => {
-        destroyedRef.current = true;
+        destroyed = true;
         if (engineRef.current) {
           engineRef.current.destroy();
           setCombatEngine(null);

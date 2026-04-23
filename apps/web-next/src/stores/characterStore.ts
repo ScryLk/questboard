@@ -47,7 +47,6 @@ export function createDefaultCharacter(
       PORTRAIT_COLORS[Math.floor(Math.random() * PORTRAIT_COLORS.length)],
     stats: { ...DEFAULT_STATS },
     actions: [],
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: false,
     createdByUserId: "user-1",
     isPublic: false,

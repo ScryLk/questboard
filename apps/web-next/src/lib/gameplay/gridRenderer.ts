@@ -18,11 +18,15 @@ export function drawGrid(
   const totalWidth = cols * cellSize;
   const totalHeight = rows * cellSize;
 
-  // Estilo da linha do grid
+  // Estilo da linha do grid.
+  // `pixelLine: true` força 1 pixel físico independente do zoom — sem
+  // isso, a linha vira sub-pixel em certos níveis de zoom e o
+  // antialiasing a engole (bug que ficava visível zoom in/out).
   gridGraphics.setStrokeStyle({
     width: 1,
     color: 0xffffff,
-    alpha: 0.08,
+    alpha: 0.12,
+    pixelLine: true,
   });
 
   // Linhas VERTICAIS

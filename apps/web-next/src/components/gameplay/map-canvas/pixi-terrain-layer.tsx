@@ -37,17 +37,18 @@ export function PixiTerrainLayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
   const readyRef = useRef(false);
-  const destroyedRef = useRef(false);
 
   const canvasW = gridCols * scaledCell;
   const canvasH = gridRows * scaledCell;
 
   // Initialize Pixi Application
   useEffect(() => {
+    // Local flag — see pixi-canvas.tsx for why this can't be a ref.
+    let destroyed = false;
+
     const app = new Application();
     appRef.current = app;
     readyRef.current = false;
-    destroyedRef.current = false;
 
     app
       .init({
@@ -60,7 +61,7 @@ export function PixiTerrainLayer({
       })
       .then(() => {
         // If cleanup already ran while init was in-flight, destroy now
-        if (destroyedRef.current) {
+        if (destroyed) {
           app.destroy(true, { children: true });
           return;
         }
@@ -75,7 +76,7 @@ export function PixiTerrainLayer({
       });
 
     return () => {
-      destroyedRef.current = true;
+      destroyed = true;
       if (readyRef.current) {
         app.destroy(true, { children: true });
       }

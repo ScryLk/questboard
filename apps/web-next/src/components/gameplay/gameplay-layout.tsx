@@ -21,6 +21,8 @@ import { LeftPanel } from "./left-panel/left-panel";
 import { RightPanel } from "./right-panel/right-panel";
 import { MapCanvas } from "./map-canvas/map-canvas";
 import { GameplayMapPicker } from "./gameplay-map-picker";
+import { ScaleBar } from "./map-overlays/ScaleBar";
+import { ZoomControls } from "./map-overlays/ZoomControls";
 import { ResizableDivider } from "./shared/resizable-divider";
 import { GameplayModals } from "./modals/gameplay-modals";
 import { ActionBar } from "./action-bar/action-bar";
@@ -30,9 +32,23 @@ import { PhaseModal } from "./PhaseModal";
 import { SceneCardIndicator } from "./toolbar/scene-card-indicator";
 import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
+import { DevIdentityBadge } from "./dev-identity-badge";
+import { ActionFeedPanel } from "./action-feed/action-feed-panel";
+import { DiceCentralReveal } from "@/components/dice/DiceCentralReveal";
+import { MoveApprovalDialog } from "./move-approval-dialog";
+import { RadialMenu } from "@/components/shared/radial-menu";
+import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
+import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
 
 
 export function GameplayLayout() {
+  // Identidade vem da URL (?as=gm|player1|player2) antes do sync ligar.
+  useIdentityFromUrl();
+  // BroadcastChannel: GM emite snapshots; player receberia — a página
+  // principal de gameplay geralmente é GM, mas se alguém abrir essa rota
+  // com ?as=player1, o hook respeita e vira listener (dev only).
+  useGameplayBroadcastSync();
+
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);
   const leftPanelWidth = useGameplayStore((s) => s.leftPanelWidth);
@@ -42,6 +58,7 @@ export function GameplayLayout() {
   const setLeftPanelWidth = useGameplayStore((s) => s.setLeftPanelWidth);
   const setRightPanelWidth = useGameplayStore((s) => s.setRightPanelWidth);
   const pendingReaction = useGameplayStore((s) => s.pendingReaction);
+  const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
 
   return (
     <SFXProvider>
@@ -118,6 +135,8 @@ export function GameplayLayout() {
           <div className="pointer-events-none absolute left-3 top-3 z-40">
             <GameplayMapPicker />
           </div>
+          <ScaleBar />
+          <ZoomControls />
         </div>
 
         {/* Right resizable divider */}
@@ -155,6 +174,9 @@ export function GameplayLayout() {
             <RightPanel />
           </aside>
         )}
+
+        {/* Feed de ações — só GM/CO_GM vê (prompt seção 2 + matriz §6). */}
+        {currentUserIsGM && <ActionFeedPanel />}
       </div>
 
       {/* Action Bar — combat turn controls */}
@@ -169,8 +191,25 @@ export function GameplayLayout() {
       {/* AI Generation Panel */}
       <AIGenerationPanel />
 
+      {/* Dice central reveal — overlay de nat20/nat1 */}
+      <DiceCentralReveal />
+
+      {/* Aprovação de movimento do jogador */}
+      <MoveApprovalDialog />
+
+      {/* Radial menu — short tap em token. Callbacks stub (Prompt 2). */}
+      <RadialMenu
+        onSelect={(id) => {
+          // TODO(prompt-2): ligar com handlers reais
+          console.info("[RadialMenu:gm]", id);
+        }}
+      />
+
       {/* OA dramatic vignette */}
       <OAAlertVignette active={pendingReaction !== null} />
+
+      {/* Badge de identidade dev (apenas NODE_ENV=development) */}
+      <DevIdentityBadge />
     </div>
     </SFXProvider>
   );

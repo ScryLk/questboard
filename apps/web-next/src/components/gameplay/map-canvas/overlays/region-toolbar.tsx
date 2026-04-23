@@ -47,7 +47,7 @@ export function RegionToolbar({ left, top, width, region }: RegionToolbarProps) 
       className="absolute z-20"
       style={{
         left: left + width / 2,
-        top: top - 44,
+        top: top - 56,
         transform: "translateX(-50%)",
       }}
     >
@@ -80,15 +80,15 @@ export function RegionToolbar({ left, top, width, region }: RegionToolbarProps) 
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1 rounded-lg border border-brand-border bg-[#111116] px-2 py-1.5 shadow-xl">
+      <div className="flex items-center gap-1 rounded-lg border border-brand-border bg-[#111116] px-2 py-2 shadow-xl">
         {ACTIONS.map(({ key, icon: Icon, label, action }) => (
           <button
             key={key}
             title={label}
             onClick={(e) => { e.stopPropagation(); action(); }}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-text"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/[0.08] hover:text-brand-text"
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-5 w-5" />
           </button>
         ))}
       </div>

@@ -39,7 +39,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
       },
     ],
     traits: "Sempre limpa canecas enquanto conversa.",
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: true,
     dialogueGreeting: "Bem-vindos ao Grifo! O que vao querer hoje?",
     dialogueNotes:
@@ -97,7 +96,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
         isReaction: true,
       },
     ],
-    linkedNarrativeNodeIds: ["node_quest_01"],
     dialogueEnabled: true,
     dialogueGreeting: "Identifiquem-se. O que querem na cidade?",
     createdByUserId: "user-1",
@@ -153,7 +151,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
       },
     ],
     traits: "Resistencia a magia. Pode conjurar Disfarce a vontade.",
-    linkedNarrativeNodeIds: ["node_quest_02", "node_boss_01"],
     dialogueEnabled: true,
     dialogueGreeting: "Que coragem... ou tolice. O que buscam em meu dominio?",
     dialogueNotes: "Falar com voz rascante. Oferece informacoes por um preco.",
@@ -210,7 +207,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
       },
     ],
     traits: "Fuga Agil: pode usar acao bonus para Desengajar ou Esconder.",
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: false,
     createdByUserId: "user-1",
     isPublic: false,
@@ -258,7 +254,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
         reach: 5,
       },
     ],
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: false,
     createdByUserId: "user-1",
     isPublic: false,
@@ -336,7 +331,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
     ],
     traits:
       "Resistencia Lendaria (3/dia). Presenca Aterrorizante: criaturas num raio de 120ft devem fazer teste de SAB (CD 19) ou ficar amedrontadas.",
-    linkedNarrativeNodeIds: ["node_boss_final"],
     dialogueEnabled: true,
     dialogueGreeting:
       "Mortais ousados... divirtam-me com um enigma ou sirvam de refeicao.",
@@ -385,7 +379,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
         reach: 5,
       },
     ],
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: true,
     dialogueGreeting:
       "Ha! Clientes! Venham ver minhas ultimas criacoes. Nao encontram melhor em lugar nenhum!",
@@ -439,7 +432,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
       },
     ],
     traits: "Pode conjurar Zona da Verdade uma vez por dia.",
-    linkedNarrativeNodeIds: ["node_quest_03"],
     dialogueEnabled: true,
     dialogueGreeting:
       "Que a luz da Lua os guie. Como posso ajuda-los, viajantes?",
@@ -497,7 +489,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
         damageType: "contundente",
       },
     ],
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: false,
     createdByUserId: "user-1",
     isPublic: false,
@@ -547,7 +538,6 @@ export const MOCK_CHARACTERS: CampaignCharacter[] = [
     ],
     traits:
       "Faro Aguçado: vantagem em testes de Percepcao (olfato). Tatica de Matilha: vantagem no ataque se aliado adjacente.",
-    linkedNarrativeNodeIds: [],
     dialogueEnabled: false,
     createdByUserId: "user-1",
     isPublic: false,

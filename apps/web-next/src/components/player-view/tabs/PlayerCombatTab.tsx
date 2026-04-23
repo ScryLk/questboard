@@ -5,6 +5,7 @@ import { usePlayerViewStore } from "@/lib/player-view-store";
 import { getAlignmentColor, getHpPercent, getHpColor } from "@/lib/gameplay-mock-data";
 import { getHPDescriptionColor } from "@/lib/visibility-filter";
 import { broadcastSend } from "@/lib/broadcast-sync";
+import { EmptyState } from "@/components/shared/empty-state";
 
 export function PlayerCombatTab() {
   const combat = usePlayerViewStore((s) => s.combat);
@@ -15,15 +16,16 @@ export function PlayerCombatTab() {
 
   if (!combat?.active) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-6">
-        <Swords className="h-8 w-8 text-brand-muted/30" />
-        <p className="text-center text-sm text-brand-muted">
-          Nenhum combate ativo
-        </p>
-        <p className="text-center text-xs text-brand-muted/60">
-          O combate sera iniciado pelo GM quando necessario
-        </p>
-      </div>
+      <EmptyState
+        icon={Swords}
+        title="Sem combate ativo"
+        description={
+          <>
+            Quando o mestre iniciar um combate, a ordem de iniciativa
+            aparece aqui.
+          </>
+        }
+      />
     );
   }
 

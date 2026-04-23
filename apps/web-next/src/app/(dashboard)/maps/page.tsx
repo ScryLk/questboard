@@ -52,6 +52,7 @@ export default function MapsPage() {
   const [category, setCategory] = useState<MapCategory | "all">("all");
   const [sortBy, setSortBy] = useState<SortBy>("recent");
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
   const [moveMapId, setMoveMapId] = useState<string | null>(null);
@@ -142,26 +143,20 @@ export default function MapsPage() {
   };
 
   const handleCreateWithAI = () => {
-    const id = addMap({
-      version: 1,
-      name: "Mapa IA",
-      description: "",
-      tags: [],
-      category: "custom",
-      thumbnail: null,
-      width: 25,
-      height: 25,
-      cellSizeFt: 5,
-      terrain: {},
-      walls: {},
-      objects: [],
-      backgroundImage: null,
-      backgroundOpacity: 0.5,
-      stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
-      collectionId: null,
-      order: 0,
-    });
-    router.push(`/maps/editor?id=${id}&ai=1`);
+    setShowAIModal(true);
+  };
+
+  const handleAICreated = (
+    id: string,
+    aiParams?: { description: string; regionMode: boolean },
+  ) => {
+    const params = new URLSearchParams({ id, ai: "1" });
+    if (aiParams?.regionMode) {
+      params.set("region", "1");
+    } else if (aiParams?.description) {
+      params.set("prompt", aiParams.description);
+    }
+    router.push(`/maps/editor?${params.toString()}`);
   };
 
   const handlePlay = (id: string) => {
@@ -406,6 +401,13 @@ export default function MapsPage() {
         <NewMapModal
           onClose={() => setShowNewModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+      {showAIModal && (
+        <NewMapModal
+          aiMode
+          onClose={() => setShowAIModal(false)}
+          onCreated={handleAICreated}
         />
       )}
       {showImportModal && (

@@ -12,6 +12,7 @@ import { useGameplayStore } from "@/lib/gameplay-store";
 import { GameTooltip } from "@/components/ui/game-tooltip";
 import { playSFX } from "@/lib/audio/sfx-triggers";
 import { NPCDialogueButton } from "./npc-dialogue-button";
+import { DiceInlineResult } from "@/components/dice/DiceInlineResult";
 
 const CHANNEL_CONFIG: {
   key: ChatChannel;
@@ -187,39 +188,38 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       </div>
 
       {/* Content */}
-      <p className="mt-1 text-xs leading-relaxed text-brand-text/80">
-        {message.content}
-      </p>
+      {message.content && message.content !== "[imagem]" && (
+        <p className="mt-1 text-xs leading-relaxed text-brand-text/80">
+          {message.content}
+        </p>
+      )}
 
-      {/* Roll card */}
-      {isRoll && (
-        <div className="mt-1.5 rounded-md border border-brand-border bg-brand-primary p-2">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[10px] text-brand-muted">
-              {message.rollFormula}
-            </span>
-            <span className="text-[10px] text-brand-muted">
-              ({message.rollDetails})
-            </span>
-          </div>
-          <p
-            className={`mt-0.5 text-lg font-bold tabular-nums ${
-              message.isNat20
-                ? "text-[#FFD700]"
-                : message.isNat1
-                  ? "text-brand-danger"
-                  : "text-brand-text"
-            }`}
-          >
-            {message.rollResult}
-            {message.isNat20 && (
-              <span className="ml-1.5 text-[10px] font-bold uppercase text-[#FFD700]">
-                NAT 20!
-              </span>
-            )}
-          </p>
+      {/* Imagem anexada (sussurro com imagem) */}
+      {message.imageUrl && (
+        <div className="mt-1.5 overflow-hidden rounded-md border border-brand-border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={message.imageUrl}
+            alt="Anexo"
+            className="max-h-56 w-full object-contain"
+          />
         </div>
       )}
+
+      {/* Roll card — nível 1 (inline animado) */}
+      {isRoll &&
+        message.rollFormula &&
+        message.rollResult !== undefined &&
+        message.rollDetails && (
+          <DiceInlineResult
+            sides={message.rollSides ?? 20}
+            formula={message.rollFormula}
+            result={message.rollResult}
+            details={message.rollDetails}
+            isNat20={message.isNat20}
+            isNat1={message.isNat1}
+          />
+        )}
     </div>
   );
 }

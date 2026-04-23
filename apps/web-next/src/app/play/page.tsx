@@ -13,7 +13,7 @@ export default function PlayJoinPage() {
   const handleJoin = () => {
     const trimmedCode = code.trim().toUpperCase();
     if (!trimmedCode) {
-      setError("Digite o codigo da sessao");
+      setError("Digite o código da sessão");
       return;
     }
     if (!name.trim()) {
@@ -87,7 +87,7 @@ export default function PlayJoinPage() {
                 setError("");
               }}
               onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-              placeholder="Como voce quer ser chamado?"
+              placeholder="Como você quer ser chamado?"
               className="mt-1.5 w-full rounded-xl border border-brand-border bg-brand-primary px-4 py-3 text-sm text-brand-text outline-none placeholder:text-brand-muted/30 focus:border-brand-accent/50"
             />
           </label>

@@ -31,6 +31,24 @@ export const OBJECT_SPRITE_SHEETS: Record<
   bomb: { filename: "Bomb.png", width: 576, height: 48 },
   guillotine: { filename: "Guillotine.png", width: 576, height: 48 },
   flasks: { filename: "Flasks_monsters.png", width: 144, height: 384 },
+  // Pack PixelCrawler — filename absoluto pula o prefixo /items.
+  trees: {
+    filename:
+      "/sprites/PixelCrawler_Environment_Props_Static_Trees_Model_01_Size_02.png",
+    width: 256,
+    height: 128,
+  },
+  bonfire: {
+    filename:
+      "/sprites/PixelCrawler_Environment_Structures_Stations_Bonfire_Bonfire_01-Sheet.png",
+    width: 128,
+    height: 32,
+  },
+  panela: {
+    filename: "/sprites_unificados/panela_animada_01.png",
+    width: 128,
+    height: 32,
+  },
 };
 
 /**
@@ -115,6 +133,28 @@ export const OBJECT_SPRITE_MAP: Record<string, SpriteMeta> = {
     kind: "sheet",
     sheet: "flasks",
     region: { x: 0, y: 0, w: 36, h: 64 },
+  },
+  tree: {
+    kind: "sheet",
+    sheet: "trees",
+    region: { x: 0, y: 64, w: 64, h: 64 },
+  },
+  bush: {
+    kind: "sheet",
+    sheet: "trees",
+    region: { x: 0, y: 0, w: 64, h: 64 },
+  },
+  campfire: {
+    kind: "sheet-anim",
+    sheet: "bonfire",
+    regions: horizontalStrip(4, 32),
+    frameDurationMs: 120,
+  },
+  cauldron: {
+    kind: "sheet-anim",
+    sheet: "panela",
+    regions: horizontalStrip(4, 32),
+    frameDurationMs: 140,
   },
 
   // ── Sheets novos — animados (ciclam regiões) ──

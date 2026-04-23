@@ -5,11 +5,19 @@ import { useParams, useSearchParams } from "next/navigation";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { PlayerViewLayout } from "@/components/player-view/PlayerViewLayout";
 import { BroadcastSync } from "@/components/player-view/connection/BroadcastSync";
+import { DevIdentityBadge } from "@/components/gameplay/dev-identity-badge";
+import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
+import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
 import { JoinScreen } from "./_components/JoinScreen";
 import { LobbyScreen } from "./_components/LobbyScreen";
 import { EndScreen } from "./_components/EndScreen";
 
 export default function PlayerSessionPage() {
+  // Dev: identidade por ?as= e sync multi-aba via BroadcastChannel.
+  // Em produção, isso será substituído por Socket.IO autenticado.
+  useIdentityFromUrl();
+  useGameplayBroadcastSync();
+
   const params = useParams();
   const searchParams = useSearchParams();
   const code = (params.code as string)?.toUpperCase() ?? "";
@@ -36,6 +44,9 @@ export default function PlayerSessionPage() {
       {joinStep === "waiting-gm" && <LobbyScreen />}
       {joinStep === "playing" && <PlayerViewLayout />}
       {joinStep === "ended" && <EndScreen />}
+
+      {/* Badge dev de identidade */}
+      <DevIdentityBadge />
     </>
   );
 }

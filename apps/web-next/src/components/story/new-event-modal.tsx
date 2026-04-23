@@ -45,10 +45,10 @@ export function NewEventModal({ arcId, onClose }: NewEventModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-md rounded-xl border border-brand-border bg-[#111116] shadow-2xl">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-y-auto rounded-xl border border-brand-border bg-[#111116] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-brand-border px-5 py-4">
           <div>

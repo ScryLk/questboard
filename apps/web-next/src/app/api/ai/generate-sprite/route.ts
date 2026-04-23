@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const MODEL = "gemini-2.0-flash-exp-image-generation";
+const MODEL = "gemini-2.5-flash-image";
 
 export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;

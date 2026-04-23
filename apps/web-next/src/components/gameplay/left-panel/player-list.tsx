@@ -22,10 +22,10 @@ export function PlayerList() {
   return (
     <div className="border-b border-brand-border">
       {/* Header */}
-      <div className="flex items-center">
+      <div className="flex items-center transition-colors hover:bg-white/[0.02]">
         <button
           onClick={() => toggleSection("players")}
-          className="flex flex-1 items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.02]"
+          className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
         >
           {collapsed ? (
             <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
@@ -43,7 +43,7 @@ export function PlayerList() {
         <GameTooltip label="Convidar Jogador" side="bottom">
           <button
             onClick={() => openModal("invitePlayers")}
-            className="mr-2 flex h-5 w-5 items-center justify-center rounded text-brand-accent transition-colors hover:bg-white/10"
+            className="mr-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-brand-accent transition-colors hover:bg-white/10"
           >
             <UserPlus className="h-3.5 w-3.5" />
           </button>
@@ -52,7 +52,13 @@ export function PlayerList() {
 
       {!collapsed && (
         <div className="px-1.5 pb-1.5">
-          {MOCK_PLAYERS.map((player) => (
+          {MOCK_PLAYERS.length === 0 ? (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-brand-muted">
+                Nenhum jogador ainda. Convide com o botão acima.
+              </p>
+            </div>
+          ) : MOCK_PLAYERS.map((player) => (
             <div
               key={player.id}
               className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03]"

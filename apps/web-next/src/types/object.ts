@@ -42,6 +42,13 @@ export interface CampaignObject {
   spritePrompt?: string;
   spriteEmoji: string;
   spriteColor: string;
+  /**
+   * Map-object type do catálogo (@/lib/gameplay-mock-data). Quando definido,
+   * a UI da biblioteca renderiza o sprite real (via ObjectSpriteIcon) em vez
+   * do emoji. Items sem equivalente no mapa (ex: poções, amuletos) ficam null
+   * e caem no fallback do emoji.
+   */
+  spriteType?: string | null;
 
   // Map properties
   blocking: boolean;

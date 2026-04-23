@@ -63,7 +63,8 @@ import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import { AMBIENT_LIGHT_CONFIG } from "@/lib/map-sidebar-types";
 import type { LayerId } from "@/lib/map-sidebar-types";
 import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
-import { useCameraStore } from "@/lib/camera-store";
+import { useCameraStore, isZoomAnimating } from "@/lib/camera-store";
+import { useRadialMenuStore } from "@/lib/radial-menu-store";
 
 export function MapCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
@@ -172,6 +173,16 @@ export function MapCanvas() {
     offsetY: number;
   } | null>(null);
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  // Object drag state (map objects — repositioning on canvas)
+  const objDragRef = useRef<{
+    objectId: string;
+    originX: number;
+    originY: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const [objDragPos, setObjDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
 
   // Tooltip
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -339,6 +350,48 @@ export function MapCanvas() {
     setTooltipPos(null);
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   }, [setHoveredToken]);
+
+  // Radial menu — short tap em token abre ações.
+  // TODO(prompt-2): montar `actions` via regra real (distância, turno,
+  // role). Por ora stub permissivo (GM vê tudo habilitado).
+  const openGmRadialAtToken = useCallback(
+    (clientX: number, clientY: number, tokenId: string) => {
+      const t = tokens.find((tk) => tk.id === tokenId);
+      if (!t) return;
+      // Distância até o token selecionado (se houver), pra UI
+      const selected = tokens.find((tk) => selectedTokenIds[0] === tk.id);
+      const dist =
+        selected && selected.id !== t.id
+          ? gridDistance(selected.x, selected.y, t.x, t.y, CELL_SIZE_FT) /
+            CELL_SIZE_FT
+          : undefined;
+      useRadialMenuStore.getState().openAt({
+        source: "gm",
+        screenX: clientX,
+        screenY: clientY,
+        target: {
+          tokenId: t.id,
+          namePt: t.name,
+          hpText: `HP ${t.hp}/${t.maxHp}`,
+          distanceCells: dist !== undefined ? Math.round(dist) : undefined,
+        },
+        actions: [
+          { id: "attack", labelPt: "Atacar", enabled: true },
+          { id: "converse", labelPt: "Conversar", enabled: true },
+          { id: "test", labelPt: "Teste", enabled: true },
+          { id: "move_to", labelPt: "Mover até", enabled: true },
+          { id: "inspect", labelPt: "Inspecionar", enabled: true },
+        ],
+      });
+
+      // Abre a aba "Alvo" com a ficha pública do token em paralelo ao
+      // radial. selectToken já foi chamado pelo handleTokenMouseDown.
+      const gm = useGameplayStore.getState();
+      gm.setRightTab("sheet");
+      if (!gm.rightPanelOpen) gm.toggleRightPanel();
+    },
+    [tokens, selectedTokenIds],
+  );
 
   // Token drag
   const handleTokenMouseDown = useCallback(
@@ -553,6 +606,76 @@ export function MapCanvas() {
       document.body.style.userSelect = "none";
     },
     [tokens, scaledCell, gridCols, gridRows, cellSizeFt, selectToken, toggleTokenSelection, moveToken, pushMovementHistory, addMovementFt, closeContextMenu, combat.active, currentTurnTokenId, pathPlanningActive, enterPathPlanning],
+  );
+
+  // Map object mousedown — select + drag to reposition, mirroring the editor UX
+  const handleObjectMouseDown = useCallback(
+    (e: React.MouseEvent, objectId: string, objX: number, objY: number) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      closeContextMenu();
+
+      const store = useGameplayStore.getState();
+      store.selectMapObject(objectId);
+      // Clear any token selection so delete/rotate keys target the object
+      clearSelection();
+
+      if (!viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cam = useCameraStore.getState();
+      const worldX = (e.clientX - rect.left - cam.panX) / cam.zoom;
+      const worldY = (e.clientY - rect.top - cam.panY) / cam.zoom;
+
+      objDragRef.current = {
+        objectId,
+        originX: objX,
+        originY: objY,
+        offsetX: worldX - objX * CELL_SIZE,
+        offsetY: worldY - objY * CELL_SIZE,
+      };
+
+      function onMove(ev: MouseEvent) {
+        if (!objDragRef.current || !viewportRef.current) return;
+        const r = viewportRef.current.getBoundingClientRect();
+        const c = useCameraStore.getState();
+        const wx = (ev.clientX - r.left - c.panX) / c.zoom;
+        const wy = (ev.clientY - r.top - c.panY) / c.zoom;
+        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((wx - objDragRef.current.offsetX) / CELL_SIZE)));
+        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((wy - objDragRef.current.offsetY) / CELL_SIZE)));
+        setObjDragPos({ id: objDragRef.current.objectId, x: gx, y: gy });
+      }
+
+      function commit(ev: MouseEvent) {
+        if (!objDragRef.current || !viewportRef.current) { done(); return; }
+        const r = viewportRef.current.getBoundingClientRect();
+        const c = useCameraStore.getState();
+        const wx = (ev.clientX - r.left - c.panX) / c.zoom;
+        const wy = (ev.clientY - r.top - c.panY) / c.zoom;
+        const gx = Math.max(0, Math.min(gridCols - 1, Math.round((wx - objDragRef.current.offsetX) / CELL_SIZE)));
+        const gy = Math.max(0, Math.min(gridRows - 1, Math.round((wy - objDragRef.current.offsetY) / CELL_SIZE)));
+        const orig = objDragRef.current;
+        if (gx !== orig.originX || gy !== orig.originY) {
+          useGameplayStore.getState().moveObject(orig.objectId, gx, gy);
+        }
+        objDragRef.current = null;
+        setObjDragPos(null);
+        done();
+      }
+
+      function done() {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", commit);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", commit);
+      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+    },
+    [gridCols, gridRows, closeContextMenu, clearSelection],
   );
 
   // Canvas mousedown (selection box, ruler, ping, pan)
@@ -1134,9 +1257,11 @@ export function MapCanvas() {
             });
           } else {
             clearSelection();
+            useGameplayStore.getState().selectMapObject(null);
           }
         } else {
           clearSelection();
+          useGameplayStore.getState().selectMapObject(null);
         }
         setSelectionBox(null);
         selBoxRef.current = null;
@@ -1260,13 +1385,26 @@ export function MapCanvas() {
         st.setActiveStroke(null);
         clearRegion();
         st.clearAISelection();
+        st.selectMapObject(null);
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        useGameplayStore.getState().selectedTokenIds.forEach((id) =>
-          useGameplayStore.getState().removeToken(id),
-        );
+        const st = useGameplayStore.getState();
+        // Prefer selected map object if one is focused (matches editor UX)
+        if (st.selectedMapObjectId) {
+          st.removeObject(st.selectedMapObjectId);
+          return;
+        }
+        st.selectedTokenIds.forEach((id) => st.removeToken(id));
         return;
+      }
+      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        const st = useGameplayStore.getState();
+        if (st.selectedMapObjectId) {
+          e.preventDefault();
+          st.rotateObject(st.selectedMapObjectId);
+          return;
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "a") { e.preventDefault(); useGameplayStore.getState().selectAllTokens(); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z") {
@@ -1489,18 +1627,27 @@ export function MapCanvas() {
     : activeTool === "draw" || activeTool === "wall" || activeTool === "terrain" || activeTool === "objects" ? "cursor-crosshair"
     : "cursor-default";
 
-  // Wheel zoom — native event listener with passive:false for proper preventDefault
+  // Wheel zoom — discreto por nível. Debounce via flag `zoomAnimating`
+  // pra não empilhar ticks durante a animação de 200ms.
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
+    let lastTrigger = 0;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      // Ignora enquanto anima + aplica throttle mínimo de 180ms
+      // (evita jump de 2 níveis em um flick do trackpad).
+      if (isZoomAnimating()) return;
+      const now = performance.now();
+      if (now - lastTrigger < 180) return;
+      lastTrigger = now;
+
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       const cam = useCameraStore.getState();
-      if (e.deltaY < 0) cam.zoomIn(1.1, mouseX, mouseY);
-      else cam.zoomOut(1.1, mouseX, mouseY);
+      if (e.deltaY < 0) cam.zoomIn(1, mouseX, mouseY);
+      else cam.zoomOut(1, mouseX, mouseY);
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
@@ -1600,7 +1747,11 @@ export function MapCanvas() {
           {/* Map objects (layer: decorations) */}
           {getLayer("decorations")?.visible && (
             <div style={{ opacity: (getLayer("decorations")?.opacity ?? 100) / 100 }}>
-              <ObjectOverlay scaledCell={scaledCell} />
+              <ObjectOverlay
+                scaledCell={scaledCell}
+                dragPos={objDragPos}
+                onObjectMouseDown={handleObjectMouseDown}
+              />
             </div>
           )}
 
@@ -1811,7 +1962,24 @@ export function MapCanvas() {
                   left: dx, top: dy, width: size, height: size,
                   transition: isDragging ? "none" : "left 200ms ease-out, top 200ms ease-out",
                 }}
-                onMouseDown={(e) => handleTokenMouseDown(e, token.id)}
+                data-token-id={token.id}
+                onMouseDown={(e) => {
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const startTime = Date.now();
+                  handleTokenMouseDown(e, token.id);
+                  // Short tap (<300ms, <8px): abre RadialMenu do GM
+                  const onUp = (ev: MouseEvent) => {
+                    window.removeEventListener("mouseup", onUp, true);
+                    const dx = Math.abs(ev.clientX - startX);
+                    const dy = Math.abs(ev.clientY - startY);
+                    const duration = Date.now() - startTime;
+                    if (duration < 300 && dx < 8 && dy < 8) {
+                      openGmRadialAtToken(ev.clientX, ev.clientY, token.id);
+                    }
+                  };
+                  window.addEventListener("mouseup", onUp, true);
+                }}
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); selectToken(token.id); openTokenContextMenu(token.id, e.clientX, e.clientY); }}
                 onMouseEnter={(e) => handleTokenMouseEnter(e, token.id)}
                 onMouseLeave={handleTokenMouseLeave}

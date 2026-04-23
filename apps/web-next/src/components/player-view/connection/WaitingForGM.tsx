@@ -30,8 +30,8 @@ export function WaitingForGM() {
         <Loader2 className="h-6 w-6 animate-spin text-brand-accent" />
 
         <p className="max-w-xs text-xs text-brand-muted">
-          O GM precisa atribuir um personagem a voce antes de entrar no mapa.
-          Aguarde um momento...
+          O mestre precisa te atribuir um personagem antes de você entrar
+          no mapa. Aguarde um momento…
         </p>
       </div>
     </div>

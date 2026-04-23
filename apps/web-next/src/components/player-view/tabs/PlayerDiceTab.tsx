@@ -7,6 +7,8 @@ import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { broadcastSend } from "@/lib/broadcast-sync";
 import { playSFX } from "@/lib/audio/sfx-triggers";
+import { useDiceAnimationStore } from "@/lib/dice-animation-store";
+import { usePlayerSettings } from "@/lib/player-settings-store";
 
 const DICE: { type: DieType; sides: number; label: string }[] = [
   { type: "d4", sides: 4, label: "D4" },
@@ -93,6 +95,7 @@ export function PlayerDiceTab() {
         rollFormula: formula,
         rollResult: sum,
         rollDetails: details,
+        rollSides: sides,
         isNat20,
         isNat1,
       };
@@ -100,6 +103,22 @@ export function PlayerDiceTab() {
       usePlayerViewStore.getState().addMessage(msg);
       useGameplayStore.getState().addMessage(msg);
       broadcastSend("player:roll", msg, "player");
+
+      // Nível 2 — só dispara em crítico/falha no MVP + respeita setting.
+      const animMode = usePlayerSettings.getState().diceAnimation;
+      if ((isNat20 || isNat1) && animMode === "full") {
+        useDiceAnimationStore.getState().show({
+          id: msg.id,
+          sides,
+          result: sum,
+          formula,
+          details,
+          actorName: senderName,
+          isNat20,
+          isNat1,
+          kind: isNat20 ? "crit" : "fumble",
+        });
+      }
     },
     [senderName],
   );
@@ -169,11 +188,13 @@ export function PlayerDiceTab() {
       {/* History */}
       <div className="flex-1 overflow-y-auto border-t border-brand-border px-3 py-2">
         <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-brand-muted">
-          Historico
+          Histórico
         </p>
         {history.length === 0 ? (
-          <p className="py-4 text-center text-[11px] text-brand-muted">
-            Nenhuma rolagem ainda
+          <p className="py-4 text-center text-[11px] text-brand-muted/70">
+            Nenhuma rolagem ainda.
+            <br />
+            Escolha um dado acima.
           </p>
         ) : (
           history.map((roll) => (

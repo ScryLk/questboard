@@ -28,8 +28,25 @@
       "@react-navigation/bottom-tabs": "7.2.0",
       "@react-navigation/native-stack": "7.2.0",
       "@react-navigation/core": "7.4.0",
-      "@react-navigation/elements": "2.3.0"
-    }
+      "@react-navigation/elements": "2.3.0",
+      "react": "18.3.1",
+      "react-dom": "18.3.1",
+      "@types/react": "18.3.28",
+      "@types/react-dom": "18.3.7"
+    },
+    "ignoredBuiltDependencies": [
+      "@clerk/shared",
+      "@firebase/util",
+      "@prisma/client",
+      "@prisma/engines",
+      "browser-tabs-lock",
+      "core-js",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs",
+      "sharp"
+    ]
   },
   "packageManager": "pnpm@10.29.3",
   "engines": {

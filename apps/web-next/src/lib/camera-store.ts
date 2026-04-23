@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { CELL_SIZE, MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } from "./gameplay/constants";
+import { getZoomInLevel, getZoomOutLevel } from "./map-scale";
 
 export interface CameraState {
   panX: number;
@@ -27,8 +28,24 @@ interface CameraStore extends CameraState {
   getVisibleWorldRect: () => { left: number; top: number; right: number; bottom: number };
 }
 
-// Animação de pan (fora do store para evitar re-renders)
+// Animação de pan/zoom (fora do store para evitar re-renders)
 let animFrameId: number | null = null;
+let zoomAnimFrameId: number | null = null;
+/** Flag pra wheel handler não bater enquanto animação de zoom roda. */
+let zoomAnimating = false;
+
+/** Consultado pelo wheel handler pra debounce. */
+export function isZoomAnimating(): boolean {
+  return zoomAnimating;
+}
+
+function cancelZoomAnim() {
+  if (zoomAnimFrameId !== null) {
+    cancelAnimationFrame(zoomAnimFrameId);
+    zoomAnimFrameId = null;
+  }
+  zoomAnimating = false;
+}
 
 export const useCameraStore = create<CameraStore>((set, get) => ({
   panX: 0,
@@ -46,38 +63,56 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   },
 
   zoomAt: (newZoom, screenX, screenY) => {
-    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+    // Snap pro nível discreto mais próximo, clampa pela constante geral.
+    const raw = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+    // Animação de 200ms easeOutCubic pro novo nível (pan correspondente
+    // pra manter o ponto sob o cursor fixo).
+    cancelZoomAnim();
+
     const s = get();
+    const cx = screenX ?? s.viewportWidth / 2;
+    const cy = screenY ?? s.viewportHeight / 2;
+    const worldX = (cx - s.panX) / s.zoom;
+    const worldY = (cy - s.panY) / s.zoom;
+    const targetPanX = cx - worldX * raw;
+    const targetPanY = cy - worldY * raw;
 
-    if (screenX !== undefined && screenY !== undefined) {
-      // Zoom centrado no ponto do cursor
-      const worldX = (screenX - s.panX) / s.zoom;
-      const worldY = (screenY - s.panY) / s.zoom;
+    const startZoom = s.zoom;
+    const startPanX = s.panX;
+    const startPanY = s.panY;
+    const startTime = performance.now();
+    const duration = 200;
+    zoomAnimating = true;
+
+    const step = () => {
+      const elapsed = performance.now() - startTime;
+      const p = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
       set({
-        zoom: clamped,
-        panX: screenX - worldX * clamped,
-        panY: screenY - worldY * clamped,
+        zoom: startZoom + (raw - startZoom) * eased,
+        panX: startPanX + (targetPanX - startPanX) * eased,
+        panY: startPanY + (targetPanY - startPanY) * eased,
       });
-    } else {
-      // Zoom centrado no viewport
-      const cx = s.viewportWidth / 2;
-      const cy = s.viewportHeight / 2;
-      const worldX = (cx - s.panX) / s.zoom;
-      const worldY = (cy - s.panY) / s.zoom;
-      set({
-        zoom: clamped,
-        panX: cx - worldX * clamped,
-        panY: cy - worldY * clamped,
-      });
-    }
+      if (p < 1) {
+        zoomAnimFrameId = requestAnimationFrame(step);
+      } else {
+        zoomAnimFrameId = null;
+        zoomAnimating = false;
+      }
+    };
+    zoomAnimFrameId = requestAnimationFrame(step);
   },
 
-  zoomIn: (factor = 1.15, screenX, screenY) => {
-    get().zoomAt(get().zoom * factor, screenX, screenY);
+  // `factor` é ignorado — zoom agora é discreto (snap pros níveis fixos).
+  // Assinatura preservada pra não quebrar callsites existentes.
+  zoomIn: (_factor = 1.15, screenX, screenY) => {
+    const target = getZoomInLevel(get().zoom);
+    get().zoomAt(target, screenX, screenY);
   },
 
-  zoomOut: (factor = 1.15, screenX, screenY) => {
-    get().zoomAt(get().zoom / factor, screenX, screenY);
+  zoomOut: (_factor = 1.15, screenX, screenY) => {
+    const target = getZoomOutLevel(get().zoom);
+    get().zoomAt(target, screenX, screenY);
   },
 
   centerOnCell: (cellX, cellY) => {

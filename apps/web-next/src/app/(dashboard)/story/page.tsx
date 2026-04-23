@@ -8,6 +8,7 @@ import {
   Columns3,
   List,
   Network,
+  Swords,
 } from "lucide-react";
 import { useStoryStore, type StoryView } from "@/stores/storyStore";
 import { calcCampaignProgress } from "@/types/story";
@@ -15,6 +16,7 @@ import { RoadmapView } from "@/components/story/roadmap-view";
 import { KanbanView } from "@/components/story/kanban-view";
 import { ListView } from "@/components/story/list-view";
 import { TimelineView } from "@/components/story/timeline-view";
+import { EncountersView } from "@/components/story/encounters-view";
 import { EventDetailDrawer } from "@/components/story/event-detail-drawer";
 import { NewArcModal } from "@/components/story/new-arc-modal";
 import { NewEventModal } from "@/components/story/new-event-modal";
@@ -26,6 +28,7 @@ const VIEW_TABS: { key: StoryView; label: string; icon: typeof GitBranch }[] = [
   { key: "kanban", label: "Kanban", icon: Columns3 },
   { key: "list", label: "Lista", icon: List },
   { key: "branching", label: "Ramificações", icon: Network },
+  { key: "encounters", label: "Encontros", icon: Swords },
 ];
 
 export default function StoryPage() {
@@ -153,11 +156,12 @@ export default function StoryPage() {
           {view === "kanban" && <KanbanView />}
           {view === "list" && <ListView />}
           {view === "timeline" && <TimelineView />}
+          {view === "encounters" && <EncountersView />}
         </div>
       )}
 
       {/* Drawer */}
-      {!isBranching && <EventDetailDrawer />}
+      {!isBranching && view !== "encounters" && <EventDetailDrawer />}
 
       {/* Modals */}
       {showNewArc && <NewArcModal onClose={() => setShowNewArc(false)} />}

@@ -13,9 +13,9 @@ export function SessionPausedOverlay() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-warning/10">
           <Pause className="h-8 w-8 text-brand-warning" />
         </div>
-        <h2 className="text-xl font-bold text-brand-text">Sessao Pausada</h2>
+        <h2 className="text-xl font-bold text-brand-text">Sessão pausada</h2>
         <p className="text-sm text-brand-muted">
-          Aguardando o GM retomar a sessao...
+          Aguardando o mestre retomar a sessão…
         </p>
 
         {/* Pulsing dots */}
