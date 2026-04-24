@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { seedAudio } from "./seed-audio";
 
 const prisma = new PrismaClient();
 
@@ -47,17 +48,8 @@ async function main() {
     },
   });
 
-  // Create some built-in audio tracks
-  await prisma.audioTrack.createMany({
-    skipDuplicates: true,
-    data: [
-      { category: "tavern", name: "Taverna Animada", url: "/audio/tavern-lively.mp3", duration: 180, isBuiltin: true },
-      { category: "forest", name: "Floresta Calma", url: "/audio/forest-calm.mp3", duration: 240, isBuiltin: true },
-      { category: "combat", name: "Batalha Épica", url: "/audio/combat-epic.mp3", duration: 200, isBuiltin: true },
-      { category: "dungeon", name: "Masmorra Sombria", url: "/audio/dungeon-dark.mp3", duration: 300, isBuiltin: true },
-      { category: "ambient", name: "Chuva", url: "/audio/rain-ambient.mp3", duration: 600, isBuiltin: true },
-    ],
-  });
+  // Audio library (official catalog)
+  await seedAudio(prisma);
 
   // Create Super Admin user
   const superAdminClerkId = process.env.SUPER_ADMIN_CLERK_ID || "clerk_super_admin_dev";

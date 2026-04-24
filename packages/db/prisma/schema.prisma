@@ -221,6 +221,7 @@ model User {
   followers        UserFollow[]      @relation("UserFollowing")
   following        UserFollow[]      @relation("UserFollowers")
   notes            Note[]
+  audioTracks      AudioTrack[]
 
   @@index([externalId])
   @@index([email])
@@ -838,13 +839,42 @@ model DiceRoll {
 
 // ─── Audio ───────────────────────────────────────────────
 
+enum AudioChannel {
+  AMBIENT
+  MUSIC
+  SFX
+}
+
 model AudioTrack {
-  id        String  @id @default(cuid())
+  id String @id @default(cuid())
+
+  // Legacy — mantidos em sincronia com os canônicos para não quebrar o
+  // audio-panel web atual. Serão removidos na fatia que reescreve o panel.
   category  String
-  name      String
-  url       String
   duration  Int
   isBuiltin Boolean @default(true)
+
+  // Canônicos (fonte de verdade a partir desta fatia).
+  ownerId       String?
+  name          String
+  description   String?
+  url           String
+  // Defaults nas 4 colunas abaixo existem apenas para segurança da migration
+  // sobre dados legados. Inserts reais passam pelo Zod (`createAudioTrackSchema`),
+  // que exige valores positivos e canal explícito.
+  durationMs    Int          @default(0)
+  fileSizeBytes Int          @default(0)
+  channel       AudioChannel @default(AMBIENT)
+  isOfficial    Boolean      @default(false)
+  tags          String[]     @default([])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, channel])
+  @@index([isOfficial, channel])
+  @@index([tags], type: Gin)
 }
 
 model SessionAudio {

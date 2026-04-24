@@ -12,4 +12,5 @@ export async function audioRoutes(app: FastifyInstance) {
   app.post("/sessions/:id/audio/stop", controller.stop);
   app.patch("/sessions/:id/audio/volume", controller.setVolume);
   app.get("/audio/library", controller.getLibrary);
+  app.get("/audio/tracks", controller.listTracks);
 }

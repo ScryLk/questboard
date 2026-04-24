@@ -24,6 +24,7 @@
     "@questboard/db": "workspace:*",
     "@questboard/game-engine": "workspace:*",
     "@questboard/shared": "workspace:*",
+    "@questboard/validators": "workspace:*",
     "bullmq": "^5.70.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",

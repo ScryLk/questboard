@@ -7,3 +7,4 @@ export * from "./ai-map.schema";
 export * from "./map-collection.schema";
 export * from "./wall.schema";
 export * from "./ai-character.schema";
+export * from "./audio.schema";

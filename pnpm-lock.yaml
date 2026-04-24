@@ -65,6 +65,9 @@ importers:
       '@questboard/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@questboard/validators':
+        specifier: workspace:*
+        version: link:../../packages/validators
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -364,6 +367,9 @@ importers:
 
   packages/validators:
     dependencies:
+      '@questboard/constants':
+        specifier: workspace:*
+        version: link:../constants
       '@questboard/shared':
         specifier: workspace:*
         version: link:../shared

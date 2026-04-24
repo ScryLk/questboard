@@ -1,9 +1,22 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { AudioService } from "./audio.service.js";
 import { createSuccessResponse } from "@questboard/shared";
+import { listAudioTracksQuerySchema } from "@questboard/validators";
+import { BadRequestError } from "../../errors/app-error.js";
 
 export function createAudioController(audioService: AudioService) {
   return {
+    async listTracks(request: FastifyRequest, reply: FastifyReply) {
+      const parsed = listAudioTracksQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        const first = parsed.error.errors[0];
+        throw new BadRequestError(first?.message ?? "Parâmetros inválidos.");
+      }
+
+      const result = await audioService.listTracks(request.user.id, parsed.data);
+      return reply.send(createSuccessResponse(result));
+    },
+
     async getState(
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply,

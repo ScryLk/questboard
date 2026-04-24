@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@questboard/db";
+import type { PrismaClient, Prisma } from "@questboard/db";
+import type { ListAudioTracksQuery } from "@questboard/validators";
 import { NotFoundError, ForbiddenError } from "../../errors/app-error.js";
 
 export function createAudioService(prisma: PrismaClient) {
@@ -9,6 +10,40 @@ export function createAudioService(prisma: PrismaClient) {
   }
 
   return {
+    async listTracks(userId: string, query: ListAudioTracksQuery) {
+      const { channel, tags, search, scope, cursor, limit } = query;
+
+      const scopeWhere: Prisma.AudioTrackWhereInput =
+        scope === "official"
+          ? { isOfficial: true }
+          : scope === "mine"
+            ? { ownerId: userId }
+            : { OR: [{ isOfficial: true }, { ownerId: userId }] };
+
+      const where: Prisma.AudioTrackWhereInput = {
+        ...scopeWhere,
+        ...(channel ? { channel } : {}),
+        ...(tags && tags.length > 0 ? { tags: { hasEvery: tags } } : {}),
+        ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+      };
+
+      const tracks = await prisma.audioTrack.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+
+      const hasMore = tracks.length > limit;
+      if (hasMore) tracks.pop();
+      const last = tracks.at(-1);
+
+      return {
+        items: tracks,
+        nextCursor: hasMore && last ? last.id : null,
+      };
+    },
+
     async getState(sessionId: string) {
       return prisma.sessionAudio.findUnique({ where: { sessionId } });
     },
