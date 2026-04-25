@@ -37,6 +37,7 @@ import { ActionFeedPanel } from "./action-feed/action-feed-panel";
 import { DiceCentralReveal } from "@/components/dice/DiceCentralReveal";
 import { MoveApprovalDialog } from "./move-approval-dialog";
 import { RadialMenu } from "@/components/shared/radial-menu";
+import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
 import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
 
@@ -197,11 +198,43 @@ export function GameplayLayout() {
       {/* Aprovação de movimento do jogador */}
       <MoveApprovalDialog />
 
-      {/* Radial menu — short tap em token. Callbacks stub (Prompt 2). */}
+      {/* Radial menu — short tap em token. */}
       <RadialMenu
         onSelect={(id) => {
-          // TODO(prompt-2): ligar com handlers reais
-          console.info("[RadialMenu:gm]", id);
+          const target = useRadialMenuStore.getState().target;
+          if (!target) return;
+          const gp = useGameplayStore.getState();
+
+          // Garante que o alvo está selecionado (target-panel lê do selecionado).
+          gp.selectToken(target.tokenId);
+
+          // Abre o painel direito se estiver fechado — ações todas moram lá.
+          if (!gp.rightPanelOpen) gp.toggleRightPanel();
+
+          switch (id) {
+            case "attack":
+            case "inspect":
+              // Alvo (HP, defesa, condições, ataques). Attack e inspect
+              // compartilham surface; attack vai priorizar o bloco Ataques
+              // quando essa feature existir (TODO).
+              gp.setRightTab("sheet");
+              break;
+            case "converse":
+              // Chat com o NPC em contexto. TODO(npc-conversation): quando
+              // a fatia de conversa com IA do NPC existir, abrir modal
+              // dedicado em vez do chat genérico.
+              gp.setRightTab("chat");
+              break;
+            case "test":
+              // Rolagem livre com contexto do alvo no campo `context`.
+              gp.setRightTab("dice");
+              break;
+            case "move_to":
+              // GM planeja caminho DESTE token (click subsequente no mapa
+              // define o destino). Funciona porque GM bypassa colisão.
+              gp.enterPathPlanning(target.tokenId);
+              break;
+          }
         }}
       />
 

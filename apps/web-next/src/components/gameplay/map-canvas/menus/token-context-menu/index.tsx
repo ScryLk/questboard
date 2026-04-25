@@ -32,6 +32,9 @@ import {
 } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useActionFeedStore } from "@/lib/action-feed-store";
+import { useCombatStore } from "@/lib/combat-store";
+import { useCombatActions } from "@/hooks/use-combat-actions";
+import { UserPlus } from "lucide-react";
 import {
   ALIGNMENT_EYE_COLORS,
   ALIGNMENT_LABELS,
@@ -128,6 +131,22 @@ export function TokenContextMenu({
   const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
   const currentUserId = useGameplayStore((s) => s.currentUserId);
 
+  // Combate canônico (novo tracker). Coexiste com `combat` legacy do
+  // gameplay-store; o item "Adicionar ao combate" depende deste.
+  const canonicalCombat = useCombatStore((s) => s.combat);
+  const combatActions = useCombatActions(
+    canonicalCombat?.sessionId ?? "mock-session",
+  );
+  const isInCanonicalCombat = useMemo(
+    () =>
+      canonicalCombat?.participants.some((p) => p.tokenId === token.id) ?? false,
+    [canonicalCombat, token.id],
+  );
+  const canAddToCombat =
+    currentUserIsGM &&
+    canonicalCombat?.isActive === true &&
+    !isInCanonicalCombat;
+
   const rules = useMemo(
     () =>
       computeTokenMenuVisibility({
@@ -206,6 +225,11 @@ export function TokenContextMenu({
 
   function handleSetCurrentTurn() {
     setCurrentTurn(token.id);
+    onClose();
+  }
+
+  function handleAddToCombat() {
+    combatActions.addParticipant(token.id);
     onClose();
   }
 
@@ -404,6 +428,14 @@ export function TokenContextMenu({
                 combat.active &&
                 combat.order[combat.turnIndex]?.tokenId === token.id
               }
+            />
+          )}
+          {canAddToCombat && (
+            <MenuItem
+              icon={UserPlus}
+              label="Adicionar ao combate"
+              onClick={handleAddToCombat}
+              onHover={requestCloseSubmenu}
             />
           )}
           {rules.canEndCombat && (

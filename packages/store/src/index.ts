@@ -5,3 +5,8 @@ export {
   type SearchState,
   type RecentSearchItem,
 } from "./search-store";
+export {
+  createCombatStore,
+  type CombatStore,
+  type CombatStoreState,
+} from "./combat";

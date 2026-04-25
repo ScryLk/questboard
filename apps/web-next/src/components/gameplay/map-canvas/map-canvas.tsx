@@ -1964,13 +1964,16 @@ export function MapCanvas() {
                 }}
                 data-token-id={token.id}
                 onMouseDown={(e) => {
+                  handleTokenMouseDown(e, token.id);
+                  // Short tap com botão esquerdo: abre RadialMenu do GM.
+                  // Botão direito é tratado por onContextMenu (dropdown).
+                  if (e.button !== 0) return;
                   const startX = e.clientX;
                   const startY = e.clientY;
                   const startTime = Date.now();
-                  handleTokenMouseDown(e, token.id);
-                  // Short tap (<300ms, <8px): abre RadialMenu do GM
                   const onUp = (ev: MouseEvent) => {
                     window.removeEventListener("mouseup", onUp, true);
+                    if (ev.button !== 0) return;
                     const dx = Math.abs(ev.clientX - startX);
                     const dy = Math.abs(ev.clientY - startY);
                     const duration = Date.now() - startTime;

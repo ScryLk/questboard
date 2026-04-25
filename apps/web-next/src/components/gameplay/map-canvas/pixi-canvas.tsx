@@ -14,6 +14,8 @@ import { COMBAT_ANIMATION_REGISTRY } from "@/lib/animation/combat-animation-regi
 import type { AnimationSettings, AnimationType } from "@/lib/animation/combat-animation-types";
 import { useSettingsStore } from "@/lib/settings-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { CombatHighlight, setCombatHighlight } from "@/lib/combat-highlight";
+import { useCombatHighlightSync } from "@/hooks/use-combat-highlight-sync";
 
 interface PixiCanvasProps {
   gridCols: number;
@@ -28,8 +30,13 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
     const worldContainerRef = useRef<Container | null>(null);
     const gridLayerRef = useRef<Container | null>(null);
     const combatLayerRef = useRef<Container | null>(null);
+    const combatHighlightLayerRef = useRef<Container | null>(null);
     const engineRef = useRef<CombatAnimationEngine | null>(null);
+    const highlightRef = useRef<CombatHighlight | null>(null);
     const readyRef = useRef(false);
+
+    // Observa store de combat + tokens e ajusta o highlight do turno atual.
+    useCombatHighlightSync();
 
     // Settings para combat engine
     const appearance = useSettingsStore((s) => s.appearance);
@@ -110,6 +117,23 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
         engineRef.current = engine;
         setCombatEngine(engine);
 
+        // ─── Combat Highlight Layer (turno atual) ───
+        // zIndex 11 — acima das animações de combate para não ficar oculto
+        // por efeitos; abaixo da UI/ponteiros.
+        const combatHighlightLayer = new Container();
+        combatHighlightLayer.zIndex = 11;
+        worldContainer.addChild(combatHighlightLayer);
+        combatHighlightLayerRef.current = combatHighlightLayer;
+
+        const highlight = new CombatHighlight(combatHighlightLayer);
+        highlight.cellSize = CELL_SIZE;
+        highlightRef.current = highlight;
+        setCombatHighlight(highlight);
+
+        app.ticker.add((ticker) => {
+          highlight.tick(ticker.deltaMS);
+        });
+
         // Dev helper
         if (process.env.NODE_ENV === "development") {
           const w = window as unknown as Record<string, unknown>;
@@ -145,6 +169,11 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
 
       return () => {
         destroyed = true;
+        if (highlightRef.current) {
+          highlightRef.current.destroy();
+          setCombatHighlight(null);
+          highlightRef.current = null;
+        }
         if (engineRef.current) {
           engineRef.current.destroy();
           setCombatEngine(null);
@@ -156,6 +185,7 @@ export function PixiCanvas({ gridCols, gridRows, gridVisible, gridOpacity }: Pix
         worldContainerRef.current = null;
         gridLayerRef.current = null;
         combatLayerRef.current = null;
+        combatHighlightLayerRef.current = null;
         appRef.current = null;
         readyRef.current = false;
       };

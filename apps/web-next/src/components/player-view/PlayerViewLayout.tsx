@@ -18,6 +18,7 @@ import { PlayerActionsBar } from "./actions-bar/PlayerActionsBar";
 import { DiceCentralReveal } from "@/components/dice/DiceCentralReveal";
 import { MoveConfirmBar } from "./MoveConfirmBar";
 import { RadialMenu } from "@/components/shared/radial-menu";
+import { useRadialMenuStore } from "@/lib/radial-menu-store";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -105,11 +106,38 @@ export function PlayerViewLayout() {
       {/* Alerta central de confirmação de movimento (click-to-request) */}
       <MoveConfirmBar />
 
-      {/* Radial menu — short tap em token. Callbacks stub (Prompt 2). */}
+      {/* Radial menu — short tap em token. */}
       <RadialMenu
         onSelect={(id) => {
-          // TODO(prompt-2): ligar com handlers reais
-          console.info("[RadialMenu:player]", id);
+          const target = useRadialMenuStore.getState().target;
+          if (!target) return;
+          const pv = usePlayerViewStore.getState();
+
+          switch (id) {
+            case "attack":
+            case "inspect":
+              // Ficha do alvo (mesma aba "ficha" renderiza PlayerTargetTab
+              // quando targetTokenId está setado).
+              pv.setTargetTokenId(target.tokenId);
+              pv.setActiveTab("ficha");
+              pv.setPanelVisible(true);
+              break;
+            case "converse":
+              pv.setActiveTab("chat");
+              pv.setPanelVisible(true);
+              break;
+            case "test":
+              pv.setActiveTab("dados");
+              pv.setPanelVisible(true);
+              break;
+            case "move_to": {
+              // Player stageia movimento até a célula do alvo (GM aprova
+              // via MoveApprovalDialog). Se o alvo não está visível, ignora.
+              const t = pv.visibleTokens.find((v) => v.id === target.tokenId);
+              if (t) pv.stageMove(t.x, t.y);
+              break;
+            }
+          }
         }}
       />
 
