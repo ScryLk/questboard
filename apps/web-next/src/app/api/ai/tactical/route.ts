@@ -1,24 +1,25 @@
 import { generateText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { TACTICAL_PROMPT } from "@/lib/ai-prompts";
 import { buildBattlefieldContext } from "@/lib/ai-utils";
 import type { TacticalRequest } from "@/lib/ai-types";
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY não configurada no servidor" },
+      { error: "GEMINI_API_KEY não configurada no servidor" },
       { status: 500 },
     );
   }
+  const google = createGoogleGenerativeAI({ apiKey });
 
   const body: TacticalRequest = await req.json();
 
   const battlefieldContext = buildBattlefieldContext(body);
 
   const { text } = await generateText({
-    model: anthropic("claude-haiku-4-5-20251001"),
+    model: google("gemini-2.5-flash"),
     system: TACTICAL_PROMPT,
     prompt: battlefieldContext,
     maxOutputTokens: 1024,

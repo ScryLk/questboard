@@ -1,15 +1,16 @@
 import { streamText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { NPC_GENERATOR_PROMPT } from "@/lib/ai-prompts";
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY não configurada no servidor" },
+      { error: "GEMINI_API_KEY não configurada no servidor" },
       { status: 500 },
     );
   }
+  const google = createGoogleGenerativeAI({ apiKey });
 
   const { prompt } = await req.json();
   if (!prompt || typeof prompt !== "string") {
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: google("gemini-2.5-flash"),
     system: NPC_GENERATOR_PROMPT,
     prompt: `Gere um NPC de D&D 5e baseado nesta descrição: "${prompt}"`,
     maxOutputTokens: 4096,

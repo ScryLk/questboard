@@ -19,9 +19,12 @@ import {
   X,
 } from "lucide-react";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
+import { useMemo } from "react";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 const CAMPAIGN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/campaigns", label: "Campanhas", icon: Castle },
   { href: "/maps", label: "Mapas", icon: Map },
   { href: "/story", label: "Historia", icon: BookOpen },
   { href: "/objects", label: "Objetos", icon: Package },
@@ -118,21 +121,11 @@ function SidebarContent({
         {/* Divider */}
         <div className="my-4 h-px bg-brand-border" />
 
-        {/* Campaigns list */}
+        {/* Campaigns list — top 5 ativas da store. Clique abre overview. */}
         <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-muted">
           Campanhas
         </p>
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-3 rounded-[10px] bg-white/5 px-3 py-2.5 text-sm font-medium text-brand-text">
-            <Castle className="h-[18px] w-[18px] text-brand-accent" />
-            <span className="flex-1 truncate">A Maldicao de Strahd</span>
-            <span className="h-2 w-2 rounded-full bg-brand-success" />
-          </div>
-          <button className="flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text">
-            <Plus className="h-[18px] w-[18px]" />
-            <span>Nova Campanha</span>
-          </button>
-        </div>
+        <SidebarCampaignList pathname={pathname} />
       </div>
 
       {/* Admin Link */}
@@ -164,6 +157,51 @@ function SidebarContent({
         </div>
       </div>
     </>
+  );
+}
+
+function SidebarCampaignList({ pathname }: { pathname: string }) {
+  // Selector retorna referência estável de `campaigns`; filtragem em
+  // useMemo pra não quebrar getSnapshot/getServerSnapshot (filter cria
+  // array novo a cada call → loop infinito).
+  const campaigns = useCampaignStore((s) => s.campaigns);
+  const top = useMemo(
+    () => campaigns.filter((c) => c.status === "active").slice(0, 5),
+    [campaigns],
+  );
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {top.map((c) => {
+        const isActive = pathname === `/campaigns/${c.id}`;
+        return (
+          <Link
+            key={c.id}
+            href={`/campaigns/${c.id}`}
+            className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-white/5 text-brand-text"
+                : "text-brand-muted hover:bg-white/5 hover:text-brand-text"
+            }`}
+          >
+            <Castle
+              className={`h-[18px] w-[18px] ${
+                isActive ? "text-brand-accent" : "text-brand-muted"
+              }`}
+            />
+            <span className="flex-1 truncate">{c.name}</span>
+            <span className="h-2 w-2 rounded-full bg-brand-success" />
+          </Link>
+        );
+      })}
+      <Link
+        href="/campaigns/new"
+        className="flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
+      >
+        <Plus className="h-[18px] w-[18px]" />
+        <span>Nova Campanha</span>
+      </Link>
+    </div>
   );
 }
 

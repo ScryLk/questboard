@@ -9,3 +9,4 @@ export * from "./object-sprites";
 export * from "./radial-menu";
 export * from "./audio";
 export * from "./combat";
+export * from "./campaigns";
