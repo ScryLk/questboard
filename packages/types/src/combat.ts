@@ -140,3 +140,102 @@ export interface HealingResult {
   amount: number;
   overheal: number;
 }
+
+// ── Attack & Damage (sistema completo do prompt 5.x) ──
+//
+// Co-existe com os tipos legacy acima (DamageRoll, AttackResult, etc.)
+// que servem ao animation engine do combate. Estes daqui modelam o
+// fluxo completo de "rolar ataque + dano + aplicar HP" e correspondem
+// ao schema Prisma `Attack` + `AttackResult` (quando o backend existir).
+//
+// "true" é dano puro sem tipo — usado por padrão quando GM não quer
+// classificar.
+
+export type AttackDamageType =
+  | "true"
+  | "slashing"
+  | "piercing"
+  | "bludgeoning"
+  | "fire"
+  | "cold"
+  | "lightning"
+  | "thunder"
+  | "acid"
+  | "poison"
+  | "psychic"
+  | "necrotic"
+  | "radiant"
+  | "force";
+
+export type AttackAdvantage = "NORMAL" | "ADVANTAGE" | "DISADVANTAGE";
+
+/** Modo de rolagem do ataque: digital (servidor + animação) ou manual
+ *  (jogador rolou fisicamente e digita o resultado). Não confundir com
+ *  `DiceRollMode` em `chat.ts` (PUBLIC/GM_ONLY/SELF — escopo da rolagem). */
+export type AttackMode = "DIGITAL" | "MANUAL";
+
+/** Resultado por alvo de um ataque executado. */
+export interface AttackTargetResult {
+  id: string;
+  attackId: string;
+  targetTokenId: string;
+  /** CA do alvo no momento do ataque (snapshot). */
+  targetAc: number | null;
+
+  /** Dados rolados no d20 antes de aplicar advantage/disadvantage. */
+  d20Rolls: number[];
+  /** Valor escolhido (max em ADVANTAGE, min em DISADVANTAGE). */
+  d20Final: number;
+  /** d20Final + attackBonus. */
+  totalAttack: number;
+  isCrit: boolean;
+  isFumble: boolean;
+  hit: boolean;
+
+  /** null quando errou. */
+  damageRolls: number[] | null;
+  damageBonus: number | null;
+  damageTotal: number | null;
+
+  /** Quando o dano foi aplicado ao HP do alvo (null se ainda pendente). */
+  appliedAt: Date | null;
+  appliedDamage: number | null;
+}
+
+export interface AttackRecord {
+  id: string;
+  sessionId: string;
+  attackerTokenId: string;
+  /** Quem disparou (GM ou PLAYER dono do atacante). */
+  attackerUserId: string;
+  attackName: string;
+  attackBonus: number;
+  damageNotation: string;
+  damageType: AttackDamageType;
+  advantage: AttackAdvantage;
+  /** Mínimo de d20 natural pra crítico (20 default; 19 em armas T20). */
+  critRangeMin: number;
+  mode: AttackMode;
+  createdAt: Date;
+}
+
+export interface AttackWithResults extends AttackRecord {
+  results: AttackTargetResult[];
+}
+
+/** Configuração mandada pro client renderizar a animação 3D dos dados.
+ *  `skip: true` é usado em modo MANUAL — sem animação. */
+export type AttackDiceConfig =
+  | { skip: true }
+  | {
+      skip?: false;
+      damageType: AttackDamageType;
+      results: Array<{
+        targetTokenId: string;
+        d20Rolls: number[];
+        damageRolls: number[];
+        damageSides: number;
+        isCrit: boolean;
+        isFumble: boolean;
+      }>;
+    };

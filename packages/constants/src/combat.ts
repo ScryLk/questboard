@@ -88,3 +88,76 @@ export const COMBAT_SHORTCUTS = {
   ROLL_ALL_INITIATIVE: "i",
   END_COMBAT: "r",
 } as const;
+
+// ── Attack & Damage ──
+
+import type { AttackDamageType } from "@questboard/types";
+
+/** Limite de alvos por ataque — bola de fogo cabe. */
+export const MAX_TARGETS_PER_ATTACK = 8;
+
+/** Limite máximo de dados num único termo (anti-abuso). 20d6 = ok, 21d6 = não. */
+export const ATTACK_DICE_MAX = 20;
+
+export const ATTACK_BONUS_RANGE = { min: -10, max: 30 } as const;
+
+/** CA assumida quando o token não tem `armorClass` setada. */
+export const DEFAULT_AC = 10;
+
+/** Notação simples (1 termo + bônus): aceita "2d6+3", "1d20", "1d8-1". */
+export const DAMAGE_NOTATION_REGEX =
+  /^(\d{1,2})d(4|6|8|10|12|20|100)([+-]\d{1,3})?$/;
+
+/** Notação composta: aceita múltiplos termos somados — "2d6+1d4+3". */
+export const COMPLEX_NOTATION_REGEX =
+  /^(\d{1,2}d(4|6|8|10|12|20|100)([+-]\d{1,3})?)(\s*\+\s*\d{1,2}d(4|6|8|10|12|20|100)([+-]\d{1,3})?)*$/;
+
+/** Duração total da animação 3D dos dados (ms). */
+export const DICE_PHYSICS_DURATION_MS = 2200;
+
+/** Pausa adicional entre fim da rolagem e revelar resultado/aplicar HP. */
+export const DICE_FREEZE_BEFORE_RESULT_MS = 200;
+
+/** Range válido pro critRangeMin (T20 permite 19+ em armas específicas). */
+export const CRIT_RANGE = { min: 15, max: 20 } as const;
+
+// ── Visual: temas dos dados (ver Questboard attack damage visual theme.md) ──
+
+/** Tema usado no d20 de ataque — sempre cyan, independente de tipo de dano. */
+export const ATTACK_DICE_THEME = "questboard-crystal-cyan";
+
+/** Mapeia tipo de dano → tema do dado. Determina cor do cristal na animação. */
+export const DAMAGE_TYPE_TO_DICE_THEME: Record<AttackDamageType, string> = {
+  true: "questboard-crystal-fuchsia",
+  bludgeoning: "questboard-crystal-fuchsia",
+  slashing: "questboard-crystal-fuchsia",
+  piercing: "questboard-crystal-fuchsia",
+  fire: "questboard-crystal-amber",
+  cold: "questboard-crystal-blue",
+  lightning: "questboard-crystal-violet",
+  thunder: "questboard-crystal-violet",
+  acid: "questboard-crystal-lime",
+  poison: "questboard-crystal-lime",
+  psychic: "questboard-crystal-fuchsia",
+  necrotic: "questboard-crystal-slate",
+  radiant: "questboard-crystal-gold",
+  force: "questboard-crystal-cyan",
+};
+
+/** Labels pt-BR dos tipos de dano (UI: select + chat card). */
+export const DAMAGE_TYPE_LABELS: Record<AttackDamageType, string> = {
+  true: "Puro",
+  bludgeoning: "Contundente",
+  slashing: "Cortante",
+  piercing: "Perfurante",
+  fire: "Fogo",
+  cold: "Gelo",
+  lightning: "Elétrico",
+  thunder: "Trovejante",
+  acid: "Ácido",
+  poison: "Veneno",
+  psychic: "Psíquico",
+  necrotic: "Necrótico",
+  radiant: "Radiante",
+  force: "Força",
+};

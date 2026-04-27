@@ -111,6 +111,9 @@ importers:
 
   apps/web-next:
     dependencies:
+      '@3d-dice/dice-box':
+        specifier: ^1.1.4
+        version: 1.1.4(babylonjs-gltf2interface@5.57.1)
       '@ai-sdk/anthropic':
         specifier: ^3.0.58
         version: 3.0.58(zod@3.25.76)
@@ -132,6 +135,9 @@ importers:
       '@questboard/constants':
         specifier: workspace:*
         version: link:../../packages/constants
+      '@questboard/game-engine':
+        specifier: workspace:*
+        version: link:../../packages/game-engine
       '@questboard/socket':
         specifier: workspace:*
         version: link:../../packages/socket
@@ -389,6 +395,9 @@ importers:
 
 packages:
 
+  '@3d-dice/dice-box@1.1.4':
+    resolution: {integrity: sha512-W8evh0LlCx/sorPS00cGZJO+/3I8g5eMfDqFAKAIUXF+/XVTP06bhgHSNFOCvLzWbdbEJX5za9QxB0ulDvfxyA==}
+
   '@ai-sdk/anthropic@3.0.58':
     resolution: {integrity: sha512-/53SACgmVukO4bkms4dpxpRlYhW8Ct6QZRe6sj1Pi5H00hYhxIrqfiLbZBGxkdRvjsBQeP/4TVGsXgH5rQeb8Q==}
     engines: {node: '>=18'}
@@ -593,6 +602,20 @@ packages:
   '@aws/lambda-invoke-store@0.2.3':
     resolution: {integrity: sha512-oLvsaPMTBejkkmHhjf09xTgk71mOqyr/409NKhRIL08If7AhVfUsJhVsx386uJaqNd42v9kWamQ9lFbkoC2dYw==}
     engines: {node: '>=18.0.0'}
+
+  '@babylonjs/core@5.57.1':
+    resolution: {integrity: sha512-k8U+SFPVGvHgeNr651nxZL26iVCmTzjmRrdbQa0BGas+lg8PIV/tfhN4uTeWWQeRFLvjbkcHA5qD8x/Xk3EpMQ==}
+
+  '@babylonjs/loaders@5.57.1':
+    resolution: {integrity: sha512-DHk0iOwJgnTcj8vI+cQVzpiUvWGJvYqWyZxsf7nzhbeND+ZwNWSG0AelaGbGHpWTaDSd/DjUcoWVZuT4Cg6/Xg==}
+    peerDependencies:
+      '@babylonjs/core': ^5.22.0
+      babylonjs-gltf2interface: ^5.22.0
+
+  '@babylonjs/materials@5.57.1':
+    resolution: {integrity: sha512-NLdR6eGUr+wFqie937HRWsnaWPeECpjOrYDGvjjYDg08VAcIC3YyctAuQxv8rId7BoDttkUd8Ey/IZ5d/9H7GA==}
+    peerDependencies:
+      '@babylonjs/core': ^5.22.0
 
   '@clerk/backend@3.0.1':
     resolution: {integrity: sha512-U5E+KpNlFlaJRdpOoOltIV8o1YjTWw5affsugEb/kIvGceSP6SzvNEBr/TnCY+2yu87Vq22ShEycpQBlse2Bkw==}
@@ -2251,6 +2274,9 @@ packages:
   avvio@9.2.0:
     resolution: {integrity: sha512-2t/sy01ArdHHE0vRH5Hsay+RtCZt3dLPji7W7/MMOCEgze5b7SNDC4j5H6FnVgPkI1MTNFGzHdHrVXDDl7QSSQ==}
 
+  babylonjs-gltf2interface@5.57.1:
+    resolution: {integrity: sha512-RZnaKfJ6Q/AYLdIjBYMRxCW/HPEC8jabAL1U8wJ0KVziw6NSbSV6S80S22fUCPTyaZ7nCekn1TYg1IPmJ/eA6w==}
+
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
 
@@ -2364,6 +2390,9 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  copy-dir@1.3.0:
+    resolution: {integrity: sha512-Q4+qBFnN4bwGwvtXXzbp4P/4iNk0MaiGAzvQ8OiMtlLjkIKjmNN689uVzShSM0908q7GoFHXIPx4zi75ocoaHw==}
 
   cors@2.8.6:
     resolution: {integrity: sha512-tJtZBBHA6vjIAaF6EnIaq6laBBP9aq/Y3ouVJjEfoHbRBcHBAHYcMh/w8LDrk2PvIMMq8gmopa5D4V8RmbrxGw==}
@@ -3813,6 +3842,16 @@ packages:
 
 snapshots:
 
+  '@3d-dice/dice-box@1.1.4(babylonjs-gltf2interface@5.57.1)':
+    dependencies:
+      '@babylonjs/core': 5.57.1
+      '@babylonjs/loaders': 5.57.1(@babylonjs/core@5.57.1)(babylonjs-gltf2interface@5.57.1)
+      '@babylonjs/materials': 5.57.1(@babylonjs/core@5.57.1)
+      copy-dir: 1.3.0
+      node-abort-controller: 3.1.1
+    transitivePeerDependencies:
+      - babylonjs-gltf2interface
+
   '@ai-sdk/anthropic@3.0.58(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
@@ -4312,6 +4351,17 @@ snapshots:
       tslib: 2.8.1
 
   '@aws/lambda-invoke-store@0.2.3': {}
+
+  '@babylonjs/core@5.57.1': {}
+
+  '@babylonjs/loaders@5.57.1(@babylonjs/core@5.57.1)(babylonjs-gltf2interface@5.57.1)':
+    dependencies:
+      '@babylonjs/core': 5.57.1
+      babylonjs-gltf2interface: 5.57.1
+
+  '@babylonjs/materials@5.57.1(@babylonjs/core@5.57.1)':
+    dependencies:
+      '@babylonjs/core': 5.57.1
 
   '@clerk/backend@3.0.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
@@ -5825,6 +5875,8 @@ snapshots:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
 
+  babylonjs-gltf2interface@5.57.1: {}
+
   balanced-match@1.0.2: {}
 
   base64-js@1.5.1: {}
@@ -5947,6 +5999,8 @@ snapshots:
   cookie@0.7.2: {}
 
   cookie@1.1.1: {}
+
+  copy-dir@1.3.0: {}
 
   cors@2.8.6:
     dependencies:

@@ -40,6 +40,8 @@ import { RadialMenu } from "@/components/shared/radial-menu";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
 import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
+import { AttackFlowModal } from "@/components/gameplay/combat/attack-flow-modal";
+import { useAttackStore } from "@/lib/attack-store";
 
 
 export function GameplayLayout() {
@@ -212,11 +214,24 @@ export function GameplayLayout() {
           if (!gp.rightPanelOpen) gp.toggleRightPanel();
 
           switch (id) {
-            case "attack":
+            case "attack": {
+              // Atacante: turno atual (se combate ativo), senão token
+              // selecionado pelo GM, senão o próprio alvo (auto-ataque
+              // — válido em mock/teste; servidor pode bloquear depois).
+              const currentTurnTokenId = gp.combat.active
+                ? gp.combat.order[gp.combat.turnIndex]?.tokenId
+                : null;
+              const attackerId =
+                currentTurnTokenId ??
+                gp.selectedTokenIds[0] ??
+                target.tokenId;
+              useAttackStore.getState().openModal({
+                attackerTokenId: attackerId,
+                targetTokenIds: [target.tokenId],
+              });
+              return;
+            }
             case "inspect":
-              // Alvo (HP, defesa, condições, ataques). Attack e inspect
-              // compartilham surface; attack vai priorizar o bloco Ataques
-              // quando essa feature existir (TODO).
               gp.setRightTab("sheet");
               break;
             case "converse":
@@ -240,6 +255,9 @@ export function GameplayLayout() {
 
       {/* OA dramatic vignette */}
       <OAAlertVignette active={pendingReaction !== null} />
+
+      {/* Modal de ataque — escuta useAttackStore */}
+      <AttackFlowModal />
 
       {/* Badge de identidade dev (apenas NODE_ENV=development) */}
       <DevIdentityBadge />

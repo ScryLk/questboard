@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { COMBAT_CONDITION_IDS } from "@questboard/constants";
+import {
+  COMBAT_CONDITION_IDS,
+  COMPLEX_NOTATION_REGEX,
+  MAX_TARGETS_PER_ATTACK,
+  ATTACK_BONUS_RANGE,
+  CRIT_RANGE,
+} from "@questboard/constants";
 
 // ── Primitivos ──
 
@@ -261,3 +267,118 @@ export type CombatDuplicateParticipantInput = z.infer<typeof combatDuplicatePart
 export type CombatMarkActedInput = z.infer<typeof combatMarkActedSchema>;
 export type CombatConditionUpdatedInput = z.infer<typeof combatConditionUpdatedSchema>;
 export type CombatHpChangeInput = z.infer<typeof combatHpChangeSchema>;
+
+// ── Attack & Damage (Questboard attack damage prompt §4.1) ──
+
+export const attackAdvantageSchema = z.enum([
+  "NORMAL",
+  "ADVANTAGE",
+  "DISADVANTAGE",
+]);
+
+export const attackModeSchema = z.enum(["DIGITAL", "MANUAL"]);
+
+export const attackDamageTypeSchema = z.enum([
+  "true",
+  "slashing",
+  "piercing",
+  "bludgeoning",
+  "fire",
+  "cold",
+  "lightning",
+  "thunder",
+  "acid",
+  "poison",
+  "psychic",
+  "necrotic",
+  "radiant",
+  "force",
+]);
+
+const damageNotationSchema = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(COMPLEX_NOTATION_REGEX, {
+    message:
+      "Notação inválida. Use formato como 1d8+3 ou 2d6+1d4+2 (faces 4/6/8/10/12/20/100).",
+  });
+
+const manualResultSchema = z.object({
+  targetTokenId: z.string().min(1),
+  /** d20 que o jogador rolou fisicamente. */
+  d20Final: z.number().int().min(1).max(20).optional(),
+  /** GM/jogador decide acerto. */
+  hit: z.boolean(),
+  /** Dano total digitado (null se errou). */
+  damageTotal: z.number().int().min(0).max(999).optional(),
+});
+
+export const attackInputSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    attackerTokenId: z.string().min(1),
+    targetTokenIds: z
+      .array(z.string().min(1))
+      .min(1, "Selecione ao menos um alvo")
+      .max(
+        MAX_TARGETS_PER_ATTACK,
+        `Máximo de ${MAX_TARGETS_PER_ATTACK} alvos por ataque`,
+      ),
+    attackName: z.string().min(1, "Nome obrigatório").max(60),
+    attackBonus: z
+      .number()
+      .int()
+      .min(ATTACK_BONUS_RANGE.min, "Bônus muito baixo")
+      .max(ATTACK_BONUS_RANGE.max, "Bônus muito alto"),
+    damageNotation: damageNotationSchema,
+    damageType: attackDamageTypeSchema.default("true"),
+    advantage: attackAdvantageSchema.default("NORMAL"),
+    critRangeMin: z
+      .number()
+      .int()
+      .min(CRIT_RANGE.min)
+      .max(CRIT_RANGE.max)
+      .default(20),
+    mode: attackModeSchema.default("DIGITAL"),
+    /** Apenas se mode=MANUAL — uma entrada por alvo, mesma ordem de targetTokenIds. */
+    manualResults: z.array(manualResultSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode === "MANUAL") {
+      if (
+        !data.manualResults ||
+        data.manualResults.length !== data.targetTokenIds.length
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["manualResults"],
+          message: "Modo manual exige resultado para cada alvo.",
+        });
+        return;
+      }
+      // Cada manualResult.targetTokenId precisa bater com um targetTokenId.
+      const targetSet = new Set(data.targetTokenIds);
+      for (const m of data.manualResults) {
+        if (!targetSet.has(m.targetTokenId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["manualResults"],
+            message: `Resultado manual para token desconhecido: ${m.targetTokenId}`,
+          });
+        }
+        if (m.hit && (m.damageTotal === undefined || m.damageTotal === null)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["manualResults"],
+            message: "Dano obrigatório quando o ataque acerta.",
+          });
+        }
+      }
+    }
+  });
+
+export type AttackInput = z.infer<typeof attackInputSchema>;
+export type AttackManualResult = z.infer<typeof manualResultSchema>;
+export type AttackAdvantageInput = z.infer<typeof attackAdvantageSchema>;
+export type AttackDamageTypeInput = z.infer<typeof attackDamageTypeSchema>;
