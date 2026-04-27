@@ -1,3 +1,5 @@
+"use client";
+
 import {
   AlertTriangle,
   Calendar,
@@ -13,6 +15,8 @@ import {
   formatRelativeDatePtBR,
   formatAbsoluteDatePtBR,
 } from "@/lib/relative-date";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 
 // ═════════════════════════════════════════════════════════════════
 // MOCK — enquanto o web-next não consome a API.
@@ -208,6 +212,14 @@ function StatusBadge({ status }: { status: Status }) {
 // ═════════════════════════════════════════════════════════════════
 
 export default function PlayersPage() {
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="jogadores" />;
+  }
+
+  // TODO(per-campaign): substituir MEMBERS hardcoded por
+  // activeCampaign.members + dados reais de presence/attention quando
+  // backend existir. Por ora renderiza o mock visual.
   const masters = MEMBERS.filter((m) => m.role === "GM" || m.role === "CO_GM");
   const players = MEMBERS.filter(
     (m) => m.role === "PLAYER" || m.role === "SPECTATOR",

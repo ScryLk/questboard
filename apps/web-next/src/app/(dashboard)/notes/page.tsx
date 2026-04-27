@@ -1,4 +1,8 @@
+"use client";
+
 import { StickyNote, Plus, Search } from "lucide-react";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 
 const NOTES = [
   { id: "1", title: "Pistas sobre a Cripta", category: "plot", content: "Os jogadores encontraram 3 pistas...", updatedAt: "2h atrás", isGmOnly: true },
@@ -24,6 +28,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function NotesPage() {
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="notas" />;
+  }
+  // TODO(per-campaign): filtrar NOTES por campaignId.
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">

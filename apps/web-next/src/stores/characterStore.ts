@@ -3,6 +3,14 @@ import { persist } from "zustand/middleware";
 import type { CampaignCharacter, CharacterStats } from "@/types/character";
 import { MOCK_CHARACTERS } from "@/lib/character-mock-data-campaign";
 
+// Mock seed: associa todos os characters legados à campanha Strahd
+// pra que o filtro por activeCampaignId tenha conteúdo. Quando o
+// backend existir, cada character já vem com createdByCampaignId real.
+const SEEDED_CHARACTERS: CampaignCharacter[] = MOCK_CHARACTERS.map((c) => ({
+  ...c,
+  createdByCampaignId: c.createdByCampaignId ?? "camp_seed_strahd",
+}));
+
 function generateId(): string {
   return `char_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -83,7 +91,7 @@ interface CharacterStoreState {
 export const useCharacterStore = create<CharacterStoreState>()(
   persist(
     (set, get) => ({
-      characters: MOCK_CHARACTERS,
+      characters: SEEDED_CHARACTERS,
       characterTokenMap: {},
 
       createCharacter: (c) =>

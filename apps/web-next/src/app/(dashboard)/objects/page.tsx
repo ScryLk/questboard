@@ -8,10 +8,14 @@ import { ObjectCard } from "@/components/objects/object-card";
 import { ObjectEditorModal } from "@/components/gameplay/modals/object-editor/object-editor-modal";
 import type { ObjectCategory } from "@/types/object";
 import { CATEGORY_CONFIG } from "@/types/object";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 
 type CategoryFilter = ObjectCategory | "all";
 
 export default function ObjectsPage() {
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+
   const objects = useObjectStore((s) => s.objects);
   const deleteObject = useObjectStore((s) => s.deleteObject);
   const duplicateObject = useObjectStore((s) => s.duplicateObject);
@@ -65,6 +69,11 @@ export default function ObjectsPage() {
 
   const sceneryCount = objects.filter((o) => o.category === "scenery").length;
   const itemCount = objects.filter((o) => o.category === "item").length;
+
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="objetos" />;
+  }
+  // TODO(per-campaign): filtrar objects por campaignId.
 
   return (
     <div className="space-y-6">

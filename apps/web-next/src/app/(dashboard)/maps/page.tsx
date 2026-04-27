@@ -14,6 +14,8 @@ import { ImportMapModal } from "@/components/maps/import-map-modal";
 import { ExportMapModal } from "@/components/maps/export-map-modal";
 import { CreateCollectionDialog } from "@/components/maps/create-collection-dialog";
 import { MoveToCollectionDialog } from "@/components/maps/move-to-collection-dialog";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 
 type SortBy = "recent" | "name" | "size";
 
@@ -33,6 +35,8 @@ const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 ];
 
 export default function MapsPage() {
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+
   const router = useRouter();
   const maps = useMapLibraryStore((s) => s.maps);
   const _migrated = useMapLibraryStore((s) => s._migrated);
@@ -208,6 +212,12 @@ export default function MapsPage() {
       </div>
     );
   }
+
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="mapas" />;
+  }
+  // TODO(per-campaign): filtrar `allMaps` por campaignId quando o
+  // entity ganhar esse campo. Por ora exibe todos.
 
   const hasAnyCollection = visibleCollections.length > 0;
 

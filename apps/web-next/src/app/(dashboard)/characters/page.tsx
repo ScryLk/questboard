@@ -7,9 +7,11 @@ import {
   createDefaultCharacter,
 } from "@/stores/characterStore";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import { CharacterCard } from "@/components/characters/character-card";
 import { CharacterEditorModal } from "@/components/gameplay/modals/character-editor/character-editor-modal";
 import { GenerateCharacterAIDialog } from "@/components/characters/generate-character-ai-dialog";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 import type { CharacterCategory } from "@/types/character";
 import { CHAR_CATEGORY_CONFIG } from "@/types/character";
 
@@ -41,8 +43,19 @@ export default function CharactersPage() {
     setCharacterEditorTarget(null);
   }
 
+  // Escopo: só personagens da campanha ativa. Sem ativa → empty global.
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+
+  const scopedCharacters = useMemo(
+    () =>
+      activeCampaignId
+        ? characters.filter((c) => c.createdByCampaignId === activeCampaignId)
+        : [],
+    [characters, activeCampaignId],
+  );
+
   const filteredCharacters = useMemo(() => {
-    let list = characters;
+    let list = scopedCharacters;
 
     if (categoryFilter !== "all") {
       list = list.filter((c) => c.category === categoryFilter);
@@ -66,12 +79,16 @@ export default function CharactersPage() {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
       return a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [characters, categoryFilter, search, favoritesOnly]);
+  }, [scopedCharacters, categoryFilter, search, favoritesOnly]);
 
-  const npcCount = characters.filter((c) => c.category === "npc").length;
-  const creatureCount = characters.filter(
+  const npcCount = scopedCharacters.filter((c) => c.category === "npc").length;
+  const creatureCount = scopedCharacters.filter(
     (c) => c.category === "creature",
   ).length;
+
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="personagens" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -82,8 +99,8 @@ export default function CharactersPage() {
             Personagens da Campanha
           </h1>
           <p className="mt-1 text-sm text-gray-400">
-            {characters.length} personagens · {npcCount} NPCs · {creatureCount}{" "}
-            criaturas
+            {scopedCharacters.length} personagens · {npcCount} NPCs ·{" "}
+            {creatureCount} criaturas
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -11,6 +11,8 @@ import {
   Swords,
 } from "lucide-react";
 import { useStoryStore, type StoryView } from "@/stores/storyStore";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 import { calcCampaignProgress } from "@/types/story";
 import { RoadmapView } from "@/components/story/roadmap-view";
 import { KanbanView } from "@/components/story/kanban-view";
@@ -32,6 +34,8 @@ const VIEW_TABS: { key: StoryView; label: string; icon: typeof GitBranch }[] = [
 ];
 
 export default function StoryPage() {
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+
   const arcs = useStoryStore((s) => s.arcs);
   const view = useStoryStore((s) => s.view);
   const setView = useStoryStore((s) => s.setView);
@@ -48,6 +52,12 @@ export default function StoryPage() {
   }
 
   const isBranching = view === "branching";
+
+  if (!activeCampaignId) {
+    return <NoActiveCampaignEmpty entityLabel="arcos da história" />;
+  }
+  // TODO(per-campaign): filtrar arcs por campaignId quando o entity
+  // ganhar esse campo no storyStore.
 
   return (
     <div className={isBranching ? "flex h-[calc(100vh-80px)] flex-col" : "space-y-6"}>
