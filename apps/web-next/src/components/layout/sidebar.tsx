@@ -16,15 +16,16 @@ import {
   Castle,
   Plus,
   ShieldAlert,
+  Info,
   X,
 } from "lucide-react";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
 import { useMemo } from "react";
 import { useCampaignStore } from "@/lib/campaign-store";
+import { useCampaignModalsStore } from "@/lib/campaign-modals-store";
 
 const CAMPAIGN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/campaigns", label: "Campanhas", icon: Castle },
   { href: "/maps", label: "Mapas", icon: Map },
   { href: "/story", label: "Historia", icon: BookOpen },
   { href: "/objects", label: "Objetos", icon: Package },
@@ -165,43 +166,73 @@ function SidebarCampaignList({ pathname }: { pathname: string }) {
   // useMemo pra não quebrar getSnapshot/getServerSnapshot (filter cria
   // array novo a cada call → loop infinito).
   const campaigns = useCampaignStore((s) => s.campaigns);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
   const top = useMemo(
     () => campaigns.filter((c) => c.status === "active").slice(0, 5),
     [campaigns],
   );
 
+  const openSettings = useCampaignModalsStore((s) => s.openSettings);
+  const openPreview = useCampaignModalsStore((s) => s.openPreview);
+
   return (
-    <div className="flex flex-col gap-0.5">
-      {top.map((c) => {
-        const isActive = pathname === `/campaigns/${c.id}`;
-        return (
-          <Link
-            key={c.id}
-            href={`/campaigns/${c.id}`}
-            className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-white/5 text-brand-text"
-                : "text-brand-muted hover:bg-white/5 hover:text-brand-text"
-            }`}
-          >
-            <Castle
-              className={`h-[18px] w-[18px] ${
-                isActive ? "text-brand-accent" : "text-brand-muted"
+    <>
+      <div className="flex flex-col gap-0.5">
+        {top.map((c) => {
+          // Pathname tem prefixos diversos (overview, settings, members) —
+          // qualquer um marca a campanha como "em foco" visualmente.
+          const inRoute = pathname.startsWith(`/campaigns/${c.id}`);
+          const isActive = activeCampaignId === c.id;
+          return (
+            <div
+              key={c.id}
+              className={`group flex items-center gap-1 rounded-[10px] pr-1 transition-colors ${
+                inRoute ? "bg-white/5" : "hover:bg-white/5"
               }`}
-            />
-            <span className="flex-1 truncate">{c.name}</span>
-            <span className="h-2 w-2 rounded-full bg-brand-success" />
-          </Link>
-        );
-      })}
-      <Link
-        href="/campaigns/new"
-        className="flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
-      >
-        <Plus className="h-[18px] w-[18px]" />
-        <span>Nova Campanha</span>
-      </Link>
-    </div>
+            >
+              <button
+                onClick={() => openPreview(c.id)}
+                className={`flex min-w-0 flex-1 items-center gap-3 rounded-l-[10px] px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  inRoute
+                    ? "text-brand-text"
+                    : "text-brand-muted group-hover:text-brand-text"
+                }`}
+                title={c.name}
+              >
+                <Castle
+                  className={`h-[18px] w-[18px] shrink-0 ${
+                    inRoute ? "text-brand-accent" : "text-brand-muted"
+                  }`}
+                />
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {isActive && (
+                  <span
+                    className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-brand-gold"
+                    title="Campanha ativa"
+                    aria-label="Campanha ativa"
+                  />
+                )}
+              </button>
+              <button
+                onClick={() => openSettings(c.id)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-brand-muted transition-colors hover:bg-white/10 hover:text-brand-text"
+                aria-label={`Configurações de ${c.name}`}
+                title="Configurações"
+              >
+                <Info className="h-[14px] w-[14px]" />
+              </button>
+            </div>
+          );
+        })}
+        <Link
+          href="/campaigns/new"
+          className="flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
+        >
+          <Plus className="h-[18px] w-[18px]" />
+          <span>Nova Campanha</span>
+        </Link>
+      </div>
+    </>
   );
 }
 

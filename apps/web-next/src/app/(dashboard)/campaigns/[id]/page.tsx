@@ -24,6 +24,8 @@ import {
   Users,
 } from "lucide-react";
 import { useCampaignStore } from "@/lib/campaign-store";
+import { useCampaignModalsStore } from "@/lib/campaign-modals-store";
+import { CampaignSubNav } from "@/components/campaigns/campaign-subnav";
 import {
   CAMPAIGN_SYSTEMS,
   AGE_RATING_LABELS,
@@ -59,6 +61,7 @@ export default function CampaignOverviewPage(props: {
   const restore = useCampaignStore((s) => s.restoreCampaign);
   const remove = useCampaignStore((s) => s.deleteCampaign);
   const setActive = useCampaignStore((s) => s.setActiveCampaignId);
+  const openSettings = useCampaignModalsStore((s) => s.openSettings);
 
   const [copied, setCopied] = useState(false);
 
@@ -124,6 +127,8 @@ export default function CampaignOverviewPage(props: {
         <ArrowLeft className="h-3 w-3" />
         Campanhas
       </Link>
+
+      <CampaignSubNav campaignId={campaign.id} />
 
       {/* Hero */}
       <div className="overflow-hidden rounded-lg border border-brand-border bg-brand-surface">
@@ -234,17 +239,40 @@ export default function CampaignOverviewPage(props: {
         </p>
       </Section>
 
-      {/* Membros — stub */}
+      {/* Membros — preview com link pra página dedicada */}
       <Section title="Membros">
-        {/* TODO(members-page): página dedicada vem na próxima fatia. */}
-        <p className="text-xs text-brand-muted">
-          A gestão de membros (convidar, mudar role, remover) chega na próxima
-          fatia.
-        </p>
-        <div className="mt-2 flex items-center gap-2 text-[11px] text-brand-muted">
-          <Users className="h-3 w-3" />
-          {campaign.memberCount}{" "}
-          {campaign.memberCount === 1 ? "pessoa" : "pessoas"}
+        <div className="flex items-center gap-3">
+          <div className="flex -space-x-2">
+            {campaign.members.slice(0, 6).map((m) => {
+              const initials = m.displayName
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+              return (
+                <span
+                  key={m.userId}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-brand-surface bg-brand-accent/20 text-[10px] font-bold text-brand-accent"
+                  title={`${m.displayName} · ${m.role}`}
+                >
+                  {initials}
+                </span>
+              );
+            })}
+            {campaign.members.length > 6 && (
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-brand-surface bg-brand-surface-light text-[10px] font-bold text-brand-muted">
+                +{campaign.members.length - 6}
+              </span>
+            )}
+          </div>
+          <Link
+            href={`/campaigns/${campaign.id}/members`}
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-brand-border px-3 py-1.5 text-[11px] font-medium text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+          >
+            <Users className="h-3 w-3" />
+            Gerenciar
+          </Link>
         </div>
       </Section>
 
@@ -286,7 +314,7 @@ export default function CampaignOverviewPage(props: {
       {/* Ações */}
       <div className="flex flex-wrap gap-2 border-t border-brand-border pt-4">
         <button
-          onClick={() => alert("Configurações virão na próxima fatia.")}
+          onClick={() => openSettings(campaign.id)}
           className="flex items-center gap-1.5 rounded-md border border-brand-border px-3 py-2 text-xs font-medium text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
         >
           <Settings className="h-3.5 w-3.5" />

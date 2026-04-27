@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CreateSessionModal } from "@/components/create-session-modal";
+import { CampaignSettingsModal } from "@/components/campaigns/campaign-settings-modal";
+import { CampaignQuickModalHost } from "@/components/campaigns/campaign-quick-modal";
 
 export default function DashboardLayout({
   children,
@@ -24,6 +26,8 @@ export default function DashboardLayout({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
       />
+      <CampaignSettingsModal />
+      <CampaignQuickModalHost />
     </div>
   );
 }

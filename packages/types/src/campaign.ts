@@ -69,6 +69,29 @@ export interface CampaignDetailed {
   // Agregações que o frontend mostra (mock por ora — backend fornecerá depois)
   memberCount: number;
   sessionCount: number;
+
+  /** Lista de membros (incluindo o owner como GM). Backend retornará via
+   *  endpoint /campaigns/:id/members; aqui mantemos in-line por simplicidade
+   *  enquanto frontend-only. */
+  members: CampaignMember[];
+}
+
+// ── Member ──
+
+/** Role canônica do membro de campanha (alinhada com schema.prisma + CLAUDE.md §10).
+ *  Não confundir com `CampaignPlayer.role` legacy abaixo, que tem shape diferente. */
+export type CampaignMemberRole = "GM" | "CO_GM" | "PLAYER" | "SPECTATOR";
+
+export interface CampaignMember {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: CampaignMemberRole;
+  /** Ficha vinculada à campanha (persiste sessão a sessão). */
+  characterId: string | null;
+  joinedAt: Date;
+  /** userId de quem convidou; null se entrou por código. */
+  invitedBy: string | null;
 }
 
 /** Form shape do wizard de criação. Sem id/timestamps/contadores. */
