@@ -1354,20 +1354,29 @@ export function MapCanvas() {
     [activeTool, rulerActive, getGridCell, getMouseEdge, hoverEdge, setHoverCell],
   );
 
-  // Double-click: toggle doors
+  // Double-click: toggle doors. Funciona em qualquer ferramenta —
+  // basta clicar duas vezes na aresta da porta (não precisa estar no
+  // wall tool). Trancada não abre, mostra toast pra ficar claro.
   const handleCanvasDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (activeTool !== "wall") return;
       const edge = getMouseEdge(e);
       if (!edge) return;
       const st = useGameplayStore.getState();
       const wall = st.wallEdges[edge.key];
       if (!wall) return;
-      if (wall.type === "door-closed" || wall.type === "door-open" || wall.type === "door-locked") {
+      if (wall.type === "door-locked") {
+        st.addToast("Porta trancada — destrancar antes de abrir.");
+        return;
+      }
+      if (wall.type === "door-closed") {
         st.toggleDoorEdge(edge.key);
+        st.addToast("Porta aberta");
+      } else if (wall.type === "door-open") {
+        st.toggleDoorEdge(edge.key);
+        st.addToast("Porta fechada");
       }
     },
-    [activeTool, getMouseEdge],
+    [getMouseEdge],
   );
 
   // Keyboard
