@@ -17,3 +17,4 @@ export * from "./feed";
 export * from "./narrative";
 export * from "./search";
 export * from "./dnd5e";
+export * from "./cosmic-horror";

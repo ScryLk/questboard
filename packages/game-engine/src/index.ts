@@ -9,3 +9,4 @@ export * from "./character/index";
 // que queiram só "abilityModifier" sem clash de nomes podem importar
 // direto de `@questboard/game-engine/systems/dnd5e`.
 export * as dnd5e from "./systems/dnd5e/index";
+export * as cosmicHorror from "./systems/cosmic-horror/index";
