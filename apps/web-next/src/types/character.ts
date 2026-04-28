@@ -49,7 +49,14 @@ export interface CharacterStats {
   passivePerception?: number;
   savingThrows?: string[];
   skills?: string[];
+  /** Tipos de dano que o alvo IGNORA (recebe 0). Strings casam com
+   *  `AttackDamageType` quando válidas — entradas livres são ignoradas
+   *  pelo engine de resistências. */
   damageImmunities?: string[];
+  /** Tipos de dano que o alvo recebe pela METADE (truncada). */
+  damageResistances?: string[];
+  /** Tipos de dano que o alvo recebe DOBRADO. */
+  damageVulnerabilities?: string[];
   conditionImmunities?: string[];
   senses?: string;
   languages?: string[];

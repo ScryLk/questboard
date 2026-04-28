@@ -26,6 +26,9 @@ import {
 interface Props {
   config: AttackDiceConfig | null;
   onComplete: () => void;
+  /** Pula animação — mostra resultado direto e dispara `onComplete`
+   *  imediatamente. Honra a setting `dice.animateResult` do usuário. */
+  instant?: boolean;
 }
 
 export interface DieEntry {
@@ -47,7 +50,7 @@ const SPIN_TICK_MS = 60;
 const STAGGER_PER_DIE_MS = 120;
 const SETTLE_DURATION_MS = 250;
 
-export function DiceCanvas({ config, onComplete }: Props) {
+export function DiceCanvas({ config, onComplete, instant = false }: Props) {
   const dice = useMemo(() => {
     if (!config || config.skip) return [] as DieEntry[];
     return buildDice(config);
@@ -69,9 +72,15 @@ export function DiceCanvas({ config, onComplete }: Props) {
     return DAMAGE_TYPE_COLOR[config.damageType] ?? ATTACK_DICE_COLOR;
   }, [config]);
 
-  // Dispara onComplete quando todos os dados pararam.
+  // Dispara onComplete quando todos os dados pararam. Em modo instant
+  // dispara no próximo tick — UI ainda monta brevemente pra mostrar o
+  // resultado, mas o modal pula direto pra "done".
   useEffect(() => {
     if (!config || config.skip || dice.length === 0) return;
+    if (instant) {
+      const t = setTimeout(onComplete, 0);
+      return () => clearTimeout(t);
+    }
     const totalMs =
       STAGGER_PER_DIE_MS * Math.max(0, dice.length - 1) +
       SPIN_DURATION_MS +
@@ -79,7 +88,7 @@ export function DiceCanvas({ config, onComplete }: Props) {
       200;
     const t = setTimeout(onComplete, totalMs);
     return () => clearTimeout(t);
-  }, [config, dice.length, onComplete]);
+  }, [config, dice.length, instant, onComplete]);
 
   return (
     <div
@@ -97,7 +106,12 @@ export function DiceCanvas({ config, onComplete }: Props) {
       {/* Grid de cards (cap em 8 visualmente) */}
       <div className="flex flex-wrap items-center justify-center gap-3 px-4">
         {dice.slice(0, 8).map((d, idx) => (
-          <DieCard key={d.id} die={d} delayMs={idx * STAGGER_PER_DIE_MS} />
+          <DieCard
+            key={d.id}
+            die={d}
+            delayMs={instant ? 0 : idx * STAGGER_PER_DIE_MS}
+            instant={instant}
+          />
         ))}
         {dice.length > 8 && (
           <span className="text-[10px] text-brand-muted">

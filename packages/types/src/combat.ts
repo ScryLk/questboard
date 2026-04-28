@@ -174,6 +174,19 @@ export type AttackAdvantage = "NORMAL" | "ADVANTAGE" | "DISADVANTAGE";
  *  `DiceRollMode` em `chat.ts` (PUBLIC/GM_ONLY/SELF — escopo da rolagem). */
 export type AttackMode = "DIGITAL" | "MANUAL";
 
+/** Como o dano interagiu com resistência/imunidade/vulnerabilidade do
+ *  alvo. `normal` quando alvo não tinha modificador pro tipo do ataque. */
+export type DamageModifier = "normal" | "resist" | "immune" | "vuln";
+
+/** Tabela de resistências de uma criatura. Só preenchido pra alvos que
+ *  têm modificadores específicos — listas vazias = comportamento normal
+ *  pra todo tipo. */
+export interface DamageMultipliers {
+  resistances: AttackDamageType[];
+  immunities: AttackDamageType[];
+  vulnerabilities: AttackDamageType[];
+}
+
 /** Resultado por alvo de um ataque executado. */
 export interface AttackTargetResult {
   id: string;
@@ -197,8 +210,12 @@ export interface AttackTargetResult {
   damageBonus: number | null;
   damageTotal: number | null;
 
+  /** Modificador aplicado ao damageTotal pra obter `appliedDamage`. null
+   *  quando errou; "normal" quando alvo não tinha resist/imune/vuln. */
+  damageModifier: DamageModifier | null;
   /** Quando o dano foi aplicado ao HP do alvo (null se ainda pendente). */
   appliedAt: Date | null;
+  /** Dano efetivamente subtraído do HP — já com resist/imune/vuln. */
   appliedDamage: number | null;
 }
 

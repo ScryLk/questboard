@@ -13,6 +13,7 @@ import { GameTooltip } from "@/components/ui/game-tooltip";
 import { playSFX } from "@/lib/audio/sfx-triggers";
 import { NPCDialogueButton } from "./npc-dialogue-button";
 import { DiceInlineResult } from "@/components/dice/DiceInlineResult";
+import { AttackResultCard } from "./attack-result-card";
 
 const CHANNEL_CONFIG: {
   key: ChatChannel;
@@ -143,6 +144,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isSystem = message.type === "system";
   const isRoll = message.type === "roll";
   const isWhisper = message.type === "whisper";
+  const isAttack = message.type === "attack";
 
   if (isSystem) {
     return (
@@ -220,6 +222,11 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             isNat1={message.isNat1}
           />
         )}
+
+      {/* Attack result card — postado pelo executeAttack */}
+      {isAttack && message.attack && (
+        <AttackResultCard payload={message.attack} />
+      )}
     </div>
   );
 }

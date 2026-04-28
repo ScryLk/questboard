@@ -34,6 +34,7 @@ import type {
 } from "@questboard/types";
 import { useAttackStore } from "@/lib/attack-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useSettingsStore } from "@/lib/settings-store";
 import { useAttackActions } from "@/hooks/use-attack-actions";
 import { DiceCanvas, buildDiceConfig, DieCard, buildDice } from "./dice-canvas";
 
@@ -95,6 +96,7 @@ function AttackFlowModalInner({
   onAnimationDone,
 }: InnerProps) {
   const tokens = useGameplayStore((s) => s.tokens);
+  const animateDice = useSettingsStore((s) => s.dice.animateResult);
   const { executeAttack, applyResults } = useAttackActions();
 
   const attacker = useMemo(
@@ -311,7 +313,11 @@ function AttackFlowModalInner({
           {phase === "animating" && (
             <div className="space-y-2">
               {diceConfig ? (
-                <DiceCanvas config={diceConfig} onComplete={onAnimationDone} />
+                <DiceCanvas
+                  config={diceConfig}
+                  onComplete={onAnimationDone}
+                  instant={!animateDice}
+                />
               ) : (
                 <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center">
                   <Dices className="h-10 w-10 animate-spin text-brand-accent" />

@@ -13,16 +13,21 @@ import {
   rollAttackD20,
   rollAttackDamage,
   extractPrimaryDieSides,
+  computeFinalDamage,
 } from "@questboard/game-engine";
 import { DEFAULT_AC } from "@questboard/constants";
 import type {
+  AttackDamageType,
   AttackWithResults,
   AttackTargetResult,
+  DamageMultipliers,
 } from "@questboard/types";
 import type { AttackInput } from "@questboard/validators";
 import { useAttackStore } from "@/lib/attack-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useCombatStore } from "@/lib/combat-store";
+import { useCharacterStore } from "@/stores/characterStore";
+import type { ChatMessage } from "@/lib/gameplay-mock-data";
 
 type AttackExecuteInput = Omit<AttackInput, "sessionId"> & {
   sessionId?: string;
@@ -73,7 +78,8 @@ export function useAttackActions() {
               damageRolls: manual.hit && manual.damageTotal ? [manual.damageTotal] : null,
               damageBonus: 0,
               damageTotal: manual.hit ? manual.damageTotal ?? 0 : null,
-              appliedAt: null,
+              damageModifier: null,
+            appliedAt: null,
               appliedDamage: null,
             };
           }
@@ -100,7 +106,8 @@ export function useAttackActions() {
               damageRolls: null,
               damageBonus: null,
               damageTotal: null,
-              appliedAt: null,
+              damageModifier: null,
+            appliedAt: null,
               appliedDamage: null,
             };
           }
@@ -120,6 +127,7 @@ export function useAttackActions() {
             damageRolls: dmg.rolls,
             damageBonus: dmg.flatBonus,
             damageTotal: dmg.total,
+            damageModifier: null,
             appliedAt: null,
             appliedDamage: null,
           };
@@ -147,6 +155,38 @@ export function useAttackActions() {
       void damageSides; // disponível pra DiceCanvas via extractPrimaryDieSides
 
       setResult(attack);
+
+      // Posta card resumo no chat (canal "geral"). Mesmo se ataque
+      // ainda não foi aplicado — o dado já rolou e isso é log.
+      const allTokens = tokens().tokens;
+      const attackerToken = allTokens.find(
+        (t) => t.id === input.attackerTokenId,
+      );
+      const targetNames = input.targetTokenIds.map(
+        (id) => allTokens.find((t) => t.id === id)?.name ?? "Alvo",
+      );
+      const chatMessage: ChatMessage = {
+        id: `msg_${attackId}`,
+        channel: "geral",
+        type: "attack",
+        sender: attackerToken?.name ?? "Atacante",
+        senderInitials: (attackerToken?.name ?? "?").slice(0, 2).toUpperCase(),
+        isGM: true,
+        content: "",
+        timestamp: new Date().toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        attack: {
+          attackName: input.attackName,
+          attackerName: attackerToken?.name ?? "Atacante",
+          targetNames,
+          damageType: input.damageType,
+          results,
+        },
+      };
+      useGameplayStore.getState().addMessage(chatMessage);
+
       return attack;
     },
     [setResult, tokens],
@@ -154,7 +194,8 @@ export function useAttackActions() {
 
   /** Aplica o dano nos alvos. Atualiza tanto gameplay-store (token.hp)
    *  quanto combat-store (participant hpCurrent), se o token for
-   *  participante do combat canônico. */
+   *  participante do combat canônico. Aplica resistência/imunidade/
+   *  vulnerabilidade do personagem vinculado ao token, se houver. */
   const applyResults = useCallback(
     (attack: AttackWithResults) => {
       const allTokens = useGameplayStore.getState().tokens;
@@ -162,14 +203,41 @@ export function useAttackActions() {
       const combatTokenIds = new Set(
         combat?.participants.map((p) => p.tokenId) ?? [],
       );
+      const characterStore = useCharacterStore.getState();
 
+      // Mutamos os results in-place pra registrar appliedDamage e modifier
+      // — o AttackResultCard já no chat vai ficar desatualizado, mas o
+      // ResultPanel do modal lê do attack-store e re-renderiza.
       for (const r of attack.results) {
         if (!r.hit || !r.damageTotal) continue;
 
         const token = allTokens.find((t) => t.id === r.targetTokenId);
         if (!token) continue;
 
-        const nextHp = Math.max(0, token.hp - r.damageTotal);
+        // Resolve resistências do alvo via character vinculado ao token.
+        const charId = characterStore.getTokenCharacterId(token.id);
+        const character = charId
+          ? characterStore.getCharacterById(charId)
+          : undefined;
+        const multipliers: DamageMultipliers | null = character?.stats
+          ? {
+              resistances: character.stats.damageResistances ?? [],
+              immunities: character.stats.damageImmunities ?? [],
+              vulnerabilities: character.stats.damageVulnerabilities ?? [],
+            }
+          : null;
+
+        const { final: appliedDamage, modifier } = computeFinalDamage(
+          r.damageTotal,
+          attack.damageType as AttackDamageType,
+          multipliers,
+        );
+
+        r.appliedDamage = appliedDamage;
+        r.damageModifier = modifier;
+        r.appliedAt = new Date();
+
+        const nextHp = Math.max(0, token.hp - appliedDamage);
         updateTokenHp(token.id, nextHp);
 
         if (combatTokenIds.has(token.id)) {
@@ -179,7 +247,7 @@ export function useAttackActions() {
           if (participant) {
             const nextParticipantHp = Math.max(
               0,
-              participant.hpCurrent - r.damageTotal,
+              participant.hpCurrent - appliedDamage,
             );
             applyCombatHp(token.id, nextParticipantHp);
           }
@@ -213,7 +281,8 @@ function makeMissResult(
     damageRolls: null,
     damageBonus: null,
     damageTotal: null,
-    appliedAt: null,
+    damageModifier: null,
+            appliedAt: null,
     appliedDamage: null,
   };
 }

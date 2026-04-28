@@ -4,7 +4,12 @@ export type PlayerStatus = "online" | "offline" | "away";
 export type TokenAlignment = "player" | "hostile" | "neutral" | "ally";
 export type CombatantStatus = "active" | "dead" | "unconscious";
 export type ChatChannel = "geral" | "mesa-gm" | "sussurro";
-export type ChatMessageType = "normal" | "system" | "whisper" | "roll";
+export type ChatMessageType =
+  | "normal"
+  | "system"
+  | "whisper"
+  | "roll"
+  | "attack";
 export type MapTool =
   | "pointer"
   | "pan"
@@ -171,6 +176,19 @@ export interface ChatMessage {
   /** Data URL de imagem anexada (frontend-only). Quando backend subir,
    *  trocar por URL do R2 e subir antes de enviar a mensagem. */
   imageUrl?: string;
+  /** Resultado completo de ataque pra mensagens type="attack". O chat
+   *  renderiza um card resumo (AttackResultCard) ao invés de só texto. */
+  attack?: AttackChatPayload;
+}
+
+export interface AttackChatPayload {
+  attackName: string;
+  attackerName: string;
+  /** Nomes dos alvos na ordem original. */
+  targetNames: string[];
+  damageType: import("@questboard/types").AttackDamageType;
+  /** Resultados por alvo (mesma ordem de targetNames). */
+  results: import("@questboard/types").AttackTargetResult[];
 }
 
 export interface MapConfig {

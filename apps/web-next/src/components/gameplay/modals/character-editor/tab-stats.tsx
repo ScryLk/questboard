@@ -172,6 +172,20 @@ export function TabStats({ form, onUpdate }: TabStatsProps) {
         />
       </section>
 
+      {/* Damage resistances */}
+      <section>
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-brand-accent">
+          Resistências a Dano
+        </h3>
+        <TagInput
+          tags={form.stats.damageResistances ?? []}
+          onChange={(v) =>
+            updateStats({ damageResistances: v.length > 0 ? v : undefined })
+          }
+          placeholder="Ex: fire, slashing... (recebe metade)"
+        />
+      </section>
+
       {/* Damage immunities */}
       <section>
         <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-brand-accent">
@@ -182,7 +196,23 @@ export function TabStats({ form, onUpdate }: TabStatsProps) {
           onChange={(v) =>
             updateStats({ damageImmunities: v.length > 0 ? v : undefined })
           }
-          placeholder="Ex: fogo, veneno..."
+          placeholder="Ex: poison, psychic... (recebe 0)"
+        />
+      </section>
+
+      {/* Damage vulnerabilities */}
+      <section>
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-brand-accent">
+          Vulnerabilidades a Dano
+        </h3>
+        <TagInput
+          tags={form.stats.damageVulnerabilities ?? []}
+          onChange={(v) =>
+            updateStats({
+              damageVulnerabilities: v.length > 0 ? v : undefined,
+            })
+          }
+          placeholder="Ex: radiant, fire... (recebe dobrado)"
         />
       </section>
 
