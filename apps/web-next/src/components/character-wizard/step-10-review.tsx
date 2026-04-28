@@ -130,6 +130,8 @@ export function Step10Review({ onFinish }: Props) {
   function handleCreate() {
     if (!klass || !race || !wizard.name.trim()) return;
 
+    const hpMax = derived?.hitPointsMax ?? klass.hitDie;
+
     const newChar = createDefaultCharacter({
       name: wizard.name.trim(),
       title: `${race.name} ${klass.name} Nv. 1`,
@@ -139,8 +141,8 @@ export function Step10Review({ onFinish }: Props) {
       category: "npc", // PCs ficam como categoria genérica até ter um tipo "pc"
       role: "ally",
       stats: {
-        hp: derived?.hitPointsMax ?? klass.hitDie,
-        maxHp: derived?.hitPointsMax ?? klass.hitDie,
+        hp: hpMax,
+        maxHp: hpMax,
         ac: derived?.armorClass.total ?? 10,
         speed: race.speed * 5, // m → ft (1.5m = 5ft, mas race.speed já vem em m, multiplicar simples)
         str: finalAttrs.str,
@@ -153,6 +155,37 @@ export function Step10Review({ onFinish }: Props) {
         skills: wizard.skillProficiencies,
       },
       createdByCampaignId: activeCampaignId ?? undefined,
+      dnd5eData: {
+        level: 1,
+        classSlug: klass.slug,
+        raceSlug: race.slug,
+        background: wizard.background ?? "acolyte",
+        alignment: wizard.alignment || undefined,
+        attributes: finalAttrs,
+        hpCurrent: hpMax,
+        hpTemp: 0,
+        hitDiceUsed: 0,
+        skillProficiencies: wizard.skillProficiencies,
+        expertiseSkills: [],
+        savingThrowProficiencies:
+          klass.savingThrowProficiencies as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">,
+        equipment: wizard.equipment.map((slug) => ({
+          itemSlug: slug,
+          equipped: true,
+          quantity: 1,
+        })),
+        spells: {
+          cantrips: wizard.cantrips,
+          firstLevel: wizard.firstLevelSpells,
+        },
+        spellSlotsExpended: {},
+        deathSavesSuccesses: 0,
+        deathSavesFailures: 0,
+        personalityTraits: wizard.personalityTraits || undefined,
+        ideals: wizard.ideals || undefined,
+        bonds: wizard.bonds || undefined,
+        flaws: wizard.flaws || undefined,
+      },
     });
     createCharacter(newChar);
     addToast(`${newChar.name} criado.`);

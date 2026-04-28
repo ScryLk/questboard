@@ -2,6 +2,43 @@
 
 import { PawPrint, UserRound, type LucideIcon } from "lucide-react";
 
+// ── D&D 5e persisted data ──
+//
+// Shape salvo em `CampaignCharacter.dnd5eData` quando o personagem foi
+// criado pelo wizard 5e. Espelha o shape do wizard store + o validator
+// `dnd5eCharacterSchema` em `@questboard/validators`. A ficha viva
+// re-deriva tudo via engine puro a partir desses campos.
+
+export interface Dnd5eCharacterPersisted {
+  level: number;
+  classSlug: string;
+  subclassSlug?: string;
+  raceSlug: string;
+  background: string;
+  alignment?: string;
+  /** Atributos finais (já com bônus de raça aplicado). */
+  attributes: Record<"str" | "dex" | "con" | "int" | "wis" | "cha", number>;
+  hpCurrent: number;
+  hpTemp: number;
+  hitDiceUsed: number;
+  skillProficiencies: string[];
+  expertiseSkills: string[];
+  savingThrowProficiencies: Array<"str" | "dex" | "con" | "int" | "wis" | "cha">;
+  /** Slugs de itens equipados. Para CA/ataques o engine olha os itens
+   *  com category=armor/weapon. Outros itens ficam só no inventário. */
+  equipment: Array<{ itemSlug: string; equipped: boolean; quantity?: number }>;
+  /** Slugs das magias conhecidas (truques + magias preparadas). */
+  spells: { cantrips: string[]; firstLevel: string[] };
+  /** Slots gastos por nível: `{ "1": 2, "3": 1 }`. */
+  spellSlotsExpended: Record<string, number>;
+  deathSavesSuccesses: number;
+  deathSavesFailures: number;
+  personalityTraits?: string;
+  ideals?: string;
+  bonds?: string;
+  flaws?: string;
+}
+
 export type CharacterCategory = "npc" | "creature";
 
 export type CharacterRole =
@@ -108,6 +145,12 @@ export interface CampaignCharacter {
   createdByUserId: string;
   isPublic: boolean;
   favorite: boolean;
+
+  /** Dados específicos de sistema. Quando presente, a ficha viva
+   *  recalcula CA/mods/perícias/ataques via engine puro
+   *  (`@questboard/game-engine` → `dnd5e.deriveDnd5eCharacter`).
+   *  Quando ausente, ficha cai no view genérico baseado em `stats`. */
+  dnd5eData?: Dnd5eCharacterPersisted;
 
   createdAt: string;
   updatedAt: string;

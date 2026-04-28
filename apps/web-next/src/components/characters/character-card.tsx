@@ -1,6 +1,7 @@
 "use client";
 
-import { Copy, Star, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Copy, Pencil, Star, Trash2 } from "lucide-react";
 import type { CampaignCharacter } from "@/types/character";
 import {
   CHAR_CATEGORY_CONFIG,
@@ -29,9 +30,9 @@ export function CharacterCard({
   const initials = character.name.slice(0, 2).toUpperCase() || "??";
 
   return (
-    <div
-      onClick={() => onEdit(character.id)}
-      className="group relative cursor-pointer rounded-xl border border-brand-border bg-[#0F0F14] p-3 transition-all hover:border-brand-accent/30 hover:bg-[#12121A]"
+    <Link
+      href={`/characters/${character.id}`}
+      className="group relative block rounded-xl border border-brand-border bg-[#0F0F14] p-3 transition-all hover:border-brand-accent/30 hover:bg-[#12121A]"
     >
       {/* Portrait preview */}
       <div
@@ -116,6 +117,7 @@ export function CharacterCard({
       <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onToggleFavorite(character.id);
           }}
@@ -131,15 +133,29 @@ export function CharacterCard({
         </button>
         <button
           onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onEdit(character.id);
+          }}
+          className="flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-brand-muted transition-colors hover:text-brand-text"
+          title="Editar"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onDuplicate(character.id);
           }}
           className="flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-brand-muted transition-colors hover:text-brand-text"
+          title="Duplicar"
         >
           <Copy className="h-3 w-3" />
         </button>
         <button
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onDelete(character.id);
           }}
@@ -153,6 +169,6 @@ export function CharacterCard({
       {character.favorite && (
         <Star className="absolute left-2 top-2 h-3 w-3 fill-[#FDCB6E] text-[#FDCB6E]" />
       )}
-    </div>
+    </Link>
   );
 }
