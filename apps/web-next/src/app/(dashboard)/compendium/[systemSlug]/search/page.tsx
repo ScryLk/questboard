@@ -29,6 +29,12 @@ import {
   listRaces,
   listSpells,
 } from "@/lib/srd";
+import {
+  useHomebrewItems,
+  useHomebrewMonsters,
+  useHomebrewSpells,
+} from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 interface SearchHit {
   type: "spell" | "monster" | "item" | "race" | "class" | "condition";
@@ -77,12 +83,23 @@ export default function CompendiumSearchPage({
   const initial = sp.get("q") ?? "";
   const [query, setQuery] = useState(initial);
 
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewSpells = useHomebrewSpells(activeCampaignId);
+  const homebrewMonsters = useHomebrewMonsters(activeCampaignId);
+  const homebrewItems = useHomebrewItems(activeCampaignId);
+
   const hits = useMemo<SearchHit[]>(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
     const out: SearchHit[] = [];
 
-    for (const s of listSpells(systemSlug)) {
+    // Homebrew aparece primeiro em cada categoria — assim conteúdo
+    // próprio da campanha fica em destaque na busca.
+    const allSpells = [...homebrewSpells, ...listSpells(systemSlug)];
+    const allMonsters = [...homebrewMonsters, ...listMonsters(systemSlug)];
+    const allItems = [...homebrewItems, ...listItems(systemSlug)];
+
+    for (const s of allSpells) {
       if (
         matches(s.name, q) ||
         matches(s.nameEn, q) ||
@@ -99,7 +116,7 @@ export default function CompendiumSearchPage({
       }
     }
 
-    for (const m of listMonsters(systemSlug)) {
+    for (const m of allMonsters) {
       if (
         matches(m.name, q) ||
         matches(m.nameEn, q) ||
@@ -116,7 +133,7 @@ export default function CompendiumSearchPage({
       }
     }
 
-    for (const it of listItems(systemSlug)) {
+    for (const it of allItems) {
       if (
         matches(it.name, q) ||
         matches(it.nameEn, q) ||
@@ -185,7 +202,7 @@ export default function CompendiumSearchPage({
     }
 
     return out;
-  }, [query, systemSlug]);
+  }, [query, systemSlug, homebrewSpells, homebrewMonsters, homebrewItems]);
 
   const grouped = useMemo(() => {
     const map = new Map<SearchHit["type"], SearchHit[]>();

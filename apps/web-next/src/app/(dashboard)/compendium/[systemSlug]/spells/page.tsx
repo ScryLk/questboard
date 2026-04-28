@@ -3,10 +3,15 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Search, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, Plus, Search, Sparkles, Zap } from "lucide-react";
 import { getSystem, listSpells } from "@/lib/srd";
+import { useHomebrewSpells } from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import type { SpellSchool } from "@/types/srd";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
+import { HomebrewBadge } from "@/components/compendium/homebrew-badge";
+import { HomebrewSpellModal } from "@/components/compendium/homebrew-spell-modal";
 
 const SCHOOL_LABELS: Record<SpellSchool, string> = {
   abjuration: "Abjuração",
@@ -49,11 +54,24 @@ export default function SpellsListPage({
   const system = getSystem(systemSlug);
   if (!system) notFound();
 
-  const allSpells = listSpells(systemSlug);
+  const srdSpells = listSpells(systemSlug);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewSpells = useHomebrewSpells(activeCampaignId);
+  const isGM = useGameplayStore((s) => s.currentUserIsGM);
+
+  const allSpells = useMemo(
+    () => [...homebrewSpells, ...srdSpells],
+    [homebrewSpells, srdSpells],
+  );
+  const homebrewSlugs = useMemo(
+    () => new Set(homebrewSpells.map((s) => s.slug)),
+    [homebrewSpells],
+  );
 
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | "all">("all");
   const [schoolFilter, setSchoolFilter] = useState<SpellSchool | "all">("all");
+  const [creating, setCreating] = useState(false);
 
   const filtered = useMemo(() => {
     return allSpells.filter((s) => {
@@ -73,6 +91,8 @@ export default function SpellsListPage({
     });
   }, [allSpells, search, levelFilter, schoolFilter]);
 
+  const canCreateHomebrew = isGM && Boolean(activeCampaignId);
+
   return (
     <div className="space-y-5">
       <Link
@@ -83,17 +103,33 @@ export default function SpellsListPage({
         {system.shortName}
       </Link>
 
-      <div>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <Sparkles className="h-3.5 w-3.5" />
-          Magias
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <Sparkles className="h-3.5 w-3.5" />
+            Magias
+          </div>
+          <h1 className="font-cinzel text-2xl font-bold text-white">
+            Magias do {system.shortName}
+          </h1>
+          <p className="mt-1 text-xs text-brand-muted">
+            {filtered.length} de {allSpells.length} magias
+            {homebrewSpells.length > 0 && (
+              <span className="ml-1 text-purple-300">
+                ({homebrewSpells.length} homebrew)
+              </span>
+            )}
+          </p>
         </div>
-        <h1 className="font-cinzel text-2xl font-bold text-white">
-          Magias do {system.shortName}
-        </h1>
-        <p className="mt-1 text-xs text-brand-muted">
-          {filtered.length} de {allSpells.length} magias
-        </p>
+        {canCreateHomebrew && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nova magia homebrew
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -171,6 +207,7 @@ export default function SpellsListPage({
                     <p className="truncate font-medium text-brand-text">
                       {spell.name}
                     </p>
+                    {homebrewSlugs.has(spell.slug) && <HomebrewBadge />}
                     {spell.concentration && (
                       <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-300">
                         Concentr.
@@ -201,6 +238,13 @@ export default function SpellsListPage({
             );
           })}
         </div>
+      )}
+
+      {creating && activeCampaignId && (
+        <HomebrewSpellModal
+          campaignId={activeCampaignId}
+          onClose={() => setCreating(false)}
+        />
       )}
     </div>
   );

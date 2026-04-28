@@ -1,11 +1,16 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { notFound, useRouter } from "next/navigation";
+import { ArrowLeft, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { getSpell, getSystem } from "@/lib/srd";
+import { useHomebrewStore } from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
+import { HomebrewBadge } from "@/components/compendium/homebrew-badge";
+import { HomebrewSpellModal } from "@/components/compendium/homebrew-spell-modal";
 
 const SCHOOL_LABELS: Record<string, string> = {
   abjuration: "Abjuração",
@@ -23,10 +28,35 @@ export default function SpellDetailPage({
 }: {
   params: Promise<{ systemSlug: string; slug: string }>;
 }) {
+  const router = useRouter();
   const { systemSlug, slug } = use(params);
   const system = getSystem(systemSlug);
-  const spell = getSpell(systemSlug, slug);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewSpell = useHomebrewStore((s) =>
+    activeCampaignId ? s.spellsByCampaign[activeCampaignId]?.find((x) => x.slug === slug) ?? null : null,
+  );
+  const deleteSpell = useHomebrewStore((s) => s.deleteSpell);
+  const isGM = useGameplayStore((s) => s.currentUserIsGM);
+  const [editing, setEditing] = useState(false);
+
+  // Homebrew tem precedência se houver — assim GM vê edição mesmo se um
+  // dia colidir com slug oficial. Default: SRD oficial.
+  const spell = homebrewSpell ?? getSpell(systemSlug, slug);
+  const isHomebrew = Boolean(homebrewSpell);
+
   if (!system || !spell) notFound();
+
+  function handleDelete() {
+    if (!homebrewSpell || !activeCampaignId) return;
+    if (
+      !confirm(
+        `Excluir a magia homebrew "${homebrewSpell.name}"? Esta ação não pode ser desfeita.`,
+      )
+    )
+      return;
+    deleteSpell(activeCampaignId, homebrewSpell.slug);
+    router.push(`/compendium/${systemSlug}/spells`);
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -38,16 +68,39 @@ export default function SpellDetailPage({
         Magias
       </Link>
 
-      <header>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <Sparkles className="h-3.5 w-3.5" />
-          {spell.level === 0 ? "Truque" : `${spell.level}º nível`} ·{" "}
-          {SCHOOL_LABELS[spell.school]}
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <Sparkles className="h-3.5 w-3.5" />
+            {spell.level === 0 ? "Truque" : `${spell.level}º nível`} ·{" "}
+            {SCHOOL_LABELS[spell.school]}
+          </div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-cinzel text-3xl font-bold text-white">
+              {spell.name}
+            </h1>
+            {isHomebrew && <HomebrewBadge />}
+          </div>
+          <p className="mt-1 text-xs italic text-brand-muted">{spell.nameEn}</p>
         </div>
-        <h1 className="font-cinzel text-3xl font-bold text-white">
-          {spell.name}
-        </h1>
-        <p className="mt-1 text-xs italic text-brand-muted">{spell.nameEn}</p>
+        {isHomebrew && isGM && (
+          <div className="flex shrink-0 gap-1.5">
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1 rounded-md border border-brand-border px-2.5 py-1.5 text-xs text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+            >
+              <Pencil className="h-3 w-3" />
+              Editar
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex items-center gap-1 rounded-md border border-red-500/30 px-2.5 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-500/10"
+            >
+              <Trash2 className="h-3 w-3" />
+              Excluir
+            </button>
+          </div>
+        )}
       </header>
 
       <section className="grid gap-3 rounded-xl border border-brand-border bg-white/[0.02] p-5 sm:grid-cols-2">
@@ -126,6 +179,14 @@ export default function SpellDetailPage({
       </section>
 
       <SrdAttributionFooter attribution={spell.attribution} variant="card" />
+
+      {editing && isHomebrew && activeCampaignId && (
+        <HomebrewSpellModal
+          campaignId={activeCampaignId}
+          existing={homebrewSpell}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 }

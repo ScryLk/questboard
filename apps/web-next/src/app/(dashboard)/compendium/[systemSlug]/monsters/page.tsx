@@ -6,8 +6,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus, Search, Skull } from "lucide-react";
 import { getSystem, listMonsters } from "@/lib/srd";
 import { addMonsterToSession } from "@/lib/srd/monster-to-token";
+import { useHomebrewMonsters } from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
+import { HomebrewBadge } from "@/components/compendium/homebrew-badge";
+import { HomebrewMonsterModal } from "@/components/compendium/homebrew-monster-modal";
 
 const CR_BUCKETS: Array<{ value: string; label: string; min: number; max: number }> = [
   { value: "all", label: "Todos", min: 0, max: 99 },
@@ -41,11 +45,25 @@ export default function MonstersListPage({
   const { systemSlug } = use(params);
   const system = getSystem(systemSlug);
   if (!system) notFound();
-  const all = listMonsters(systemSlug);
+  const srdMonsters = listMonsters(systemSlug);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewMonsters = useHomebrewMonsters(activeCampaignId);
   const isGM = useGameplayStore((s) => s.currentUserIsGM);
+
+  const all = useMemo(
+    () => [...homebrewMonsters, ...srdMonsters],
+    [homebrewMonsters, srdMonsters],
+  );
+  const homebrewSlugs = useMemo(
+    () => new Set(homebrewMonsters.map((m) => m.slug)),
+    [homebrewMonsters],
+  );
 
   const [search, setSearch] = useState("");
   const [crBucket, setCrBucket] = useState("all");
+  const [creating, setCreating] = useState(false);
+
+  const canCreateHomebrew = isGM && Boolean(activeCampaignId);
 
   const filtered = useMemo(() => {
     const bucket = CR_BUCKETS.find((b) => b.value === crBucket)!;
@@ -76,17 +94,33 @@ export default function MonstersListPage({
         {system.shortName}
       </Link>
 
-      <div>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <Skull className="h-3.5 w-3.5" />
-          Monstros
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <Skull className="h-3.5 w-3.5" />
+            Monstros
+          </div>
+          <h1 className="font-cinzel text-2xl font-bold text-white">
+            Monstros do {system.shortName}
+          </h1>
+          <p className="mt-1 text-xs text-brand-muted">
+            {filtered.length} de {all.length} monstros
+            {homebrewMonsters.length > 0 && (
+              <span className="ml-1 text-purple-300">
+                ({homebrewMonsters.length} homebrew)
+              </span>
+            )}
+          </p>
         </div>
-        <h1 className="font-cinzel text-2xl font-bold text-white">
-          Monstros do {system.shortName}
-        </h1>
-        <p className="mt-1 text-xs text-brand-muted">
-          {filtered.length} de {all.length} monstros
-        </p>
+        {canCreateHomebrew && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Novo monstro homebrew
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -140,6 +174,7 @@ export default function MonstersListPage({
                     <p className="truncate font-medium text-brand-text">
                       {m.name}
                     </p>
+                    {homebrewSlugs.has(m.slug) && <HomebrewBadge />}
                     <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-brand-text">
                       ND {formatCr(m.challengeRating)}
                     </span>
@@ -169,6 +204,13 @@ export default function MonstersListPage({
             </div>
           ))}
         </div>
+      )}
+
+      {creating && activeCampaignId && (
+        <HomebrewMonsterModal
+          campaignId={activeCampaignId}
+          onClose={() => setCreating(false)}
+        />
       )}
     </div>
   );

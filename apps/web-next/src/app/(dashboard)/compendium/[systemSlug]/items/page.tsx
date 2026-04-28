@@ -3,10 +3,15 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Search, Sword } from "lucide-react";
+import { ArrowLeft, Plus, Search, Sword } from "lucide-react";
 import { getSystem, listItems } from "@/lib/srd";
+import { useHomebrewItems } from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import type { ItemCategory } from "@/types/srd";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
+import { HomebrewBadge } from "@/components/compendium/homebrew-badge";
+import { HomebrewItemModal } from "@/components/compendium/homebrew-item-modal";
 
 const CATEGORY_LABELS: Record<ItemCategory | "all", string> = {
   all: "Todos",
@@ -43,10 +48,25 @@ export default function ItemsListPage({
   const { systemSlug } = use(params);
   const system = getSystem(systemSlug);
   if (!system) notFound();
-  const all = listItems(systemSlug);
+  const srdItems = listItems(systemSlug);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewItems = useHomebrewItems(activeCampaignId);
+  const isGM = useGameplayStore((s) => s.currentUserIsGM);
+
+  const all = useMemo(
+    () => [...homebrewItems, ...srdItems],
+    [homebrewItems, srdItems],
+  );
+  const homebrewSlugs = useMemo(
+    () => new Set(homebrewItems.map((i) => i.slug)),
+    [homebrewItems],
+  );
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ItemCategory | "all">("all");
+  const [creating, setCreating] = useState(false);
+
+  const canCreateHomebrew = isGM && Boolean(activeCampaignId);
 
   const filtered = useMemo(() => {
     return all.filter((i) => {
@@ -74,17 +94,33 @@ export default function ItemsListPage({
         {system.shortName}
       </Link>
 
-      <div>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <Sword className="h-3.5 w-3.5" />
-          Itens
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <Sword className="h-3.5 w-3.5" />
+            Itens
+          </div>
+          <h1 className="font-cinzel text-2xl font-bold text-white">
+            Itens do {system.shortName}
+          </h1>
+          <p className="mt-1 text-xs text-brand-muted">
+            {filtered.length} de {all.length} itens
+            {homebrewItems.length > 0 && (
+              <span className="ml-1 text-purple-300">
+                ({homebrewItems.length} homebrew)
+              </span>
+            )}
+          </p>
         </div>
-        <h1 className="font-cinzel text-2xl font-bold text-white">
-          Itens do {system.shortName}
-        </h1>
-        <p className="mt-1 text-xs text-brand-muted">
-          {filtered.length} de {all.length} itens
-        </p>
+        {canCreateHomebrew && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Novo item homebrew
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -147,6 +183,7 @@ export default function ItemsListPage({
                     <p className="truncate font-medium text-brand-text">
                       {it.name}
                     </p>
+                    {homebrewSlugs.has(it.slug) && <HomebrewBadge />}
                     {rarity && (
                       <span
                         className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase"
@@ -184,6 +221,13 @@ export default function ItemsListPage({
             );
           })}
         </div>
+      )}
+
+      {creating && activeCampaignId && (
+        <HomebrewItemModal
+          campaignId={activeCampaignId}
+          onClose={() => setCreating(false)}
+        />
       )}
     </div>
   );
