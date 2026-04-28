@@ -200,9 +200,9 @@ export default function NewCampaignPage() {
   const stepProgress = useMemo(() => (step / 3) * 100, [step]);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-4xl">
       {/* Header com progresso */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-3 flex items-center gap-3">
         <button
           onClick={() => (step === 1 ? router.back() : setStep((step - 1) as Step))}
           className="flex h-9 w-9 items-center justify-center rounded-md border border-brand-border text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
@@ -220,7 +220,7 @@ export default function NewCampaignPage() {
           </p>
         </div>
       </div>
-      <div className="mb-6 h-1 overflow-hidden rounded-full bg-brand-surface">
+      <div className="mb-4 h-1 overflow-hidden rounded-full bg-brand-surface">
         <div
           className="h-full bg-brand-accent transition-all"
           style={{ width: `${stepProgress}%` }}
@@ -228,7 +228,7 @@ export default function NewCampaignPage() {
       </div>
 
       {/* Step content */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {step === 1 && (
           <>
             <Field label="Nome da campanha" required error={fieldErrors.name}>
@@ -242,97 +242,108 @@ export default function NewCampaignPage() {
               />
             </Field>
 
-            <Field label="Sistema" required error={fieldErrors.system}>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {CAMPAIGN_SYSTEMS.map((s) => (
-                  <RadioCard
-                    key={s.value}
-                    selected={draft.system === s.value}
-                    onClick={() => update("system", s.value)}
-                  >
-                    <div className="font-medium text-brand-text">{s.label}</div>
-                    <div className="text-[10px] uppercase tracking-wider text-brand-muted">
-                      Engine: {s.engine}
-                    </div>
-                  </RadioCard>
-                ))}
-              </div>
-              {cthulhuNotice && (
-                <div className="mt-2 flex items-start gap-2 rounded-md border border-brand-warning/30 bg-brand-warning/5 px-3 py-2 text-[11px] text-brand-warning">
-                  <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    Cthulhu usa Sistema Livre na engine atual. Combate por
-                    turnos ainda não está disponível para esse sistema.
-                  </span>
-                </div>
-              )}
-            </Field>
-
-            <Field label="Visibilidade" required error={fieldErrors.visibility}>
-              <div className="space-y-2">
-                {(["PRIVATE", "CODE", "PUBLIC"] as CampaignVisibility[]).map((v) => {
-                  const Icon =
-                    v === "PRIVATE" ? Lock : v === "CODE" ? Hash : Globe;
-                  return (
+            {/* Sistema + Visibilidade lado a lado pra caber sem scroll. */}
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+              <Field label="Sistema" required error={fieldErrors.system}>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {CAMPAIGN_SYSTEMS.map((s) => (
                     <RadioCard
-                      key={v}
-                      selected={draft.visibility === v}
-                      onClick={() => update("visibility", v)}
+                      key={s.value}
+                      selected={draft.system === s.value}
+                      onClick={() => update("system", s.value)}
+                      compact
                     >
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 shrink-0 text-brand-accent" />
-                        <span className="font-medium text-brand-text">
-                          {CAMPAIGN_VISIBILITY_LABELS[v]}
-                        </span>
+                      <div className="text-sm font-medium text-brand-text">
+                        {s.label}
                       </div>
-                      <p className="mt-1 text-[11px] text-brand-muted">
-                        {CAMPAIGN_VISIBILITY_DESCRIPTIONS[v]}
-                      </p>
+                      <div className="text-[9px] uppercase tracking-wider text-brand-muted">
+                        Engine: {s.engine}
+                      </div>
                     </RadioCard>
-                  );
-                })}
-              </div>
-            </Field>
+                  ))}
+                </div>
+                {cthulhuNotice && (
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-brand-warning/30 bg-brand-warning/5 px-3 py-2 text-[11px] text-brand-warning">
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Cthulhu usa Sistema Livre na engine atual. Combate por
+                      turnos ainda não está disponível para esse sistema.
+                    </span>
+                  </div>
+                )}
+              </Field>
+
+              <Field label="Visibilidade" required error={fieldErrors.visibility}>
+                <div className="space-y-1.5">
+                  {(["PRIVATE", "CODE", "PUBLIC"] as CampaignVisibility[]).map((v) => {
+                    const Icon =
+                      v === "PRIVATE" ? Lock : v === "CODE" ? Hash : Globe;
+                    return (
+                      <RadioCard
+                        key={v}
+                        selected={draft.visibility === v}
+                        onClick={() => update("visibility", v)}
+                        compact
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-brand-accent" />
+                          <span className="text-sm font-medium text-brand-text">
+                            {CAMPAIGN_VISIBILITY_LABELS[v]}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[10px] leading-tight text-brand-muted">
+                          {CAMPAIGN_VISIBILITY_DESCRIPTIONS[v]}
+                        </p>
+                      </RadioCard>
+                    );
+                  })}
+                </div>
+              </Field>
+            </div>
           </>
         )}
 
         {step === 2 && (
-          <>
-            <Field label="URL da capa" hint="Cole link de Imgur, Discord, etc." error={fieldErrors.coverImageUrl}>
-              <input
-                type="url"
-                value={draft.coverImageUrl}
-                onChange={(e) => update("coverImageUrl", e.target.value)}
-                placeholder="https://..."
-                className="w-full rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
-              />
-              {draft.coverImageUrl && (
-                <div className="mt-2 aspect-[16/9] overflow-hidden rounded-md border border-brand-border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={draft.coverImageUrl}
-                    alt="Pré-visualização da capa"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              )}
-            </Field>
+          <div className="grid gap-3 md:grid-cols-2">
+            {/* Coluna esquerda: capa + sinopse */}
+            <div className="space-y-3">
+              <Field label="URL da capa" hint="Cole link de Imgur, Discord, etc." error={fieldErrors.coverImageUrl}>
+                <input
+                  type="url"
+                  value={draft.coverImageUrl}
+                  onChange={(e) => update("coverImageUrl", e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
+                />
+                {draft.coverImageUrl && (
+                  <div className="mt-2 aspect-[16/9] overflow-hidden rounded-md border border-brand-border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={draft.coverImageUrl}
+                      alt="Pré-visualização da capa"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+              </Field>
 
-            <Field
-              label="Sinopse"
-              hint={`${draft.synopsis.length}/2000`}
-              error={fieldErrors.synopsis}
-            >
-              <textarea
-                value={draft.synopsis}
-                onChange={(e) => update("synopsis", e.target.value)}
-                maxLength={2000}
-                rows={5}
-                placeholder="Conte em poucas linhas o tom da mesa, o conflito principal e o que esperar."
-                className="w-full resize-y rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
-              />
-            </Field>
+              <Field
+                label="Sinopse"
+                hint={`${draft.synopsis.length}/2000`}
+                error={fieldErrors.synopsis}
+              >
+                <textarea
+                  value={draft.synopsis}
+                  onChange={(e) => update("synopsis", e.target.value)}
+                  maxLength={2000}
+                  rows={4}
+                  placeholder="Conte em poucas linhas o tom da mesa, o conflito principal e o que esperar."
+                  className="w-full resize-y rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
+                />
+              </Field>
+            </div>
 
+            {/* Coluna direita: tags (chips wrap natural) */}
             <Field
               label="Tags"
               hint={`${draft.tags.length}/8 selecionadas`}
@@ -361,23 +372,25 @@ export default function NewCampaignPage() {
                 })}
               </div>
             </Field>
-          </>
+          </div>
         )}
 
         {step === 3 && (
-          <>
-            <ToggleRow
-              icon={Castle}
-              title="Modo Solo Story"
-              description="Mesa pra um único jogador. Não pode ser combinado com visibilidade pública."
-              checked={draft.isSoloStory}
-              onChange={(v) => update("isSoloStory", v)}
-              error={
-                soloPublicConflict
-                  ? "Solo Story incompatível com visibilidade pública."
-                  : undefined
-              }
-            />
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <ToggleRow
+                icon={Castle}
+                title="Modo Solo Story"
+                description="Mesa pra um único jogador. Não pode ser combinado com visibilidade pública."
+                checked={draft.isSoloStory}
+                onChange={(v) => update("isSoloStory", v)}
+                error={
+                  soloPublicConflict
+                    ? "Solo Story incompatível com visibilidade pública."
+                    : undefined
+                }
+              />
+            </div>
 
             <Section title="Idioma e ritmo">
               <Field label="Idioma da mesa">
@@ -516,24 +529,26 @@ export default function NewCampaignPage() {
             </Section>
 
             {draft.visibility === "PUBLIC" && (
-              <Section title="Pitch público" defaultOpen>
-                <Field
-                  label="Pitch curto que aparece no catálogo"
-                  hint={`${draft.publicPitch.length}/500`}
-                  error={fieldErrors.publicPitch}
-                >
-                  <textarea
-                    value={draft.publicPitch}
-                    onChange={(e) => update("publicPitch", e.target.value)}
-                    maxLength={500}
-                    rows={3}
-                    placeholder="Uma linha de gancho que faça alguém querer entrar."
-                    className="w-full resize-y rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
-                  />
-                </Field>
-              </Section>
+              <div className="md:col-span-2">
+                <Section title="Pitch público" defaultOpen>
+                  <Field
+                    label="Pitch curto que aparece no catálogo"
+                    hint={`${draft.publicPitch.length}/500`}
+                    error={fieldErrors.publicPitch}
+                  >
+                    <textarea
+                      value={draft.publicPitch}
+                      onChange={(e) => update("publicPitch", e.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Uma linha de gancho que faça alguém querer entrar."
+                      className="w-full resize-y rounded-md border border-brand-border bg-brand-surface px-3 py-2 text-sm text-brand-text outline-none focus:border-brand-accent"
+                    />
+                  </Field>
+                </Section>
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
@@ -623,15 +638,20 @@ function RadioCard({
   selected,
   onClick,
   children,
+  compact = false,
 }: {
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  /** `true` reduz padding vertical pra encaixar mais cards no viewport. */
+  compact?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+      className={`w-full rounded-md border text-left transition-colors ${
+        compact ? "px-2.5 py-1.5" : "px-3 py-2"
+      } ${
         selected
           ? "border-brand-accent bg-brand-accent/10"
           : "border-brand-border bg-brand-surface hover:border-brand-accent/40"
