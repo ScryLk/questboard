@@ -13,6 +13,8 @@ import {
   DoorClosed,
   Lock,
   AlertTriangle,
+  Wind,
+  Crown,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { PathCellEvent, PathEventType } from "@/lib/gameplay-store";
@@ -43,6 +45,8 @@ export function PathPreviewPanel() {
   const tokens = useGameplayStore((s) => s.tokens);
   const movementUsedFt = useGameplayStore((s) => s.movementUsedFt);
   const turnActions = useGameplayStore((s) => s.turnActions);
+  const setDashing = useGameplayStore((s) => s.setDashing);
+  const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
   const exitPathPlanning = useGameplayStore((s) => s.exitPathPlanning);
   const undoPathStep = useGameplayStore((s) => s.undoPathStep);
   const clearPath = useGameplayStore((s) => s.clearPath);
@@ -54,6 +58,9 @@ export function PathPreviewPanel() {
   const maxFt = getMaxMovementFt(token.speed, turnActions.isDashing, movementUsedFt);
   const totalFt = plannedPath.length > 0 ? plannedPath[plannedPath.length - 1].totalFt : 0;
   const isOverSpeed = totalFt > maxFt;
+  // GM bypassa o limite de movimento (CLAUDE.md §3 + §10): pode confirmar
+  // mesmo trajetos longos sem precisar marcar Dash.
+  const blockedByLimit = isOverSpeed && !currentUserIsGM;
   const pct = maxFt > 0 ? Math.min(100, (totalFt / maxFt) * 100) : 0;
 
   // Collect all events
@@ -69,7 +76,7 @@ export function PathPreviewPanel() {
 
   async function handleConfirm() {
     if (plannedPath.length === 0) return;
-    if (isOverSpeed) return; // Safety: don't execute if over movement limit
+    if (blockedByLimit) return; // Safety: jogador não pode passar do speed
     await executePath(token!.id, plannedPath);
   }
 
@@ -95,7 +102,7 @@ export function PathPreviewPanel() {
         <div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-brand-muted">
-              Distância: <span className={`font-semibold ${isOverSpeed ? "text-red-400" : "text-brand-text"}`}>
+              Distância: <span className={`font-semibold ${isOverSpeed ? (currentUserIsGM ? "text-amber-400" : "text-red-400") : "text-brand-text"}`}>
                 {totalFt}/{maxFt}ft
               </span>
               {" "}({plannedPath.length} {plannedPath.length === 1 ? "célula" : "células"})
@@ -114,10 +121,43 @@ export function PathPreviewPanel() {
           {/* Progress bar */}
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
             <div
-              className={`h-full rounded-full transition-all ${isOverSpeed ? "bg-red-500" : "bg-brand-accent"}`}
+              className={`h-full rounded-full transition-all ${
+                isOverSpeed
+                  ? currentUserIsGM
+                    ? "bg-amber-400"
+                    : "bg-red-500"
+                  : "bg-brand-accent"
+              }`}
               style={{ width: `${Math.min(100, pct)}%` }}
             />
           </div>
+          {isOverSpeed && currentUserIsGM && (
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-amber-400/90">
+              <Crown className="h-2.5 w-2.5" />
+              GM bypass — trajeto excede o limite de {maxFt}ft, mas será aplicado.
+            </p>
+          )}
+        </div>
+
+        {/* Modificadores de movimento — atalho rápido pra dobrar speed
+         *  sem precisar abrir a action bar. */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setDashing(!turnActions.isDashing)}
+            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
+              turnActions.isDashing
+                ? "border-blue-500/40 bg-blue-500/15 text-blue-300"
+                : "border-brand-border bg-white/[0.02] text-brand-muted hover:border-brand-accent/30 hover:text-brand-text"
+            }`}
+            title={
+              turnActions.isDashing
+                ? `Dash ativo — ${token.speed * 2}ft no turno`
+                : `Ativar Dash — dobra para ${token.speed * 2}ft`
+            }
+          >
+            <Wind className="h-2.5 w-2.5" />
+            Dash {turnActions.isDashing ? "✓" : `×2`}
+          </button>
         </div>
 
         {/* Events */}
@@ -162,8 +202,13 @@ export function PathPreviewPanel() {
         <div className="flex gap-1.5">
           <button
             onClick={handleConfirm}
-            disabled={plannedPath.length === 0}
+            disabled={plannedPath.length === 0 || blockedByLimit}
             className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-brand-accent px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-accent/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            title={
+              blockedByLimit
+                ? `Trajeto excede o limite de ${maxFt}ft. Ative Dash para dobrar.`
+                : undefined
+            }
           >
             <Check className="h-3 w-3" />
             Confirmar
