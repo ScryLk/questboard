@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   X,
@@ -15,6 +16,7 @@ import {
   AlertTriangle,
   Wind,
   Crown,
+  GripHorizontal,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { PathCellEvent, PathEventType } from "@/lib/gameplay-store";
@@ -51,6 +53,46 @@ export function PathPreviewPanel() {
   const undoPathStep = useGameplayStore((s) => s.undoPathStep);
   const clearPath = useGameplayStore((s) => s.clearPath);
 
+  // Offset relativo da posição default (bottom-center). Usuário arrasta
+  // o header pra realocar quando o painel cobre o caminho que quer
+  // desenhar. Reset ao sair do path planning.
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!pathPlanningActive) setOffset({ x: 0, y: 0 });
+  }, [pathPlanningActive]);
+
+  function onDragStart(e: React.MouseEvent) {
+    e.preventDefault();
+    dragStateRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startOffsetX: offset.x,
+      startOffsetY: offset.y,
+    };
+    function onMove(ev: MouseEvent) {
+      const s = dragStateRef.current;
+      if (!s) return;
+      setOffset({
+        x: s.startOffsetX + (ev.clientX - s.startX),
+        y: s.startOffsetY + (ev.clientY - s.startY),
+      });
+    }
+    function onUp() {
+      dragStateRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
   const token = tokens.find((t) => t.id === pathPlanningTokenId);
 
   if (!pathPlanningActive || !token) return null;
@@ -82,15 +124,26 @@ export function PathPreviewPanel() {
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-4 left-1/2 z-30 w-80 -translate-x-1/2 rounded-xl border border-brand-border bg-[#111116]/95 shadow-2xl backdrop-blur-sm"
+      className="pointer-events-auto absolute bottom-4 left-1/2 z-30 w-80 rounded-xl border border-brand-border bg-[#111116]/95 shadow-2xl backdrop-blur-sm"
+      style={{
+        transform: `translate(calc(-50% + ${offset.x}px), ${offset.y}px)`,
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-brand-border px-3 py-2">
-        <span className="text-xs font-bold uppercase tracking-wider text-brand-accent">
-          Trajeto Planejado
-        </span>
+      {/* Header — drag handle (segura e arrasta pra reposicionar) */}
+      <div
+        onMouseDown={onDragStart}
+        className="flex cursor-grab items-center justify-between gap-2 border-b border-brand-border px-3 py-2 select-none active:cursor-grabbing"
+        title="Arraste para reposicionar"
+      >
+        <div className="flex items-center gap-1.5">
+          <GripHorizontal className="h-3 w-3 text-brand-muted/60" />
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-accent">
+            Trajeto Planejado
+          </span>
+        </div>
         <button
           onClick={exitPathPlanning}
+          onMouseDown={(e) => e.stopPropagation()}
           className="rounded p-0.5 text-brand-muted hover:text-brand-text"
         >
           <X className="h-3.5 w-3.5" />
