@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CloudFog,
@@ -50,6 +50,39 @@ export function CellContextMenu({ cellX, cellY, x, y, onClose }: CellContextMenu
   const isFogged = fogCells.has(`${cellX},${cellY}`);
   const [popover, setPopover] = useState<PopoverView>(null);
 
+  // Edge-aware positioning — clampa contra os 4 lados do viewport.
+  // Sem isso, abrir o menu perto da borda direita (ex: célula encostada
+  // no painel de Alvo) faz o menu ficar atrás do painel.
+  const VIEWPORT_MARGIN = 8;
+  const [pos, setPos] = useState<{ top: number; left: number }>({
+    top: y,
+    left: x,
+  });
+
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const overflowsRight = x + rect.width > vw - VIEWPORT_MARGIN;
+    const overflowsBottom = y + rect.height > vh - VIEWPORT_MARGIN;
+
+    const nextLeft = overflowsRight
+      ? Math.max(VIEWPORT_MARGIN, x - rect.width)
+      : x;
+    const nextTop = overflowsBottom
+      ? Math.max(VIEWPORT_MARGIN, y - rect.height)
+      : y;
+
+    if (nextLeft !== pos.left || nextTop !== pos.top) {
+      setPos({ top: nextTop, left: nextLeft });
+    }
+    // Re-clampa só quando o cursor muda ou ao trocar de popover (a
+    // troca pode mudar a altura do conteúdo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [x, y, popover]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
@@ -97,7 +130,7 @@ export function CellContextMenu({ cellX, cellY, x, y, onClose }: CellContextMenu
 
   if (popover === "addToken") {
     return (
-      <div ref={ref} className="fixed z-50 min-w-[260px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: x, top: y }}>
+      <div ref={ref} className="fixed z-50 min-w-[260px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: pos.left, top: pos.top }}>
         <AddTokenPopover
           cellX={cellX}
           cellY={cellY}
@@ -114,7 +147,7 @@ export function CellContextMenu({ cellX, cellY, x, y, onClose }: CellContextMenu
 
   if (popover === "marker") {
     return (
-      <div ref={ref} className="fixed z-50 min-w-[240px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: x, top: y }}>
+      <div ref={ref} className="fixed z-50 min-w-[240px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: pos.left, top: pos.top }}>
         <MarkerPopover
           onCancel={() => setPopover(null)}
           onSubmit={(data) => {
@@ -129,7 +162,7 @@ export function CellContextMenu({ cellX, cellY, x, y, onClose }: CellContextMenu
 
   if (popover === "note") {
     return (
-      <div ref={ref} className="fixed z-50 min-w-[240px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: x, top: y }}>
+      <div ref={ref} className="fixed z-50 min-w-[240px] rounded-lg border border-brand-border bg-[#16161D] p-3 shadow-xl" style={{ left: pos.left, top: pos.top }}>
         <NotePopover
           onCancel={() => setPopover(null)}
           onSubmit={(data) => {
@@ -148,7 +181,7 @@ export function CellContextMenu({ cellX, cellY, x, y, onClose }: CellContextMenu
     <div
       ref={ref}
       className="fixed z-50 min-w-[200px] rounded-lg border border-brand-border bg-[#16161D] py-1 shadow-xl"
-      style={{ left: x, top: y }}
+      style={{ left: pos.left, top: pos.top }}
     >
       <div className="px-3 py-1 text-[10px] text-brand-muted">
         Celula ({cellX}, {cellY})
