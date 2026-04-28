@@ -21,6 +21,7 @@ import { LeftPanel } from "./left-panel/left-panel";
 import { RightPanel } from "./right-panel/right-panel";
 import { MapCanvas } from "./map-canvas/map-canvas";
 import { GameplayMapPicker } from "./gameplay-map-picker";
+import { CombatTurnHUD } from "./combat-turn-hud";
 import { ScaleBar } from "./map-overlays/ScaleBar";
 import { ZoomControls } from "./map-overlays/ZoomControls";
 import { ResizableDivider } from "./shared/resizable-divider";
@@ -138,6 +139,12 @@ export function GameplayLayout() {
           <div className="pointer-events-none absolute left-3 top-3 z-40">
             <GameplayMapPicker />
           </div>
+          {/* HUD de combate — topo-centro, sempre visível pro GM */}
+          {currentUserIsGM && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2">
+              <CombatTurnHUD />
+            </div>
+          )}
           <ScaleBar />
           <ZoomControls />
         </div>

@@ -116,10 +116,22 @@ export function StartCombatModal({ onClose }: StartCombatModalProps) {
         </button>
         <button
           onClick={() => {
+            if (entries.length === 0) {
+              onClose();
+              return;
+            }
+            useGameplayStore.getState().startCombat(
+              sorted.map((e) => ({
+                tokenId: e.tokenId,
+                initiative: e.initiative,
+                status: "active" as const,
+              })),
+            );
             usePhaseStore.getState().transitionTo("combat", "Combate");
             onClose();
           }}
-          className="h-9 rounded-lg bg-brand-accent px-4 text-xs font-medium text-white transition-colors hover:bg-brand-accent/90"
+          disabled={entries.length === 0}
+          className="h-9 rounded-lg bg-brand-accent px-4 text-xs font-medium text-white transition-colors hover:bg-brand-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Iniciar Combate
         </button>

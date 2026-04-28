@@ -226,6 +226,11 @@ export interface GameplayState {
   nextTurn: () => void;
   prevTurn: () => void;
   endCombat: () => void;
+  /** Inicia o combate com a lista de combatentes ordenada por iniciativa
+   *  (descendente). Reseta turn index, round e turnActions. Quando o
+   *  array vem vazio cai no setup default (sem combatentes — botão de
+   *  HUD impede esse caso). */
+  startCombat: (order: Combatant[]) => void;
   /** Atalho de teste: inicia combate se inativo, inclui o token no order
    *  se faltar, e seta este token como o turno atual. Usado pelo menu
    *  contextual ("Definir turno") pra testar o fluxo na visão do player. */
@@ -710,6 +715,21 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
       }
     });
     get().addToast("Combate encerrado. Clique na fase para alterar.");
+  },
+  startCombat: (order) => {
+    const sorted = [...order].sort((a, b) => b.initiative - a.initiative);
+    set({
+      combat: {
+        active: true,
+        round: 1,
+        turnIndex: 0,
+        order: sorted,
+      },
+      movementUsedFt: 0,
+      turnActions: { ...DEFAULT_TURN_ACTIONS },
+      reactionUsedMap: {},
+    });
+    playSFXSync("combat:turn_change");
   },
   setCurrentTurn: (tokenId) => {
     set((s) => {
