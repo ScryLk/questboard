@@ -26,6 +26,7 @@ import { AOEOverlay } from "./overlays/aoe-overlay";
 import { DrawOverlay } from "./overlays/draw-overlay";
 import { TerrainOverlay } from "./overlays/terrain-overlay";
 import { AttackLineOverlay } from "./overlays/attack-line-overlay";
+import { TargetSelectionOverlay } from "./overlays/target-selection-overlay";
 import { FogOverlay } from "./overlays/fog-overlay";
 import { RegionSelectOverlay } from "./overlays/region-select-overlay";
 import { AISelectionOverlay } from "./overlays/ai-selection-overlay";
@@ -1887,6 +1888,9 @@ export function MapCanvas() {
               scaledCell={scaledCell}
             />
           )}
+
+          {/* Anéis de alvo do ataque atual (multi-target visual) */}
+          <TargetSelectionOverlay tokens={onMapTokens} scaledCell={scaledCell} />
 
           {/* Reaction prompt */}
           {pendingReaction && (() => {
