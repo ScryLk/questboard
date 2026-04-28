@@ -16,3 +16,4 @@ export * from "./campaign";
 export * from "./feed";
 export * from "./narrative";
 export * from "./search";
+export * from "./dnd5e";
