@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search, Sparkles, Star } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search, Sparkles, Star, Wand2 } from "lucide-react";
 import {
   useCharacterStore,
   createDefaultCharacter,
@@ -111,6 +112,13 @@ export default function CharactersPage() {
             <Sparkles className="h-4 w-4" />
             Gerar com IA
           </button>
+          <Link
+            href="/characters/new/dnd5e"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-purple-500/40 bg-purple-500/10 px-4 py-2.5 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
+          >
+            <Wand2 className="h-4 w-4" />
+            Wizard 5e
+          </Link>
           <button
             onClick={() => openEditor(null)}
             className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-accent/80"
