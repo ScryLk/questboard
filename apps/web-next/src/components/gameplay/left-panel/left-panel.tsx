@@ -10,8 +10,11 @@ import { ObjectLibrarySection } from "./object-library/object-library-section";
 import { AudioPanel } from "../audio/audio-panel";
 
 export function LeftPanel() {
+  // `min-h-full` (não `h-full`) deixa o conteúdo crescer além da altura
+  // do aside quando todas as seções estão expandidas — é isso que dispara
+  // o `overflow-y: auto` do aside e habilita o scroll.
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       <InitiativeTracker />
       <PlayerList />
       <MapSidebarSection />
