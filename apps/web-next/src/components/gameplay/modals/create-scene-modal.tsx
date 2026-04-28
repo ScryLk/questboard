@@ -77,7 +77,12 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   };
 
   return (
-    <ModalShell title="Nova Cena" maxWidth={880} onClose={onClose}>
+    <ModalShell
+      title="Nova Cena"
+      maxWidth={880}
+      maxHeight="none"
+      onClose={onClose}
+    >
       <div className="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         {/* ── Coluna esquerda: form + ações no rodapé ── */}
         <div className="flex flex-col gap-4">
@@ -213,13 +218,14 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
 
         {/* ── Coluna direita: galerias ── */}
         <div className="space-y-4">
-          {/* Session maps */}
+          {/* Session maps — lista compacta horizontal pra não duplicar
+           *  vertical com Templates abaixo. */}
           {MOCK_SESSION_MAPS.length > 0 && (
             <section>
               <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
                 Mapas da Sessão
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {MOCK_SESSION_MAPS.map((map) => {
                   const isSelected = selectedSourceId === `session:${map.id}`;
                   return (
@@ -231,13 +237,13 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
                         setRows(String(map.gridRows));
                         setSelectedSourceId(`session:${map.id}`);
                       }}
-                      className={`group relative flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors ${
+                      className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
                         isSelected
                           ? "border-brand-accent/60 bg-brand-accent/10"
                           : "border-brand-border bg-brand-primary hover:border-brand-accent/40"
                       }`}
                     >
-                      <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md bg-[#0A0A0F]">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0A0A0F]">
                         {map.thumbnail ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -246,22 +252,22 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <Map className="h-7 w-7 text-brand-muted/60" />
+                          <Map className="h-3.5 w-3.5 text-brand-muted/60" />
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-brand-text">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-medium text-brand-text">
                           {map.name}
                         </p>
-                        {map.isActive && (
-                          <span className="shrink-0 rounded-full bg-brand-success/15 px-1.5 py-0.5 text-[8px] font-medium text-brand-success">
-                            Ativo
-                          </span>
-                        )}
+                        <p className="truncate text-[10px] text-brand-muted">
+                          {map.gridCols}×{map.gridRows}
+                        </p>
                       </div>
-                      <p className="text-[10px] text-brand-muted">
-                        {map.gridCols}×{map.gridRows} · {map.category}
-                      </p>
+                      {map.isActive && (
+                        <span className="shrink-0 rounded-full bg-brand-success/15 px-1 py-0.5 text-[8px] font-medium text-brand-success">
+                          Ativo
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -274,7 +280,7 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
             <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
               Templates
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {CURATED_TEMPLATES.map((tmpl) => {
                 const isSelected = selectedSourceId === `tmpl:${tmpl.id}`;
                 return (
@@ -286,29 +292,29 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
                       setRows(String(Math.max(15, tmpl.height * 3)));
                       setSelectedSourceId(`tmpl:${tmpl.id}`);
                     }}
-                    className={`group flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors ${
+                    className={`flex flex-col gap-1 rounded-lg border p-1.5 text-left transition-colors ${
                       isSelected
                         ? "border-brand-accent/60 bg-brand-accent/10"
                         : "border-brand-border bg-brand-primary hover:border-brand-accent/40"
                     }`}
                   >
-                    <div className="aspect-[4/3] w-full overflow-hidden rounded-md">
+                    <div className="aspect-[3/2] w-full overflow-hidden rounded-md">
                       <RoomTemplatePreview
                         template={tmpl}
                         width={120}
-                        height={90}
+                        height={80}
                         className="h-full w-full"
                       />
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[12px] leading-none">{tmpl.icon}</span>
+                      <span className="text-[11px] leading-none">{tmpl.icon}</span>
                       <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-brand-text">
                         {tmpl.name}
                       </p>
+                      <span className="shrink-0 text-[9px] text-brand-muted">
+                        {tmpl.width}×{tmpl.height}
+                      </span>
                     </div>
-                    <p className="text-[10px] text-brand-muted">
-                      {tmpl.width}×{tmpl.height}
-                    </p>
                   </button>
                 );
               })}

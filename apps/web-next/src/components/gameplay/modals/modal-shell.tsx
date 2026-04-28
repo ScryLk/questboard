@@ -6,6 +6,10 @@ import { X } from "lucide-react";
 interface ModalShellProps {
   title: string;
   maxWidth?: number;
+  /** CSS max-height (qualquer string CSS válida). Default `85vh`.
+   *  Use `none` quando o modal já está dimensionado para caber e o
+   *  scroll interno introduziria recorte indesejado. */
+  maxHeight?: string;
   children: React.ReactNode;
   onClose: () => void;
 }
@@ -13,6 +17,7 @@ interface ModalShellProps {
 export function ModalShell({
   title,
   maxWidth = 480,
+  maxHeight = "85vh",
   children,
   onClose,
 }: ModalShellProps) {
@@ -35,8 +40,13 @@ export function ModalShell({
     >
       <div
         ref={ref}
-        className="relative max-h-[85vh] overflow-y-auto rounded-xl border border-brand-border bg-[#111116] shadow-2xl"
-        style={{ width: `min(${maxWidth}px, calc(100vw - 32px))` }}
+        className={`relative rounded-xl border border-brand-border bg-[#111116] shadow-2xl ${
+          maxHeight === "none" ? "" : "overflow-y-auto"
+        }`}
+        style={{
+          width: `min(${maxWidth}px, calc(100vw - 32px))`,
+          maxHeight: maxHeight === "none" ? undefined : maxHeight,
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-brand-border px-5 py-4">
