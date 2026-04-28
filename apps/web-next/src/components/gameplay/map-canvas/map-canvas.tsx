@@ -10,7 +10,13 @@ import {
 } from "@/lib/gameplay-mock-data";
 import type { RulerPoint } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
-import { getNearestEdge, rectangleWallKeys, type NearestEdge } from "@/lib/wall-helpers";
+import {
+  canMoveDiagonal,
+  canTokenMove,
+  getNearestEdge,
+  rectangleWallKeys,
+  type NearestEdge,
+} from "@/lib/wall-helpers";
 import { TokenContextMenu } from "./menus/token-context-menu";
 import { CellContextMenu } from "./menus/cell-context-menu";
 import { CanvasContextMenu } from "./menus/canvas-context-menu";
@@ -732,7 +738,24 @@ export function MapCanvas() {
         const dist = Math.max(Math.abs(cell.x - lastCell.x), Math.abs(cell.y - lastCell.y));
 
         if (dist === 1) {
-          // Adjacent: add single cell
+          // Adjacent: add single cell. Paredes bloqueiam de qualquer lado;
+          // só portas abertas (door-open) e paredes ilusórias deixam passar.
+          // Portas fechadas/trancadas bloqueiam até serem abertas (right
+          // click → "Abrir porta"). Walls aplicam mesmo pra GM aqui — o
+          // pedido é "sair só pelas portas".
+          const isDiag = lastCell.x !== cell.x && lastCell.y !== cell.y;
+          if (isDiag) {
+            if (!canMoveDiagonal(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false)) {
+              state.addToast("Parede bloqueia passagem");
+              return;
+            }
+          } else {
+            const wallCheck = canTokenMove(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false);
+            if (!wallCheck.allowed) {
+              state.addToast(wallCheck.reason ?? "Parede bloqueia passagem");
+              return;
+            }
+          }
           const step = calculateStepCost(lastCell.x, lastCell.y, cell.x, cell.y, state.terrainCells, cellSizeFt);
           if (step.isImpassable) return;
           // Block if exceeds movement limit
@@ -752,17 +775,16 @@ export function MapCanvas() {
             events,
           });
         } else {
-          // Distant: use A* to find route. GM bypassa paredes/portas
-          // (CLAUDE.md §3 + §10) — sem isso, planejar trajeto longo
-          // através de estruturas com porta fechada falha silenciosamente.
+          // Distant: A* respeita paredes e portas (também para GM no
+          // path planning — abrir a porta primeiro pra atravessar).
           const result = findPath(
             lastCell.x, lastCell.y, cell.x, cell.y,
             state.wallEdges, state.terrainCells, gridCols, gridRows, cellSizeFt,
-            state.currentUserIsGM,
+            false,
           );
           if (!result.found || result.path.length === 0) {
             state.addToast(
-              "Sem rota até o destino. Verifique paredes e portas trancadas.",
+              "Sem rota até o destino. Abra a porta ou contorne a parede.",
             );
             return;
           }
