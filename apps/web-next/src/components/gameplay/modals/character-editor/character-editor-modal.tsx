@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import {
   useCharacterStore,
   createDefaultCharacter,
@@ -40,6 +41,7 @@ export function CharacterEditorModal({ onClose }: CharacterEditorModalProps) {
   const characters = useCharacterStore((s) => s.characters);
   const createCharacter = useCharacterStore((s) => s.createCharacter);
   const updateCharacter = useCharacterStore((s) => s.updateCharacter);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
 
   const isEditing = targetId !== null;
   const existingCharacter = isEditing
@@ -47,7 +49,11 @@ export function CharacterEditorModal({ onClose }: CharacterEditorModalProps) {
     : undefined;
 
   const [form, setForm] = useState<CampaignCharacter>(() =>
-    existingCharacter ? { ...existingCharacter } : createDefaultCharacter(),
+    existingCharacter
+      ? { ...existingCharacter }
+      : createDefaultCharacter({
+          createdByCampaignId: activeCampaignId ?? undefined,
+        }),
   );
   const [activeTab, setActiveTab] = useState<TabKey>("basico");
 

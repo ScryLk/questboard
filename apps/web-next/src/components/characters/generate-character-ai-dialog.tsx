@@ -11,6 +11,7 @@ import {
   useCharacterStore,
 } from "@/stores/characterStore";
 import { useNarrativeStore } from "@/stores/narrativeStore";
+import { useCampaignStore } from "@/lib/campaign-store";
 import type { CampaignCharacter } from "@/types/character";
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
 export function GenerateCharacterAIDialog({ onClose, onCreated }: Props) {
   const createCharacter = useCharacterStore((s) => s.createCharacter);
   const nodes = useNarrativeStore((s) => s.nodes);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
 
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState<AICharacterCategory>("npc");
@@ -131,7 +133,9 @@ export function GenerateCharacterAIDialog({ onClose, onCreated }: Props) {
         console.warn("[GenerateCharacterAIDialog] sprite gen exception:", spriteErr);
       }
 
-      const defaults = createDefaultCharacter();
+      const defaults = createDefaultCharacter({
+        createdByCampaignId: activeCampaignId ?? undefined,
+      });
       const ai = payload.character;
       const newCharacter: CampaignCharacter = {
         ...defaults,

@@ -102,7 +102,10 @@ export default function CampaignOverviewPage(props: {
   }
 
   function handleRestore() {
-    restore(campaign!.id);
+    const result = restore(campaign!.id);
+    if (!result.ok) {
+      window.alert(result.error);
+    }
   }
 
   function handleDelete() {

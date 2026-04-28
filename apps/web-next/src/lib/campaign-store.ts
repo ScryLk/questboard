@@ -13,7 +13,15 @@ import type {
   CampaignMemberRole,
   CampaignStatus,
 } from "@questboard/types";
-import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from "@questboard/constants";
+import {
+  JOIN_CODE_ALPHABET,
+  JOIN_CODE_LENGTH,
+  MAX_CAMPAIGNS_BY_PLAN,
+} from "@questboard/constants";
+
+/** Plano do usuário corrente. Persistido. Default `LENDARIO` no mock
+ *  pra não bloquear features durante dev — backend será authoritative. */
+export type UserPlan = keyof typeof MAX_CAMPAIGNS_BY_PLAN;
 
 // ── Helpers ──
 
@@ -184,13 +192,20 @@ interface CampaignStoreState {
   /** Id da campanha "ativa" (selecionada no contexto do dashboard).
    *  Persistida pra abrir nessa ao recarregar. */
   activeCampaignId: string | null;
+  /** Plano do owner (mock). Default LENDARIO — backend será fonte de
+   *  verdade quando billing existir. UI consulta para gating de features
+   *  e contagem de campanhas ativas. */
+  currentPlan: UserPlan;
 
   createCampaign: (draft: CampaignDraft, ownerId?: string) => CampaignDetailed;
   updateCampaign: (id: string, patch: Partial<CampaignDetailed>) => void;
   archiveCampaign: (id: string) => void;
-  restoreCampaign: (id: string) => void;
+  /** Reativa campanha arquivada. Falha (retorna `error`) se restaurar
+   *  excede o limite do plano atual. */
+  restoreCampaign: (id: string) => { ok: true } | { ok: false; error: string };
   deleteCampaign: (id: string) => void;
   regenerateJoinCode: (id: string) => string | null;
+  setCurrentPlan: (plan: UserPlan) => void;
 
   // Membros
   inviteMember: (
@@ -231,6 +246,8 @@ export const useCampaignStore = create<CampaignStoreState>()(
     (set, get) => ({
       campaigns: MOCK_CAMPAIGNS,
       activeCampaignId: null,
+      currentPlan: "LENDARIO" as UserPlan,
+      setCurrentPlan: (plan) => set({ currentPlan: plan }),
 
       createCampaign: (draft, ownerId = MOCK_OWNER_ID) => {
         const now = new Date();
@@ -288,16 +305,34 @@ export const useCampaignStore = create<CampaignStoreState>()(
           })),
         ),
 
-      restoreCampaign: (id) =>
-        // TODO(plan-limits): em backend, validar limite do plano antes de
-        // permitir restaurar. Aqui só reativa.
+      restoreCampaign: (id) => {
+        const s = get();
+        const campaign = s.campaigns.find((c) => c.id === id);
+        if (!campaign) return { ok: false as const, error: "Campanha não encontrada." };
+        if (campaign.status !== "archived") {
+          return { ok: false as const, error: "Esta campanha não está arquivada." };
+        }
+
+        const limit = MAX_CAMPAIGNS_BY_PLAN[s.currentPlan];
+        const activeOwned = s.campaigns.filter(
+          (c) => c.ownerId === campaign.ownerId && c.status !== "archived",
+        ).length;
+        if (activeOwned >= limit) {
+          return {
+            ok: false as const,
+            error: `Limite do plano atingido (${limit} ${limit === 1 ? "campanha ativa" : "campanhas ativas"}). Arquive outra ou faça upgrade.`,
+          };
+        }
+
         set((s) =>
           patchCampaign(s, id, (c) => ({
             ...c,
             status: "active" as CampaignStatus,
             archivedAt: null,
           })),
-        ),
+        );
+        return { ok: true as const };
+      },
 
       deleteCampaign: (id) =>
         set((s) => ({

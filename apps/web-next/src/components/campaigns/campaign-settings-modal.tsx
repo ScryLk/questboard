@@ -581,7 +581,12 @@ function CampaignSettingsModalInner({
                 <div className="flex flex-wrap gap-2">
                   {campaign.status === "archived" ? (
                     <button
-                      onClick={() => restoreCampaign(campaign.id)}
+                      onClick={() => {
+                        const result = restoreCampaign(campaign.id);
+                        if (!result.ok) {
+                          window.alert(result.error);
+                        }
+                      }}
                       className="flex items-center gap-1.5 rounded-md border border-brand-accent/40 bg-brand-accent/10 px-3 py-2 text-xs font-semibold text-brand-accent transition-colors hover:bg-brand-accent/20"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
