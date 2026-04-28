@@ -4,8 +4,19 @@ import { useCallback, useRef, useState } from "react";
 import { Map, Upload, X } from "lucide-react";
 import { ModalShell } from "./modal-shell";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import { MOCK_SESSION_MAPS } from "@/lib/gameplay-mock-data";
+import type {
+  MapObjectCell,
+  MapObjectType,
+  TerrainCell,
+  WallData,
+  WallType,
+} from "@/lib/gameplay-mock-data";
+import type { SceneSavedState } from "@/lib/map-sidebar-types";
+import { wallSideToEdgeKey } from "@/lib/wall-helpers";
 import { ROOM_TEMPLATES } from "@/lib/room-templates";
+import type { RoomTemplate } from "@/lib/room-templates";
 import { RoomTemplatePreview } from "./room-template-preview";
 
 interface CreateSceneModalProps {
@@ -38,10 +49,6 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const setMapBackgroundImage = useGameplayStore(
-    (s) => s.setMapBackgroundImage,
-  );
-
   const processFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
@@ -70,9 +77,62 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   );
 
   const handleCreate = () => {
+    const gridCols = Math.max(1, parseInt(cols, 10) || 25);
+    const gridRows = Math.max(1, parseInt(rows, 10) || 25);
+    const sceneName = name.trim() || "Nova Cena";
+
+    const tmpl: RoomTemplate | null = selectedSourceId?.startsWith("tmpl:")
+      ? CURATED_TEMPLATES.find(
+          (t) => `tmpl:${t.id}` === selectedSourceId,
+        ) ?? null
+      : null;
+
+    const { terrainCells, wallEdges, mapObjects } = buildSceneContent(
+      tmpl,
+      gridCols,
+      gridRows,
+    );
+
+    const sidebar = useMapSidebarStore.getState();
+
+    // Estado salvo da nova cena. Não puxa nada do gameplay-store atual
+    // (esta é uma cena nova, em branco) — só o que veio do template.
+    const savedState: SceneSavedState = {
+      tokens: [],
+      fogCells: [],
+      markers: [],
+      notes: [],
+      aoeInstances: [],
+      lightSources: [],
+      terrainCells,
+      wallEdges,
+      mapObjects,
+      cameraPosition: { scrollLeft: 0, scrollTop: 0, zoom: 1 },
+      ambientLight: sidebar.ambientLight,
+      gridVisible: true,
+    };
+
+    const category = tmpl?.category === "outdoor" ? "Overworld" : "Dungeon";
+    const scene = sidebar.addScene({
+      name: sceneName,
+      category,
+      dimensions: `${gridCols}×${gridRows}`,
+      savedState,
+    });
+
+    // Aplica como ativa — loadSceneState empurra o conteúdo pro gameplay-store.
+    sidebar.setActiveScene(scene.id);
+
+    // mapConfig + bg não fazem parte de SceneSavedState, então setamos direto.
+    const gp = useGameplayStore.getState();
+    gp.setMapConfig({ gridCols, gridRows, name: sceneName });
     if (bgImage) {
-      setMapBackgroundImage(bgImage);
+      gp.setMapBackgroundImage(bgImage);
+    } else {
+      // Limpa fundo anterior pra que o terreno do template fique visível.
+      gp.setMapBackgroundImage(null);
     }
+
     onClose();
   };
 
@@ -324,4 +384,71 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
       </div>
     </ModalShell>
   );
+}
+
+// ── Helpers ──
+
+function makeObjectId(): string {
+  return `obj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Converte um RoomTemplate em arrays prontos pra gameplay-store,
+ *  centralizando o conteúdo dentro do grid escolhido. Quando o template
+ *  é null (cena em branco), retorna tudo vazio. */
+function buildSceneContent(
+  tmpl: RoomTemplate | null,
+  gridCols: number,
+  gridRows: number,
+): {
+  terrainCells: TerrainCell[];
+  wallEdges: Record<string, WallData>;
+  mapObjects: MapObjectCell[];
+} {
+  if (!tmpl) {
+    return { terrainCells: [], wallEdges: {}, mapObjects: [] };
+  }
+
+  const cx = Math.max(0, Math.floor((gridCols - tmpl.width) / 2));
+  const cy = Math.max(0, Math.floor((gridRows - tmpl.height) / 2));
+
+  const terrainCells: TerrainCell[] = [];
+  for (const t of tmpl.terrain) {
+    const x = cx + t.dx;
+    const y = cy + t.dy;
+    if (x < 0 || y < 0 || x >= gridCols || y >= gridRows) continue;
+    terrainCells.push({ x, y, type: t.type });
+  }
+
+  const wallEdges: Record<string, WallData> = {};
+  for (const w of tmpl.walls) {
+    const x = cx + w.dx;
+    const y = cy + w.dy;
+    if (x < 0 || y < 0 || x >= gridCols || y >= gridRows) continue;
+    let wt: WallType = "wall";
+    if (w.isDoor) {
+      wt =
+        w.doorState === "open"
+          ? "door-open"
+          : w.doorState === "locked"
+            ? "door-locked"
+            : "door-closed";
+    }
+    wallEdges[wallSideToEdgeKey(x, y, w.side)] = { type: wt, style: "stone" };
+  }
+
+  const mapObjects: MapObjectCell[] = [];
+  for (const o of tmpl.objects) {
+    const x = cx + o.dx;
+    const y = cy + o.dy;
+    if (x < 0 || y < 0 || x >= gridCols || y >= gridRows) continue;
+    mapObjects.push({
+      id: makeObjectId(),
+      x,
+      y,
+      type: o.type as MapObjectType,
+      rotation: 0,
+    });
+  }
+
+  return { terrainCells, wallEdges, mapObjects };
 }
