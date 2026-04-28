@@ -3,8 +3,10 @@
 import { use } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Skull } from "lucide-react";
+import { ArrowLeft, Plus, Skull } from "lucide-react";
 import { getMonster, getSystem } from "@/lib/srd";
+import { addMonsterToSession } from "@/lib/srd/monster-to-token";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
 
 const SIZE_LABELS: Record<string, string> = {
@@ -39,6 +41,9 @@ export default function MonsterDetailPage({
   const { systemSlug, slug } = use(params);
   const system = getSystem(systemSlug);
   const m = getMonster(systemSlug, slug);
+  // O hook tem que ser sempre chamado antes do early-return — daí o
+  // `?.` no acesso. notFound() pula a render se m for nulo.
+  const isGM = useGameplayStore((s) => s.currentUserIsGM);
   if (!system || !m) notFound();
 
   const speedParts = [
@@ -59,15 +64,29 @@ export default function MonsterDetailPage({
         Monstros
       </Link>
 
-      <header>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <Skull className="h-3.5 w-3.5" />
-          {SIZE_LABELS[m.size]} {m.type}
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <Skull className="h-3.5 w-3.5" />
+            {SIZE_LABELS[m.size]} {m.type}
+          </div>
+          <h1 className="font-cinzel text-3xl font-bold text-white">
+            {m.name}
+          </h1>
+          <p className="mt-1 text-xs italic text-brand-muted">
+            {m.nameEn} · {m.alignment}
+          </p>
         </div>
-        <h1 className="font-cinzel text-3xl font-bold text-white">{m.name}</h1>
-        <p className="mt-1 text-xs italic text-brand-muted">
-          {m.nameEn} · {m.alignment}
-        </p>
+        {isGM && (
+          <button
+            onClick={() => addMonsterToSession(m)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-accent/80"
+            title="Adiciona um token deste monstro no centro do viewport atual."
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Adicionar à sessão
+          </button>
+        )}
       </header>
 
       <section className="grid grid-cols-3 gap-3 rounded-xl border border-brand-border bg-white/[0.02] p-5">

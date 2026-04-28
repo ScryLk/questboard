@@ -3,8 +3,10 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Search, Skull } from "lucide-react";
+import { ArrowLeft, Plus, Search, Skull } from "lucide-react";
 import { getSystem, listMonsters } from "@/lib/srd";
+import { addMonsterToSession } from "@/lib/srd/monster-to-token";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import { SrdAttributionFooter } from "@/components/compendium/srd-attribution-footer";
 
 const CR_BUCKETS: Array<{ value: string; label: string; min: number; max: number }> = [
@@ -40,6 +42,7 @@ export default function MonstersListPage({
   const system = getSystem(systemSlug);
   if (!system) notFound();
   const all = listMonsters(systemSlug);
+  const isGM = useGameplayStore((s) => s.currentUserIsGM);
 
   const [search, setSearch] = useState("");
   const [crBucket, setCrBucket] = useState("all");
@@ -121,35 +124,49 @@ export default function MonstersListPage({
       ) : (
         <div className="grid gap-2">
           {filtered.map((m) => (
-            <Link
+            <div
               key={m.slug}
-              href={`/compendium/${systemSlug}/monsters/${m.slug}`}
               className="group flex items-start gap-3 rounded-lg border border-brand-border bg-white/[0.02] p-3 transition-colors hover:border-brand-accent/40"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-red-500/10 text-red-400">
-                <Skull className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate font-medium text-brand-text">
-                    {m.name}
-                  </p>
-                  <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-brand-text">
-                    ND {formatCr(m.challengeRating)}
-                  </span>
+              <Link
+                href={`/compendium/${systemSlug}/monsters/${m.slug}`}
+                className="flex min-w-0 flex-1 items-start gap-3"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-red-500/10 text-red-400">
+                  <Skull className="h-5 w-5" />
                 </div>
-                <p className="text-[11px] text-brand-muted">
-                  {SIZE_LABELS[m.size]} {m.type} · {m.alignment}
-                </p>
-                <p className="mt-0.5 text-[11px] text-brand-text/70">
-                  CA {m.armorClass} · HP {m.hitPoints} ({m.hitDice}) · Vel {m.speed.walk}m
-                </p>
-              </div>
-              <SrdAttributionFooter
-                attribution={m.attribution}
-                className="self-end"
-              />
-            </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium text-brand-text">
+                      {m.name}
+                    </p>
+                    <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-brand-text">
+                      ND {formatCr(m.challengeRating)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-brand-muted">
+                    {SIZE_LABELS[m.size]} {m.type} · {m.alignment}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-brand-text/70">
+                    CA {m.armorClass} · HP {m.hitPoints} ({m.hitDice}) · Vel {m.speed.walk}m
+                  </p>
+                </div>
+              </Link>
+              {isGM && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addMonsterToSession(m);
+                  }}
+                  className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-brand-accent/30 bg-brand-accent/10 px-2 text-[10px] font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+                  title="Adicionar à sessão"
+                >
+                  <Plus className="h-3 w-3" />
+                  Sessão
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

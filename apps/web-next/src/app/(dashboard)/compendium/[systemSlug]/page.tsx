@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BookOpen,
   ChevronRight,
+  Search,
   Skull,
   Sparkles,
   Sword,
@@ -46,22 +47,33 @@ export default function SystemOverviewPage({
         Compêndio
       </Link>
 
-      <div>
-        <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
-          <BookOpen className="h-3.5 w-3.5" />
-          Sistema
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-brand-accent">
+            <BookOpen className="h-3.5 w-3.5" />
+            Sistema
+          </div>
+          <h1 className="font-cinzel text-2xl font-bold text-white">
+            {system.name}
+          </h1>
+          <p className="mt-1 text-xs text-brand-muted">
+            {system.publisher}
+            {system.edition && ` · ${system.edition}`} ·{" "}
+            {system.licenseType === "CC-BY-4.0" ? "CC-BY 4.0" : "Proprietário"}
+          </p>
+          <p className="mt-3 max-w-2xl text-sm text-brand-text/90">
+            {system.description}
+          </p>
         </div>
-        <h1 className="font-cinzel text-2xl font-bold text-white">
-          {system.name}
-        </h1>
-        <p className="mt-1 text-xs text-brand-muted">
-          {system.publisher}
-          {system.edition && ` · ${system.edition}`} ·{" "}
-          {system.licenseType === "CC-BY-4.0" ? "CC-BY 4.0" : "Proprietário"}
-        </p>
-        <p className="mt-3 max-w-2xl text-sm text-brand-text/90">
-          {system.description}
-        </p>
+        {system.hasContent && (
+          <Link
+            href={`/compendium/${systemSlug}/search`}
+            className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white/[0.02] px-3 py-2 text-xs text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text sm:inline-flex"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Buscar tudo
+          </Link>
+        )}
       </div>
 
       {!system.hasContent && (
