@@ -38,6 +38,10 @@ const DIRS = [
 
 /**
  * A* pathfinding respecting walls, terrain costs, and map boundaries.
+ *
+ * `allowClosedDoors`: quando true, portas fechadas (não trancadas)
+ * contam como passáveis. Path planning usa pra deixar o trajeto
+ * atravessar portas e marcar como evento — execução abre na hora.
  */
 export function findPath(
   startX: number,
@@ -50,6 +54,7 @@ export function findPath(
   gridRows: number,
   cellSizeFt: number,
   isGM = false,
+  allowClosedDoors = false,
 ): PathfindingResult {
   if (startX === endX && startY === endY) {
     return { path: [], totalCost: 0, found: true };
@@ -113,9 +118,9 @@ export function findPath(
       // Wall check
       const isDiag = dir.dx !== 0 && dir.dy !== 0;
       if (isDiag) {
-        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM)) continue;
+        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM, allowClosedDoors)) continue;
       } else {
-        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM);
+        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM, allowClosedDoors);
         if (!check.allowed) continue;
       }
 
@@ -174,6 +179,7 @@ export function getReachableCells(
   gridRows: number,
   cellSizeFt: number,
   isGM = false,
+  allowClosedDoors = false,
 ): Map<string, number> {
   const costs = new Map<string, number>();
   const startKey = nodeKey(startX, startY);
@@ -202,9 +208,9 @@ export function getReachableCells(
       // Wall check
       const isDiag = dir.dx !== 0 && dir.dy !== 0;
       if (isDiag) {
-        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM)) continue;
+        if (!canMoveDiagonal(current.x, current.y, nx, ny, wallEdges, isGM, allowClosedDoors)) continue;
       } else {
-        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM);
+        const check = canTokenMove(current.x, current.y, nx, ny, wallEdges, isGM, allowClosedDoors);
         if (!check.allowed) continue;
       }
 

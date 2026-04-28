@@ -62,9 +62,10 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
       MOCK_MAP.gridCols,
       MOCK_MAP.gridRows,
       cellSizeFt,
-      // Walls e portas fechadas SEMPRE limitam o highlight de alcance,
-      // mesmo pro GM. Pra entrar numa estrutura, abra a porta primeiro.
       false,
+      // Portas fechadas entram no highlight — trajeto pode atravessar
+      // marcando a porta como evento. Trancadas seguem bloqueando.
+      true,
     );
   }, [token, pathPlanningActive, plannedPath, maxFt, wallEdges, terrainCells, cellSizeFt]);
 

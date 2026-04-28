@@ -22,6 +22,8 @@ import { useGameplayStore } from "@/lib/gameplay-store";
 import type { PathCellEvent, PathEventType } from "@/lib/gameplay-store";
 import { getMaxMovementFt } from "@/lib/movement-cost";
 import { executePath } from "@/lib/path-execution";
+import { makeWallKey } from "@/lib/wall-helpers";
+import { DoorOpen } from "lucide-react";
 
 const EVENT_ICONS: Record<PathEventType, typeof Swords> = {
   opportunity_attack: Swords,
@@ -116,6 +118,34 @@ export function PathPreviewPanel() {
   const dangerCount = allEvents.filter((e) => e.severity === "danger").length;
   const warningCount = allEvents.filter((e) => e.severity === "warning").length;
 
+  // Lista de portas fechadas no caminho — usada pra mostrar botão de
+  // pré-abrir. Cada porta é a aresta entre cell[i-1] e cell[i] (origem
+  // do path = posição do token).
+  const closedDoorEdges: string[] = (() => {
+    const keys: string[] = [];
+    for (let i = 0; i < plannedPath.length; i++) {
+      const cell = plannedPath[i];
+      if (!cell.events.some((e) => e.type === "door_closed")) continue;
+      const prev = i === 0 ? { x: token.x, y: token.y } : plannedPath[i - 1];
+      keys.push(makeWallKey(prev.x, prev.y, cell.x, cell.y));
+    }
+    return keys;
+  })();
+  const closedDoorCount = closedDoorEdges.length;
+
+  function preOpenDoors() {
+    const st = useGameplayStore.getState();
+    for (const key of closedDoorEdges) {
+      const w = st.wallEdges[key];
+      if (w?.type === "door-closed") st.toggleDoorEdge(key);
+    }
+    st.addToast(
+      closedDoorCount === 1
+        ? "Porta aberta"
+        : `${closedDoorCount} portas abertas`,
+    );
+  }
+
   async function handleConfirm() {
     if (plannedPath.length === 0) return;
     if (blockedByLimit) return; // Safety: jogador não pode passar do speed
@@ -194,7 +224,7 @@ export function PathPreviewPanel() {
 
         {/* Modificadores de movimento — atalho rápido pra dobrar speed
          *  sem precisar abrir a action bar. */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setDashing(!turnActions.isDashing)}
             className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
@@ -211,6 +241,19 @@ export function PathPreviewPanel() {
             <Wind className="h-2.5 w-2.5" />
             Dash {turnActions.isDashing ? "✓" : `×2`}
           </button>
+
+          {/* Botão de pré-abrir portas. Só aparece se o trajeto cruza
+           *  alguma porta fechada — caso contrário polui o painel. */}
+          {closedDoorCount > 0 && (
+            <button
+              onClick={preOpenDoors}
+              className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300 transition-colors hover:bg-amber-500/20"
+              title="Abre as portas no caminho antes de confirmar — caso contrário, o token abre na hora ao chegar"
+            >
+              <DoorOpen className="h-2.5 w-2.5" />
+              Abrir {closedDoorCount === 1 ? "porta" : `${closedDoorCount} portas`}
+            </button>
+          )}
         </div>
 
         {/* Events */}

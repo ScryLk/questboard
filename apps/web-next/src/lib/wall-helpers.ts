@@ -153,6 +153,11 @@ export function canTokenMove(
   toY: number,
   wallEdges: Record<string, WallData>,
   isGM = false,
+  /** Quando true, portas fechadas (não trancadas) são permitidas — usado
+   *  pelo path planning, que mostra a porta como "evento" no caminho e
+   *  abre ela automaticamente ao executar. Default false (drag-move,
+   *  validação canônica). */
+  allowClosedDoors = false,
 ): { allowed: boolean; reason?: string } {
   const key = makeWallKey(fromX, fromY, toX, toY);
   const wall = wallEdges[key];
@@ -162,7 +167,10 @@ export function canTokenMove(
 
   switch (wall.type) {
     case "wall": return { allowed: false, reason: "Parede bloqueia passagem" };
-    case "door-closed": return { allowed: false, reason: "Porta fechada" };
+    case "door-closed":
+      return allowClosedDoors
+        ? { allowed: true }
+        : { allowed: false, reason: "Porta fechada" };
     case "door-locked": return { allowed: false, reason: "Porta trancada" };
     case "door-open": return { allowed: true };
     case "window": return { allowed: false, reason: "Janela bloqueia passagem" };
@@ -184,23 +192,24 @@ export function canMoveDiagonal(
   toY: number,
   wallEdges: Record<string, WallData>,
   isGM = false,
+  allowClosedDoors = false,
 ): boolean {
   const dx = toX - fromX;
   const dy = toY - fromY;
 
   if (Math.abs(dx) !== 1 || Math.abs(dy) !== 1) {
-    return canTokenMove(fromX, fromY, toX, toY, wallEdges, isGM).allowed;
+    return canTokenMove(fromX, fromY, toX, toY, wallEdges, isGM, allowClosedDoors).allowed;
   }
 
   // Path A: horizontal first, then vertical
   const pathA =
-    canTokenMove(fromX, fromY, toX, fromY, wallEdges, isGM).allowed &&
-    canTokenMove(toX, fromY, toX, toY, wallEdges, isGM).allowed;
+    canTokenMove(fromX, fromY, toX, fromY, wallEdges, isGM, allowClosedDoors).allowed &&
+    canTokenMove(toX, fromY, toX, toY, wallEdges, isGM, allowClosedDoors).allowed;
 
   // Path B: vertical first, then horizontal
   const pathB =
-    canTokenMove(fromX, fromY, fromX, toY, wallEdges, isGM).allowed &&
-    canTokenMove(fromX, toY, toX, toY, wallEdges, isGM).allowed;
+    canTokenMove(fromX, fromY, fromX, toY, wallEdges, isGM, allowClosedDoors).allowed &&
+    canTokenMove(fromX, toY, toX, toY, wallEdges, isGM, allowClosedDoors).allowed;
 
   return pathA || pathB;
 }

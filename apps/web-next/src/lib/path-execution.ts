@@ -4,6 +4,7 @@ import { detectOpportunityAttacks } from "./reactions";
 import { MOCK_MAP } from "./gameplay-mock-data";
 import { playOAAlertSound } from "./oa-alert-sound";
 import { useSettingsStore } from "./settings-store";
+import { makeWallKey } from "./wall-helpers";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,6 +44,22 @@ export async function executePath(
     const prev = i > 0 ? path[i - 1] : null;
     const prevX = prev ? prev.x : store.getState().tokens.find((t) => t.id === tokenId)?.x ?? cell.x;
     const prevY = prev ? prev.y : store.getState().tokens.find((t) => t.id === tokenId)?.y ?? cell.y;
+
+    // Auto-abrir porta fechada que estiver na borda entre prev e este.
+    // Trancada NÃO é aberta (vai bloquear no detectStepEvents da próxima
+    // vez que o usuário tentar planejar). A descrição visual da porta
+    // fica como evento na célula, e o token abre fisicamente ao chegar.
+    const beforeMove = store.getState();
+    const edgeKey = makeWallKey(prevX, prevY, cell.x, cell.y);
+    const wall = beforeMove.wallEdges[edgeKey];
+    if (wall && wall.type === "door-closed") {
+      beforeMove.toggleDoorEdge(edgeKey);
+      // Pequeno toast só na primeira porta atravessada — evita spam em
+      // trajetos com várias portas, mas dá feedback claro.
+      if (cell.events.some((e) => e.type === "door_closed")) {
+        beforeMove.addToast("Porta aberta no caminho");
+      }
+    }
 
     // Move token (CSS transition handles visual animation at 200ms)
     store.getState().moveToken(tokenId, cell.x, cell.y);

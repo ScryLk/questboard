@@ -738,19 +738,19 @@ export function MapCanvas() {
         const dist = Math.max(Math.abs(cell.x - lastCell.x), Math.abs(cell.y - lastCell.y));
 
         if (dist === 1) {
-          // Adjacent: add single cell. Paredes bloqueiam de qualquer lado;
-          // só portas abertas (door-open) e paredes ilusórias deixam passar.
-          // Portas fechadas/trancadas bloqueiam até serem abertas (right
-          // click → "Abrir porta"). Walls aplicam mesmo pra GM aqui — o
-          // pedido é "sair só pelas portas".
+          // Adjacent: add single cell. Paredes sólidas bloqueiam, portas
+          // ABERTAS passam livres, portas FECHADAS são permitidas no
+          // path planning como evento — execute() abre na hora ou GM
+          // pré-abre via botão. Trancadas continuam bloqueando até serem
+          // destrancadas no editor.
           const isDiag = lastCell.x !== cell.x && lastCell.y !== cell.y;
           if (isDiag) {
-            if (!canMoveDiagonal(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false)) {
+            if (!canMoveDiagonal(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false, true)) {
               state.addToast("Parede bloqueia passagem");
               return;
             }
           } else {
-            const wallCheck = canTokenMove(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false);
+            const wallCheck = canTokenMove(lastCell.x, lastCell.y, cell.x, cell.y, state.wallEdges, false, true);
             if (!wallCheck.allowed) {
               state.addToast(wallCheck.reason ?? "Parede bloqueia passagem");
               return;
@@ -775,16 +775,18 @@ export function MapCanvas() {
             events,
           });
         } else {
-          // Distant: A* respeita paredes e portas (também para GM no
-          // path planning — abrir a porta primeiro pra atravessar).
+          // Distant: A* respeita paredes sólidas e portas trancadas.
+          // Portas fechadas (não trancadas) são tratadas como passáveis
+          // — o trajeto inclui a porta como evento e abre na execução.
           const result = findPath(
             lastCell.x, lastCell.y, cell.x, cell.y,
             state.wallEdges, state.terrainCells, gridCols, gridRows, cellSizeFt,
             false,
+            true,
           );
           if (!result.found || result.path.length === 0) {
             state.addToast(
-              "Sem rota até o destino. Abra a porta ou contorne a parede.",
+              "Sem rota até o destino. Pode haver porta trancada ou parede sólida no caminho.",
             );
             return;
           }
