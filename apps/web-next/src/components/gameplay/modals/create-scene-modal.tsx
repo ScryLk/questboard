@@ -1,21 +1,32 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Image, Map, Upload, X } from "lucide-react";
+import { Map, Upload, X } from "lucide-react";
 import { ModalShell } from "./modal-shell";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { MOCK_SESSION_MAPS } from "@/lib/gameplay-mock-data";
+import { ROOM_TEMPLATES } from "@/lib/room-templates";
+import { RoomTemplatePreview } from "./room-template-preview";
 
 interface CreateSceneModalProps {
   onClose: () => void;
 }
 
-const PRESET_MAPS = [
-  { id: "tavern", name: "Taverna", size: "20x15" },
-  { id: "dungeon", name: "Masmorra", size: "30x30" },
-  { id: "forest", name: "Floresta", size: "25x25" },
-  { id: "castle", name: "Castelo", size: "40x30" },
+// Subset curado pra "Nova Cena". Backend trará uma galeria maior; aqui
+// pegamos um exemplar de cada vibe (taverna, masmorra, throne, outdoor,
+// biblioteca, tesouro) pra dar variedade visual sem encher a tela.
+const TEMPLATE_PICKS = [
+  "tavern_main",
+  "throne_room",
+  "small_stone_room",
+  "forest_clearing",
+  "library",
+  "treasure_vault",
 ];
+
+const CURATED_TEMPLATES = TEMPLATE_PICKS.map((id) =>
+  ROOM_TEMPLATES.find((t) => t.id === id),
+).filter((t): t is NonNullable<typeof t> => Boolean(t));
 
 export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   const [name, setName] = useState("");
@@ -24,7 +35,7 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   const [cellSize, setCellSize] = useState("40");
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const setMapBackgroundImage = useGameplayStore(
@@ -66,197 +77,229 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   };
 
   return (
-    <ModalShell title="Nova Cena" maxWidth={480} onClose={onClose}>
-      {/* Scene name */}
-      <div className="mb-4">
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-          Nome da cena
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ex: Sala do Trono"
-          className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-3 text-sm text-brand-text placeholder:text-brand-muted/60 focus:border-brand-accent focus:outline-none"
-        />
-      </div>
-
-      {/* Grid dimensions */}
-      <div className="mb-4">
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-          Dimensoes do Grid
-        </label>
-        <div className="flex gap-3">
-          <div className="flex-1">
+    <ModalShell title="Nova Cena" maxWidth={880} onClose={onClose}>
+      <div className="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        {/* ── Coluna esquerda: form ── */}
+        <div className="space-y-4">
+          {/* Scene name */}
+          <div>
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
+              Nome da cena
+            </label>
             <input
-              type="number"
-              value={cols}
-              onChange={(e) => setCols(e.target.value)}
-              className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-3 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Sala do Trono"
+              className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-3 text-sm text-brand-text placeholder:text-brand-muted/60 focus:border-brand-accent focus:outline-none"
             />
-            <span className="mt-0.5 block text-[10px] text-brand-muted">
-              Colunas
-            </span>
           </div>
-          <span className="flex items-center pt-0 text-brand-muted">x</span>
-          <div className="flex-1">
-            <input
-              type="number"
-              value={rows}
-              onChange={(e) => setRows(e.target.value)}
-              className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-3 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
-            />
-            <span className="mt-0.5 block text-[10px] text-brand-muted">
-              Linhas
-            </span>
-          </div>
-          <div className="flex-1">
-            <input
-              type="number"
-              value={cellSize}
-              onChange={(e) => setCellSize(e.target.value)}
-              className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-3 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
-            />
-            <span className="mt-0.5 block text-[10px] text-brand-muted">
-              Celula (px)
-            </span>
-          </div>
-        </div>
-      </div>
 
-      {/* Background image upload */}
-      <div className="mb-4">
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-          Imagem de Fundo (opcional)
-        </label>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-
-        {bgImage ? (
-          <div className="relative rounded-lg border border-brand-border bg-brand-primary">
-            <img
-              src={bgImage}
-              alt="Background preview"
-              className="h-28 w-full rounded-lg object-cover"
-            />
-            <button
-              onClick={() => setBgImage(null)}
-              className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-black/80"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <p className="px-3 py-1.5 text-[10px] text-brand-muted">
-              Imagem carregada
-            </p>
-          </div>
-        ) : (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            className={`flex h-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-              dragging
-                ? "border-brand-accent bg-brand-accent/10"
-                : "border-brand-border bg-brand-primary hover:border-brand-accent/50"
-            }`}
-          >
-            <div className="flex flex-col items-center gap-1 text-brand-muted">
-              <Upload className="h-5 w-5" />
-              <span className="text-xs">Arraste ou clique para enviar</span>
+          {/* Grid dimensions */}
+          <div>
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
+              Dimensões do Grid
+            </label>
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2">
+              <div>
+                <input
+                  type="number"
+                  value={cols}
+                  onChange={(e) => setCols(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-2 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
+                />
+                <span className="mt-0.5 block text-center text-[10px] text-brand-muted">
+                  Colunas
+                </span>
+              </div>
+              <span className="self-center text-brand-muted">×</span>
+              <div>
+                <input
+                  type="number"
+                  value={rows}
+                  onChange={(e) => setRows(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-2 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
+                />
+                <span className="mt-0.5 block text-center text-[10px] text-brand-muted">
+                  Linhas
+                </span>
+              </div>
+              <span className="self-center text-brand-muted">·</span>
+              <div>
+                <input
+                  type="number"
+                  value={cellSize}
+                  onChange={(e) => setCellSize(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-brand-border bg-brand-primary px-2 text-sm text-brand-text focus:border-brand-accent focus:outline-none"
+                />
+                <span className="mt-0.5 block text-center text-[10px] text-brand-muted">
+                  Célula (px)
+                </span>
+              </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Session maps */}
-      {MOCK_SESSION_MAPS.length > 0 && (
-        <div className="mb-4">
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-            Mapas da Sessao
-          </label>
-          <div className="grid max-h-[180px] grid-cols-2 gap-2 overflow-y-auto pr-1">
-            {MOCK_SESSION_MAPS.map((map) => {
-              const isSelected = selectedMapId === map.id;
-              return (
+          {/* Background image upload */}
+          <div>
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
+              Imagem de Fundo (opcional)
+            </label>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {bgImage ? (
+              <div className="relative overflow-hidden rounded-lg border border-brand-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={bgImage}
+                  alt="Background preview"
+                  className="h-24 w-full object-cover"
+                />
                 <button
-                  key={map.id}
-                  onClick={() => {
-                    setName(map.name);
-                    setCols(String(map.gridCols));
-                    setRows(String(map.gridRows));
-                    setSelectedMapId(map.id);
-                  }}
-                  className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition-colors ${
-                    isSelected
-                      ? "border-brand-accent/60 bg-brand-accent/10"
-                      : "border-brand-border bg-brand-primary hover:border-brand-accent/30"
-                  }`}
+                  onClick={() => setBgImage(null)}
+                  className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-black/80"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
-                    <Map className="h-4 w-4 text-brand-muted" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-brand-text">
-                      {map.name}
-                    </p>
-                    <p className="text-[10px] text-brand-muted">
-                      {map.gridCols}x{map.gridRows} · {map.category}
-                    </p>
-                  </div>
-                  {map.isActive && (
-                    <span className="ml-auto shrink-0 rounded-full bg-brand-success/15 px-1.5 py-0.5 text-[9px] font-medium text-brand-success">
-                      Ativo
-                    </span>
-                  )}
+                  <X className="h-3.5 w-3.5" />
                 </button>
-              );
-            })}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                className={`flex h-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+                  dragging
+                    ? "border-brand-accent bg-brand-accent/10"
+                    : "border-brand-border bg-brand-primary hover:border-brand-accent/50"
+                }`}
+              >
+                <div className="flex flex-col items-center gap-1 text-brand-muted">
+                  <Upload className="h-5 w-5" />
+                  <span className="text-xs">Arraste ou clique para enviar</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Preset templates */}
-      <div className="mb-5">
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-brand-muted">
-          Templates
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {PRESET_MAPS.map((map) => (
-            <button
-              key={map.id}
-              onClick={() => {
-                setName(map.name);
-                const [c, r] = map.size.split("x");
-                setCols(c);
-                setRows(r);
-                setSelectedMapId(null);
-              }}
-              className="flex items-center gap-2 rounded-lg border border-brand-border bg-brand-primary p-2.5 text-left transition-colors hover:border-brand-accent/50"
-            >
-              <Image className="h-4 w-4 text-brand-muted" />
-              <div>
-                <p className="text-xs font-medium text-brand-text">
-                  {map.name}
-                </p>
-                <p className="text-[10px] text-brand-muted">{map.size}</p>
+        {/* ── Coluna direita: galerias ── */}
+        <div className="space-y-4">
+          {/* Session maps */}
+          {MOCK_SESSION_MAPS.length > 0 && (
+            <section>
+              <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
+                Mapas da Sessão
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {MOCK_SESSION_MAPS.map((map) => {
+                  const isSelected = selectedSourceId === `session:${map.id}`;
+                  return (
+                    <button
+                      key={map.id}
+                      onClick={() => {
+                        setName(map.name);
+                        setCols(String(map.gridCols));
+                        setRows(String(map.gridRows));
+                        setSelectedSourceId(`session:${map.id}`);
+                      }}
+                      className={`group relative flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors ${
+                        isSelected
+                          ? "border-brand-accent/60 bg-brand-accent/10"
+                          : "border-brand-border bg-brand-primary hover:border-brand-accent/40"
+                      }`}
+                    >
+                      <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md bg-[#0A0A0F]">
+                        {map.thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={map.thumbnail}
+                            alt={map.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Map className="h-7 w-7 text-brand-muted/60" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-brand-text">
+                          {map.name}
+                        </p>
+                        {map.isActive && (
+                          <span className="shrink-0 rounded-full bg-brand-success/15 px-1.5 py-0.5 text-[8px] font-medium text-brand-success">
+                            Ativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-brand-muted">
+                        {map.gridCols}×{map.gridRows} · {map.category}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
-            </button>
-          ))}
+            </section>
+          )}
+
+          {/* Templates */}
+          <section>
+            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
+              Templates
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {CURATED_TEMPLATES.map((tmpl) => {
+                const isSelected = selectedSourceId === `tmpl:${tmpl.id}`;
+                return (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => {
+                      setName(tmpl.name);
+                      setCols(String(Math.max(20, tmpl.width * 3)));
+                      setRows(String(Math.max(15, tmpl.height * 3)));
+                      setSelectedSourceId(`tmpl:${tmpl.id}`);
+                    }}
+                    className={`group flex flex-col gap-1.5 rounded-lg border p-1.5 text-left transition-colors ${
+                      isSelected
+                        ? "border-brand-accent/60 bg-brand-accent/10"
+                        : "border-brand-border bg-brand-primary hover:border-brand-accent/40"
+                    }`}
+                  >
+                    <div className="aspect-[4/3] w-full overflow-hidden rounded-md">
+                      <RoomTemplatePreview
+                        template={tmpl}
+                        width={120}
+                        height={90}
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[12px] leading-none">{tmpl.icon}</span>
+                      <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-brand-text">
+                        {tmpl.name}
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-brand-muted">
+                      {tmpl.width}×{tmpl.height}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2 border-t border-brand-border pt-4">
         <button
           onClick={onClose}
           className="h-9 rounded-lg border border-brand-border px-4 text-xs font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
