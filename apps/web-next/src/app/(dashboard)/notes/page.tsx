@@ -5,10 +5,10 @@ import { useCampaignStore } from "@/lib/campaign-store";
 import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
 
 const NOTES = [
-  { id: "1", title: "Pistas sobre a Cripta", category: "plot", content: "Os jogadores encontraram 3 pistas...", updatedAt: "2h atrás", isGmOnly: true },
-  { id: "2", title: "Inventário da Loja", category: "item", content: "Poção de Cura (50po), Poção de...", updatedAt: "1d atrás", isGmOnly: false },
-  { id: "3", title: "Motivações do Vilão", category: "npc", content: "Eldrith quer encontrar o artefato...", updatedAt: "3d atrás", isGmOnly: true },
-  { id: "4", title: "Regras da Casa", category: "general", content: "Inspiração pode ser gasta para...", updatedAt: "1sem atrás", isGmOnly: false },
+  { id: "1", campaignId: "camp_seed_strahd", title: "Pistas sobre a Cripta", category: "plot", content: "Os jogadores encontraram 3 pistas...", updatedAt: "2h atrás", isGmOnly: true },
+  { id: "2", campaignId: "camp_seed_strahd", title: "Inventário da Loja", category: "item", content: "Poção de Cura (50po), Poção de...", updatedAt: "1d atrás", isGmOnly: false },
+  { id: "3", campaignId: "camp_seed_strahd", title: "Motivações do Vilão", category: "npc", content: "Eldrith quer encontrar o artefato...", updatedAt: "3d atrás", isGmOnly: true },
+  { id: "4", campaignId: "camp_seed_tormenta_oneshot", title: "Regras da Casa", category: "general", content: "Inspiração pode ser gasta para...", updatedAt: "1sem atrás", isGmOnly: false },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -32,7 +32,7 @@ export default function NotesPage() {
   if (!activeCampaignId) {
     return <NoActiveCampaignEmpty entityLabel="notas" />;
   }
-  // TODO(per-campaign): filtrar NOTES por campaignId.
+  const scopedNotes = NOTES.filter((n) => n.campaignId === activeCampaignId);
 
   return (
     <div className="space-y-8">
@@ -61,7 +61,7 @@ export default function NotesPage() {
 
       {/* Notes Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {NOTES.map((note) => (
+        {scopedNotes.map((note) => (
           <div
             key={note.id}
             className="rounded-xl border border-white/10 bg-brand-surface p-5 hover:border-white/20"

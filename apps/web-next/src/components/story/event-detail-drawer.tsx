@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { EventStatus, EventType } from "@/types/story";
 import { EVENT_TYPE_LABELS, EVENT_STATUS_LABELS } from "@/types/story";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 
 const STATUS_OPTIONS: { value: EventStatus; icon: typeof Circle; label: string }[] = [
   { value: "pending", icon: Circle, label: "Pendente" },
@@ -34,7 +34,7 @@ const TYPE_OPTIONS: EventType[] = [
 export function EventDetailDrawer() {
   const drawerOpen = useStoryStore((s) => s.drawerOpen);
   const selectedEventId = useStoryStore((s) => s.selectedEventId);
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const closeDrawer = useStoryStore((s) => s.closeDrawer);
   const updateEvent = useStoryStore((s) => s.updateEvent);
   const toggleTask = useStoryStore((s) => s.toggleTask);

@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { useState, useCallback } from "react";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import type { StoryEvent, EventStatus } from "@/types/story";
 import { EVENT_STATUS_LABELS } from "@/types/story";
 import { EventCard } from "./event-card";
@@ -94,7 +94,7 @@ function StatusColumn({
 }
 
 export function KanbanView() {
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const updateEvent = useStoryStore((s) => s.updateEvent);
 
   const [activeEvent, setActiveEvent] = useState<StoryEvent | null>(null);

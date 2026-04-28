@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { FileJson, Upload } from "lucide-react";
 import { ModalShell } from "@/components/gameplay/modals/modal-shell";
 import { useMapLibraryStore } from "@/lib/map-library-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import { parseMapJSON } from "@/lib/map-export";
 import type { QuestBoardMap } from "@/lib/map-types";
 
@@ -14,6 +15,7 @@ interface ImportMapModalProps {
 
 export function ImportMapModal({ onClose, onImported }: ImportMapModalProps) {
   const importMap = useMapLibraryStore((s) => s.importMap);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [dragging, setDragging] = useState(false);
@@ -59,7 +61,7 @@ export function ImportMapModal({ onClose, onImported }: ImportMapModalProps) {
 
   const handleImport = () => {
     if (!rawJson) return;
-    const id = importMap(rawJson);
+    const id = importMap(rawJson, activeCampaignId);
     if (id) {
       onImported?.(id);
       onClose();

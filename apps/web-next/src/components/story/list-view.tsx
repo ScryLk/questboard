@@ -14,7 +14,7 @@ import {
   Star,
   Swords,
 } from "lucide-react";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import type { EventStatus, EventType, StoryEvent, StoryArc } from "@/types/story";
 import { EVENT_TYPE_LABELS, EVENT_STATUS_LABELS } from "@/types/story";
 
@@ -32,7 +32,7 @@ type SortField = "order" | "title" | "type" | "status" | "session";
 type SortDir = "asc" | "desc";
 
 export function ListView() {
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const selectEvent = useStoryStore((s) => s.selectEvent);
   const selectedEventId = useStoryStore((s) => s.selectedEventId);
 

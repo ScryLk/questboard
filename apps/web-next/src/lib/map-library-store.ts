@@ -16,7 +16,10 @@ interface MapLibraryState {
   updateMap: (id: string, updates: Partial<QuestBoardMap>) => void;
   deleteMap: (id: string) => void;
   duplicateMap: (id: string) => string | null;
-  importMap: (json: string) => string | null;
+  /** Importa o mapa do JSON. `campaignId` define o dono — geralmente
+   *  a campanha ativa do dashboard. Mapas sem campanha (null) ficam
+   *  invisíveis em /maps até serem re-associados. */
+  importMap: (json: string, campaignId: string | null) => string | null;
   migrateFromLegacy: () => void;
   setMapCollection: (mapId: string, collectionId: string | null) => void;
   reorderMapsInCollection: (collectionId: string, mapIds: string[]) => void;
@@ -84,7 +87,7 @@ export const useMapLibraryStore = create<MapLibraryState>()(
         return newId;
       },
 
-      importMap: (json) => {
+      importMap: (json, campaignId) => {
         const result = parseMapJSON(json);
         if ("error" in result) return null;
 
@@ -101,7 +104,12 @@ export const useMapLibraryStore = create<MapLibraryState>()(
           // Thumbnail generation might fail in non-browser contexts
         }
 
-        const id = get().addMap(result);
+        // JSON importado pode não trazer campaignId — usa a campanha ativa
+        // como dona. Se o JSON já trouxer o campo, respeita.
+        const id = get().addMap({
+          ...result,
+          campaignId: result.campaignId ?? campaignId,
+        });
         return id;
       },
 
@@ -202,26 +210,41 @@ export const useMapLibraryStore = create<MapLibraryState>()(
     }),
     {
       name: "questboard-maps",
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         maps: state.maps,
         _migrated: state._migrated,
       }),
       migrate: (persisted, fromVersion) => {
-        const state = persisted as { maps?: Record<string, Partial<QuestBoardMap>>; _migrated?: boolean } | undefined;
+        const state = persisted as
+          | { maps?: Record<string, Partial<QuestBoardMap>>; _migrated?: boolean }
+          | undefined;
         if (!state || !state.maps) return persisted;
+        let maps = state.maps;
         if (fromVersion < 2) {
-          const upgraded: Record<string, QuestBoardMap> = {};
-          for (const [id, map] of Object.entries(state.maps)) {
+          const upgraded: Record<string, Partial<QuestBoardMap>> = {};
+          for (const [id, map] of Object.entries(maps)) {
             upgraded[id] = {
-              ...(map as QuestBoardMap),
-              collectionId: (map as QuestBoardMap).collectionId ?? null,
-              order: (map as QuestBoardMap).order ?? 0,
+              ...map,
+              collectionId: map.collectionId ?? null,
+              order: map.order ?? 0,
             };
           }
-          return { ...state, maps: upgraded };
+          maps = upgraded;
         }
-        return persisted;
+        if (fromVersion < 3) {
+          // Mapas pré-fatia ficam órfãos (campaignId=null). Não tentamos
+          // adivinhar a campanha — usuário re-associa pela UI quando precisar.
+          const withCampaign: Record<string, QuestBoardMap> = {};
+          for (const [id, map] of Object.entries(maps)) {
+            withCampaign[id] = {
+              ...(map as QuestBoardMap),
+              campaignId: (map as QuestBoardMap).campaignId ?? null,
+            };
+          }
+          return { ...state, maps: withCampaign };
+        }
+        return { ...state, maps };
       },
     },
   ),

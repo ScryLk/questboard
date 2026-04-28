@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useStoryStore } from "@/stores/storyStore";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 const COLOR_OPTIONS = [
   "#6C5CE7",
@@ -19,13 +20,19 @@ interface NewArcModalProps {
 
 export function NewArcModal({ onClose }: NewArcModalProps) {
   const addArc = useStoryStore((s) => s.addArc);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(COLOR_OPTIONS[0]);
 
   function handleSubmit() {
-    if (!title.trim()) return;
-    addArc(title.trim(), color, description.trim() || undefined);
+    if (!title.trim() || !activeCampaignId) return;
+    addArc(
+      title.trim(),
+      color,
+      description.trim() || undefined,
+      activeCampaignId,
+    );
     onClose();
   }
 

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { StoryArc } from "@/types/story";
 import { calcArcProgress } from "@/types/story";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import { EventCard } from "./event-card";
 import { useDroppable } from "@dnd-kit/core";
 import {
@@ -66,7 +66,7 @@ export function ArcColumn({ arc, onAddEvent }: ArcColumnProps) {
   const deleteArc = useStoryStore((s) => s.deleteArc);
   const updateArc = useStoryStore((s) => s.updateArc);
   const reorderArcs = useStoryStore((s) => s.reorderArcs);
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);

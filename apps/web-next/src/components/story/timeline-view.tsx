@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import { GameTooltip } from "@/components/ui/game-tooltip";
 
 export function TimelineView() {
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const selectEvent = useStoryStore((s) => s.selectEvent);
   const selectedEventId = useStoryStore((s) => s.selectedEventId);
 

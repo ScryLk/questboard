@@ -40,8 +40,16 @@ export default function ObjectsPage() {
     setObjectEditorTarget(null);
   }
 
+  const scopedObjects = useMemo(
+    () =>
+      activeCampaignId
+        ? objects.filter((o) => o.campaignId === activeCampaignId)
+        : [],
+    [objects, activeCampaignId],
+  );
+
   const filteredObjects = useMemo(() => {
-    let list = objects;
+    let list = scopedObjects;
 
     if (categoryFilter !== "all") {
       list = list.filter((o) => o.category === categoryFilter);
@@ -65,15 +73,16 @@ export default function ObjectsPage() {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
       return a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [objects, categoryFilter, search, favoritesOnly]);
+  }, [scopedObjects, categoryFilter, search, favoritesOnly]);
 
-  const sceneryCount = objects.filter((o) => o.category === "scenery").length;
-  const itemCount = objects.filter((o) => o.category === "item").length;
+  const sceneryCount = scopedObjects.filter(
+    (o) => o.category === "scenery",
+  ).length;
+  const itemCount = scopedObjects.filter((o) => o.category === "item").length;
 
   if (!activeCampaignId) {
     return <NoActiveCampaignEmpty entityLabel="objetos" />;
   }
-  // TODO(per-campaign): filtrar objects por campaignId.
 
   return (
     <div className="space-y-6">
@@ -84,8 +93,8 @@ export default function ObjectsPage() {
             Objetos da Campanha
           </h1>
           <p className="mt-1 text-sm text-gray-400">
-            {objects.length} objetos · {sceneryCount} cenário · {itemCount}{" "}
-            itens
+            {scopedObjects.length} objetos · {sceneryCount} cenário ·{" "}
+            {itemCount} itens
           </p>
         </div>
         <button

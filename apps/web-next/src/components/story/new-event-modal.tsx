@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import type { EventType } from "@/types/story";
 import { EVENT_TYPE_LABELS } from "@/types/story";
 
@@ -23,7 +23,7 @@ interface NewEventModalProps {
 
 export function NewEventModal({ arcId, onClose }: NewEventModalProps) {
   const addEvent = useStoryStore((s) => s.addEvent);
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState<EventType>("milestone");

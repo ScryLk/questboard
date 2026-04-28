@@ -43,7 +43,6 @@ export default function MapsPage() {
   const migrateFromLegacy = useMapLibraryStore((s) => s.migrateFromLegacy);
   const deleteMap = useMapLibraryStore((s) => s.deleteMap);
   const duplicateMap = useMapLibraryStore((s) => s.duplicateMap);
-  const addMap = useMapLibraryStore((s) => s.addMap);
   const clearCollectionFromMaps = useMapLibraryStore((s) => s.clearCollectionFromMaps);
   const loadMapFromLibrary = useGameplayStore((s) => s.loadMapFromLibrary);
 
@@ -68,7 +67,13 @@ export default function MapsPage() {
     if (mounted && !_migrated) migrateFromLegacy();
   }, [mounted, _migrated, migrateFromLegacy]);
 
-  const allMaps = useMemo(() => Object.values(maps), [maps]);
+  const allMaps = useMemo(
+    () =>
+      activeCampaignId
+        ? Object.values(maps).filter((m) => m.campaignId === activeCampaignId)
+        : [],
+    [maps, activeCampaignId],
+  );
 
   const mapsByCollection = useMemo(() => {
     const grouped: Record<string, typeof allMaps> = {};
@@ -216,8 +221,6 @@ export default function MapsPage() {
   if (!activeCampaignId) {
     return <NoActiveCampaignEmpty entityLabel="mapas" />;
   }
-  // TODO(per-campaign): filtrar `allMaps` por campaignId quando o
-  // entity ganhar esse campo. Por ora exibe todos.
 
   const hasAnyCollection = visibleCollections.length > 0;
 

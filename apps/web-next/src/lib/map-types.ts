@@ -51,6 +51,10 @@ export interface QuestBoardMap {
   };
   collectionId: string | null;
   order: number;
+  /** Campanha que possui este mapa. `null` em mapas legados (pré-fatia
+   *  de active-campaign-context) — esses não aparecem em /maps até serem
+   *  re-associados. Mapas novos sempre vêm com a campanha ativa. */
+  campaignId: string | null;
 }
 
 export interface MapCollection {
@@ -127,17 +131,22 @@ export function saveDataToObjectCells(data: MapObjectSaveData[]): MapObjectCell[
   })) as MapObjectCell[];
 }
 
-/** Convert editor state fields into QuestBoardMap data (without id/timestamps/thumbnail). */
-export function editorStateToMapData(state: {
-  mapName: string;
-  gridCols: number;
-  gridRows: number;
-  terrainCells: TerrainCell[];
-  wallEdges: Record<string, WallData>;
-  mapObjects: MapObjectCell[];
-  backgroundImage: string | null;
-  backgroundOpacity: number;
-}): Omit<QuestBoardMap, "id" | "createdAt" | "updatedAt" | "thumbnail"> {
+/** Convert editor state fields into QuestBoardMap data (without id/timestamps/thumbnail).
+ *  `campaignId` é responsabilidade do caller — passe a campanha ativa
+ *  ou `null` se o mapa for criado fora do contexto de uma campanha. */
+export function editorStateToMapData(
+  state: {
+    mapName: string;
+    gridCols: number;
+    gridRows: number;
+    terrainCells: TerrainCell[];
+    wallEdges: Record<string, WallData>;
+    mapObjects: MapObjectCell[];
+    backgroundImage: string | null;
+    backgroundOpacity: number;
+  },
+  campaignId: string | null,
+): Omit<QuestBoardMap, "id" | "createdAt" | "updatedAt" | "thumbnail"> {
   const terrain = terrainCellsToRecord(state.terrainCells);
   const walls = wallEdgesToSaveData(state.wallEdges);
   const objects = objectCellsToSaveData(state.mapObjects);
@@ -163,6 +172,7 @@ export function editorStateToMapData(state: {
     },
     collectionId: null,
     order: 0,
+    campaignId,
   };
 }
 
@@ -251,5 +261,6 @@ export function migrateSavedMap(old: SavedMap): QuestBoardMap {
     },
     collectionId: null,
     order: 0,
+    campaignId: null,
   };
 }

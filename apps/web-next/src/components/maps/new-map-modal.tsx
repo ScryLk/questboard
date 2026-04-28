@@ -10,6 +10,7 @@ import {
 } from "@questboard/constants";
 import { ModalShell } from "@/components/gameplay/modals/modal-shell";
 import { useMapLibraryStore } from "@/lib/map-library-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import type { MapCategory } from "@/lib/map-types";
 
 export interface AICreationParams {
@@ -45,6 +46,7 @@ export function NewMapModal({
   aiMode = false,
 }: NewMapModalProps) {
   const addMap = useMapLibraryStore((s) => s.addMap);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
 
   const [name, setName] = useState("");
   const [cols, setCols] = useState<number>(MAP_LIMITS.DEFAULT_WIDTH);
@@ -118,6 +120,7 @@ export function NewMapModal({
       stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
       collectionId: null,
       order: 0,
+      campaignId: activeCampaignId,
     });
     if (aiMode) {
       onCreated(id, {

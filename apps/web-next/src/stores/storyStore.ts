@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import type {
   StoryArc,
@@ -7,6 +8,7 @@ import type {
   EventType,
 } from "@/types/story";
 import { calcCampaignProgress } from "@/types/story";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 export type StoryView =
   | "roadmap"
@@ -26,7 +28,12 @@ interface StoryStore {
   selectEvent: (id: string) => void;
   closeDrawer: () => void;
 
-  addArc: (title: string, color?: string, description?: string) => void;
+  addArc: (
+    title: string,
+    color: string | undefined,
+    description: string | undefined,
+    campaignId: string,
+  ) => void;
   updateArc: (id: string, data: Partial<Pick<StoryArc, "title" | "description" | "status" | "color">>) => void;
   deleteArc: (id: string) => void;
   reorderArcs: (from: number, to: number) => void;
@@ -188,7 +195,7 @@ const arc4Events: StoryEvent[] = [
 const INITIAL_ARCS: StoryArc[] = [
   {
     id: "arc1",
-    campaignId: "c1",
+    campaignId: "camp_seed_strahd",
     title: "Chegada em Barovia",
     description: "O grupo é tragado pela névoa e descobre os horrores de Barovia.",
     status: "completed",
@@ -199,7 +206,7 @@ const INITIAL_ARCS: StoryArc[] = [
   },
   {
     id: "arc2",
-    campaignId: "c1",
+    campaignId: "camp_seed_strahd",
     title: "Explorando os Arredores",
     description: "Investigações em Vallaki e arredores revelam aliados e inimigos.",
     status: "completed",
@@ -210,7 +217,7 @@ const INITIAL_ARCS: StoryArc[] = [
   },
   {
     id: "arc3",
-    campaignId: "c1",
+    campaignId: "camp_seed_strahd",
     title: "Aliados e Artefatos",
     description: "A busca pelos artefatos lendários capazes de destruir Strahd.",
     status: "in_progress",
@@ -221,7 +228,7 @@ const INITIAL_ARCS: StoryArc[] = [
   },
   {
     id: "arc4",
-    campaignId: "c1",
+    campaignId: "camp_seed_strahd",
     title: "Confronto Final",
     description: "A batalha decisiva no Castelo Ravenloft.",
     status: "planned",
@@ -244,11 +251,11 @@ export const useStoryStore = create<StoryStore>()((set, get) => ({
 
   closeDrawer: () => set({ drawerOpen: false, selectedEventId: null }),
 
-  addArc: (title, color, description) => {
+  addArc: (title, color, description, campaignId) => {
     const arcs = get().arcs;
     const newArc: StoryArc = {
       id: `arc_${generateId()}`,
-      campaignId: "c1",
+      campaignId,
       title,
       description,
       status: "planned",
@@ -409,9 +416,24 @@ export const useStoryStore = create<StoryStore>()((set, get) => ({
   },
 }));
 
+/** Arcos pertencentes à campanha ativa. Retorna array vazio quando
+ *  nenhuma campanha está selecionada — a página de /story já bloqueia
+ *  esse caso visualmente, então é só uma defesa em profundidade. */
+export function useScopedArcs(): StoryArc[] {
+  const arcs = useStoryStore((s) => s.arcs);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  return useMemo(
+    () =>
+      activeCampaignId
+        ? arcs.filter((a) => a.campaignId === activeCampaignId)
+        : [],
+    [arcs, activeCampaignId],
+  );
+}
+
 // Hook for dashboard integration
 export function useStoryProgress() {
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const allEvents = arcs.flatMap((a) => a.events);
   return {
     percent: calcCampaignProgress(arcs),

@@ -13,7 +13,7 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { useStoryStore } from "@/stores/storyStore";
+import { useStoryStore, useScopedArcs } from "@/stores/storyStore";
 import type { StoryEvent } from "@/types/story";
 import { ArcColumn } from "./arc-column";
 import { EventCard } from "./event-card";
@@ -23,7 +23,7 @@ interface RoadmapViewProps {
 }
 
 export function RoadmapView({ onAddEvent }: RoadmapViewProps) {
-  const arcs = useStoryStore((s) => s.arcs);
+  const arcs = useScopedArcs();
   const moveEvent = useStoryStore((s) => s.moveEvent);
 
   const [activeEvent, setActiveEvent] = useState<StoryEvent | null>(null);

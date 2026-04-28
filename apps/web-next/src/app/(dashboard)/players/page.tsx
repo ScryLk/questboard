@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -17,15 +18,19 @@ import {
 } from "@/lib/relative-date";
 import { useCampaignStore } from "@/lib/campaign-store";
 import { NoActiveCampaignEmpty } from "@/components/campaigns/no-active-campaign-empty";
+import {
+  getMemberEnrichment,
+  type MemberCharacter,
+  type MemberPresence,
+} from "@/lib/player-mock-enrichment";
+import type { CampaignMemberRole } from "@questboard/types";
 
 // ═════════════════════════════════════════════════════════════════
-// MOCK — enquanto o web-next não consome a API.
-// Shape inspirado nos endpoints `/campaigns/:id/members` e `/stats`
-// que o backend já expõe. Quando a integração real chegar, substituir
-// por fetch + React Query sem trocar a UI.
+// /players deriva dos `members` da campanha ativa (campaign-store).
+// Presence/attention/character são enriquecimento mock por userId
+// até o backend de /campaigns/:id/stats existir.
 // ═════════════════════════════════════════════════════════════════
 
-type Role = "GM" | "CO_GM" | "PLAYER" | "SPECTATOR";
 type Status = "IN_SESSION" | "OFFLINE";
 type AttentionReason =
   | "CONSECUTIVE_ABSENCES"
@@ -33,106 +38,20 @@ type AttentionReason =
   | "NO_CHARACTER"
   | "CHARACTER_DOWN";
 
-interface Character {
-  name: string;
-  race: string;
-  className: string;
-  level: number;
-  hpCurrent: number;
-  hpMax: number;
-  ac: number;
-}
-
 interface Member {
   id: string;
   name: string;
-  role: Role;
+  role: CampaignMemberRole;
   joinedAt: string;
-  character: Character | null;
-  presence: {
-    attendedCount: number;
-    totalSessions: number;
-    percentage: number;
-    lastSessionAt: string | null;
-  };
+  character: MemberCharacter | null;
+  presence: MemberPresence;
   status: Status;
   attention: { reason: AttentionReason; detail: string } | null;
 }
 
-const MEMBERS: Member[] = [
-  {
-    id: "u1",
-    name: "Lucas Kepler",
-    role: "GM",
-    joinedAt: "2026-02-10",
-    character: null,
-    presence: { attendedCount: 24, totalSessions: 24, percentage: 100, lastSessionAt: "2026-04-18" },
-    status: "IN_SESSION",
-    attention: null,
-  },
-  {
-    id: "u2",
-    name: "Maria Santos",
-    role: "CO_GM",
-    joinedAt: "2026-03-14",
-    character: null,
-    presence: { attendedCount: 10, totalSessions: 12, percentage: 83, lastSessionAt: "2026-04-18" },
-    status: "IN_SESSION",
-    attention: null,
-  },
-  {
-    id: "u3",
-    name: "João Silva",
-    role: "PLAYER",
-    joinedAt: "2026-02-10",
-    character: { name: "Elara", race: "Elfa", className: "Maga", level: 5, hpCurrent: 32, hpMax: 45, ac: 14 },
-    presence: { attendedCount: 18, totalSessions: 24, percentage: 75, lastSessionAt: "2026-04-18" },
-    status: "IN_SESSION",
-    attention: null,
-  },
-  {
-    id: "u4",
-    name: "Pedro Costa",
-    role: "PLAYER",
-    joinedAt: "2026-02-15",
-    character: { name: "Thorin", race: "Anão", className: "Guerreiro", level: 5, hpCurrent: 8, hpMax: 50, ac: 18 },
-    presence: { attendedCount: 21, totalSessions: 24, percentage: 88, lastSessionAt: "2026-03-28" },
-    status: "OFFLINE",
-    attention: { reason: "CONSECUTIVE_ABSENCES", detail: "3 faltas seguidas" },
-  },
-  {
-    id: "u5",
-    name: "Ana Oliveira",
-    role: "PLAYER",
-    joinedAt: "2026-02-20",
-    character: { name: "Lyra", race: "Halfling", className: "Ladina", level: 4, hpCurrent: 25, hpMax: 28, ac: 15 },
-    presence: { attendedCount: 20, totalSessions: 24, percentage: 83, lastSessionAt: "2026-04-11" },
-    status: "OFFLINE",
-    attention: null,
-  },
-  {
-    id: "u6",
-    name: "Lucas Ferreira",
-    role: "PLAYER",
-    joinedAt: "2026-02-25",
-    character: { name: "Kael", race: "Tiefling", className: "Bruxo", level: 4, hpCurrent: 0, hpMax: 32, ac: 12 },
-    presence: { attendedCount: 12, totalSessions: 24, percentage: 50, lastSessionAt: "2026-03-28" },
-    status: "OFFLINE",
-    attention: { reason: "INACTIVE", detail: "sumiu há 24 dias" },
-  },
-  {
-    id: "u7",
-    name: "Camila Reis",
-    role: "SPECTATOR",
-    joinedAt: "2026-04-10",
-    character: null,
-    presence: { attendedCount: 2, totalSessions: 3, percentage: 67, lastSessionAt: "2026-04-18" },
-    status: "OFFLINE",
-    attention: null,
-  },
-];
-
-// Métricas derivadas (também mockadas — em produção viriam do /stats)
+// Métricas globais que ainda não vêm do mock — em produção, /stats.
+// Por ora ficam mock fixas (mesmo número independente de campanha
+// selecionada, só pra preencher os 3 cards de topo).
 const CAMPAIGN_STATS = {
   averageAttendance: { percentage: 79, trendVsPreviousMonth: 5 },
   nextSession: {
@@ -160,7 +79,7 @@ function presenceColor(pct: number): string {
   return "text-red-400";
 }
 
-const ROLE_LABEL: Record<Role, string> = {
+const ROLE_LABEL: Record<CampaignMemberRole, string> = {
   GM: "Mestre Principal",
   CO_GM: "Co-Mestre",
   PLAYER: "Jogador",
@@ -213,18 +132,40 @@ function StatusBadge({ status }: { status: Status }) {
 
 export default function PlayersPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const activeCampaign = useCampaignStore((s) =>
+    s.activeCampaignId
+      ? s.campaigns.find((c) => c.id === s.activeCampaignId) ?? null
+      : null,
+  );
+
+  const allMembers = useMemo<Member[]>(() => {
+    if (!activeCampaign) return [];
+    return activeCampaign.members.map((m) => {
+      const e = getMemberEnrichment(m.userId);
+      return {
+        id: m.userId,
+        name: m.displayName,
+        role: m.role,
+        joinedAt: m.joinedAt.toISOString().slice(0, 10),
+        character: e.character,
+        presence: e.presence,
+        status: e.status,
+        attention: e.attention,
+      };
+    });
+  }, [activeCampaign]);
+
   if (!activeCampaignId) {
     return <NoActiveCampaignEmpty entityLabel="jogadores" />;
   }
 
-  // TODO(per-campaign): substituir MEMBERS hardcoded por
-  // activeCampaign.members + dados reais de presence/attention quando
-  // backend existir. Por ora renderiza o mock visual.
-  const masters = MEMBERS.filter((m) => m.role === "GM" || m.role === "CO_GM");
-  const players = MEMBERS.filter(
+  const masters = allMembers.filter(
+    (m) => m.role === "GM" || m.role === "CO_GM",
+  );
+  const players = allMembers.filter(
     (m) => m.role === "PLAYER" || m.role === "SPECTATOR",
   );
-  const needsAttention = MEMBERS.filter((m) => m.attention !== null);
+  const needsAttention = allMembers.filter((m) => m.attention !== null);
 
   const { averageAttendance, nextSession } = CAMPAIGN_STATS;
   const trend = averageAttendance.trendVsPreviousMonth;

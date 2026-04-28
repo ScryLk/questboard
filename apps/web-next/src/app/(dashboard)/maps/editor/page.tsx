@@ -64,6 +64,7 @@ import { hasProceduralTexture, getTerrainCanvas } from "@/lib/terrain-texture-ge
 import { PixiTerrainLayer } from "@/components/gameplay/map-canvas/pixi-terrain-layer";
 import { ROOM_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/room-templates";
 import { useMapLibraryStore } from "@/lib/map-library-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import { editorStateToMapData, mapToEditorState } from "@/lib/map-types";
 import { generateMapThumbnail } from "@/lib/map-thumbnail";
 
@@ -194,6 +195,7 @@ export default function MapEditorPage() {
 
   const addMap = useMapLibraryStore((s) => s.addMap);
   const updateMap = useMapLibraryStore((s) => s.updateMap);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
 
   const [state, setState] = useState<EditorState>(createInitialState);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -924,16 +926,19 @@ export default function MapEditorPage() {
   // ── Save / Load ────────────────────────────────────────────────────
 
   const handleSave = useCallback(() => {
-    const mapData = editorStateToMapData({
-      mapName: state.mapName,
-      gridCols: state.gridCols,
-      gridRows: state.gridRows,
-      terrainCells: state.terrainCells,
-      wallEdges: state.wallEdges,
-      mapObjects: state.mapObjects,
-      backgroundImage: state.backgroundImage,
-      backgroundOpacity: state.backgroundOpacity,
-    });
+    const mapData = editorStateToMapData(
+      {
+        mapName: state.mapName,
+        gridCols: state.gridCols,
+        gridRows: state.gridRows,
+        terrainCells: state.terrainCells,
+        wallEdges: state.wallEdges,
+        mapObjects: state.mapObjects,
+        backgroundImage: state.backgroundImage,
+        backgroundOpacity: state.backgroundOpacity,
+      },
+      activeCampaignId,
+    );
 
     // Generate thumbnail
     const thumbnail = generateMapThumbnail({
@@ -953,7 +958,7 @@ export default function MapEditorPage() {
     }
     setSaveIndicator("saved");
     setTimeout(() => setSaveIndicator(null), 2000);
-  }, [state.mapName, state.gridCols, state.gridRows, state.terrainCells, state.wallEdges, state.mapObjects, state.backgroundImage, state.backgroundOpacity, state.savedMapId, addMap, updateMap]);
+  }, [state.mapName, state.gridCols, state.gridRows, state.terrainCells, state.wallEdges, state.mapObjects, state.backgroundImage, state.backgroundOpacity, state.savedMapId, addMap, updateMap, activeCampaignId]);
 
   // Load map from URL param on mount
   useEffect(() => {
