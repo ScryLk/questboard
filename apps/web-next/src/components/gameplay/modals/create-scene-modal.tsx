@@ -79,8 +79,8 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
   return (
     <ModalShell title="Nova Cena" maxWidth={880} onClose={onClose}>
       <div className="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        {/* ── Coluna esquerda: form ── */}
-        <div className="space-y-4">
+        {/* ── Coluna esquerda: form + ações no rodapé ── */}
+        <div className="flex flex-col gap-4">
           {/* Scene name */}
           <div>
             <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-brand-muted">
@@ -190,6 +190,25 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
               </div>
             )}
           </div>
+
+          {/* Spacer empurra ações pro fim da coluna pra alinhar com a galeria */}
+          <div className="flex-1" />
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 border-t border-brand-border pt-4">
+            <button
+              onClick={onClose}
+              className="h-9 rounded-lg border border-brand-border px-4 text-xs font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreate}
+              className="h-9 rounded-lg bg-brand-accent px-4 text-xs font-medium text-white transition-colors hover:bg-brand-accent/90"
+            >
+              Criar Cena
+            </button>
+          </div>
         </div>
 
         {/* ── Coluna direita: galerias ── */}
@@ -296,22 +315,6 @@ export function CreateSceneModal({ onClose }: CreateSceneModalProps) {
             </div>
           </section>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="mt-5 flex justify-end gap-2 border-t border-brand-border pt-4">
-        <button
-          onClick={onClose}
-          className="h-9 rounded-lg border border-brand-border px-4 text-xs font-medium text-brand-muted transition-colors hover:bg-white/5 hover:text-brand-text"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleCreate}
-          className="h-9 rounded-lg bg-brand-accent px-4 text-xs font-medium text-white transition-colors hover:bg-brand-accent/90"
-        >
-          Criar Cena
-        </button>
       </div>
     </ModalShell>
   );
