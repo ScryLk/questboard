@@ -16,6 +16,12 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getSystem, getSystemCounts } from "@/lib/srd";
+import {
+  useHomebrewItems,
+  useHomebrewMonsters,
+  useHomebrewSpells,
+} from "@/lib/srd/homebrew-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 const SECTIONS = [
   { type: "spells", label: "Magias", icon: Sparkles, count: "spells" as const },
@@ -35,7 +41,28 @@ export default function SystemOverviewPage({
   const system = getSystem(systemSlug);
   if (!system) notFound();
 
-  const counts = getSystemCounts(systemSlug);
+  const baseCounts = getSystemCounts(systemSlug);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const homebrewSpells = useHomebrewSpells(activeCampaignId);
+  const homebrewMonsters = useHomebrewMonsters(activeCampaignId);
+  const homebrewItems = useHomebrewItems(activeCampaignId);
+
+  // Soma SRD oficial + homebrew da campanha ativa pros badges.
+  const counts = {
+    ...baseCounts,
+    spells: baseCounts.spells + homebrewSpells.length,
+    monsters: baseCounts.monsters + homebrewMonsters.length,
+    items: baseCounts.items + homebrewItems.length,
+  };
+
+  const homebrewCounts = {
+    spells: homebrewSpells.length,
+    monsters: homebrewMonsters.length,
+    items: homebrewItems.length,
+    races: 0,
+    classes: 0,
+    conditions: 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -86,6 +113,7 @@ export default function SystemOverviewPage({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {SECTIONS.map(({ type, label, icon: Icon, count }) => {
           const total = counts[count];
+          const hb = homebrewCounts[count];
           return (
             <Link
               key={type}
@@ -99,6 +127,9 @@ export default function SystemOverviewPage({
                 <p className="font-medium text-brand-text">{label}</p>
                 <p className="text-[11px] text-brand-muted">
                   {total === 0 ? "Sem entradas" : `${total} entrada${total === 1 ? "" : "s"}`}
+                  {hb > 0 && (
+                    <span className="ml-1 text-purple-300">({hb} homebrew)</span>
+                  )}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-brand-muted opacity-0 transition-opacity group-hover:opacity-100" />

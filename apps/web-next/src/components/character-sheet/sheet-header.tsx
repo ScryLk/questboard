@@ -1,6 +1,7 @@
 "use client";
 
-import { Heart, Shield, Footprints, Zap } from "lucide-react";
+import Link from "next/link";
+import { Footprints, Heart, Pencil, Shield, Zap } from "lucide-react";
 import type { CampaignCharacter } from "@/types/character";
 import type { Dnd5eSheetContext } from "@/hooks/use-dnd5e-derived";
 
@@ -39,9 +40,21 @@ export function SheetHeader({ character, ctx }: Props) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <h1 className="font-cinzel text-2xl font-bold text-white">
-            {character.name}
-          </h1>
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="font-cinzel text-2xl font-bold text-white">
+              {character.name}
+            </h1>
+            {ctx && (
+              <Link
+                href={`/characters/new/dnd5e?edit=${character.id}`}
+                className="flex shrink-0 items-center gap-1 rounded-md border border-brand-border px-2.5 py-1 text-[11px] text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text"
+                title="Reabre o wizard 5e com tudo pré-preenchido"
+              >
+                <Pencil className="h-3 w-3" />
+                Editar
+              </Link>
+            )}
+          </div>
           <p className="text-sm text-brand-muted">
             {ctx
               ? `${ctx.raceName} · ${ctx.className} Nv. ${ctx.data.level}`

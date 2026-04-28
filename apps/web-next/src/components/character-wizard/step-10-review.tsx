@@ -60,9 +60,11 @@ interface Props {
 export function Step10Review({ onFinish }: Props) {
   const wizard = useDnd5eWizardStore();
   const createCharacter = useCharacterStore((s) => s.createCharacter);
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter);
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
   const addToast = useGameplayStore((s) => s.addToast);
   const reset = useDnd5eWizardStore((s) => s.reset);
+  const isEditing = Boolean(wizard.editingCharacterId);
 
   const klass = wizard.classSlug
     ? listClasses("dnd5e").find((c) => c.slug === wizard.classSlug)
@@ -131,6 +133,88 @@ export function Step10Review({ onFinish }: Props) {
     if (!klass || !race || !wizard.name.trim()) return;
 
     const hpMax = derived?.hitPointsMax ?? klass.hitDie;
+
+    const dnd5eData = {
+      level: 1,
+      classSlug: klass.slug,
+      raceSlug: race.slug,
+      background: wizard.background ?? "acolyte",
+      alignment: wizard.alignment || undefined,
+      attributes: finalAttrs,
+      hpCurrent: hpMax,
+      hpTemp: 0,
+      hitDiceUsed: 0,
+      skillProficiencies: wizard.skillProficiencies,
+      expertiseSkills: [] as string[],
+      savingThrowProficiencies:
+        klass.savingThrowProficiencies as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">,
+      equipment: wizard.equipment.map((slug) => ({
+        itemSlug: slug,
+        equipped: true,
+        quantity: 1,
+      })),
+      spells: {
+        cantrips: wizard.cantrips,
+        firstLevel: wizard.firstLevelSpells,
+      },
+      spellSlotsExpended: {},
+      deathSavesSuccesses: 0,
+      deathSavesFailures: 0,
+      personalityTraits: wizard.personalityTraits || undefined,
+      ideals: wizard.ideals || undefined,
+      bonds: wizard.bonds || undefined,
+      flaws: wizard.flaws || undefined,
+    };
+
+    if (isEditing && wizard.editingCharacterId) {
+      // Modo edit: preserva HP atual e nível existentes; só atualiza
+      // o que o wizard controla. Se class/race mudou, recalcula HP max.
+      const existing = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === wizard.editingCharacterId);
+      if (existing?.dnd5eData) {
+        const preservedLevel = existing.dnd5eData.level;
+        const preservedHpCurrent = existing.stats.hp;
+        const preservedHpMax = existing.stats.maxHp;
+        const preservedSlotsExpended = existing.dnd5eData.spellSlotsExpended;
+        const preservedHpTemp = existing.dnd5eData.hpTemp;
+
+        updateCharacter(wizard.editingCharacterId, {
+          name: wizard.name.trim(),
+          title: `${race.name} ${klass.name} Nv. ${preservedLevel}`,
+          description: [wizard.personalityTraits, wizard.ideals, wizard.bonds]
+            .filter(Boolean)
+            .join("\n\n"),
+          stats: {
+            ...existing.stats,
+            ac: derived?.armorClass.total ?? existing.stats.ac,
+            speed: race.speed * 5,
+            str: finalAttrs.str,
+            dex: finalAttrs.dex,
+            con: finalAttrs.con,
+            int: finalAttrs.int,
+            wis: finalAttrs.wis,
+            cha: finalAttrs.cha,
+            savingThrows: klass.savingThrowProficiencies,
+            skills: wizard.skillProficiencies,
+          },
+          dnd5eData: {
+            ...dnd5eData,
+            level: preservedLevel,
+            hpCurrent: preservedHpCurrent,
+            hpTemp: preservedHpTemp,
+            spellSlotsExpended: preservedSlotsExpended,
+          },
+        });
+        // Apenas atualiza maxHp se classe ou con mudou (recalcula).
+        // Já está dentro de stats acima — pular extra-update.
+        void preservedHpMax;
+        addToast(`${wizard.name.trim()} atualizado.`);
+        reset();
+        onFinish();
+        return;
+      }
+    }
 
     const newChar = createDefaultCharacter({
       name: wizard.name.trim(),
@@ -429,7 +513,7 @@ export function Step10Review({ onFinish }: Props) {
           className="flex items-center gap-1.5 rounded-lg bg-brand-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Save className="h-4 w-4" />
-          Criar personagem
+          {isEditing ? "Salvar alterações" : "Criar personagem"}
         </button>
       </div>
     </div>

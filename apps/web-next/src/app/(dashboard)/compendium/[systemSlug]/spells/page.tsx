@@ -4,7 +4,7 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Plus, Search, Sparkles, Zap } from "lucide-react";
-import { getSystem, listSpells } from "@/lib/srd";
+import { getSystem, listClasses, listSpells } from "@/lib/srd";
 import { useHomebrewSpells } from "@/lib/srd/homebrew-store";
 import { useCampaignStore } from "@/lib/campaign-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
@@ -71,12 +71,16 @@ export default function SpellsListPage({
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | "all">("all");
   const [schoolFilter, setSchoolFilter] = useState<SpellSchool | "all">("all");
+  const [classFilter, setClassFilter] = useState<string | "all">("all");
   const [creating, setCreating] = useState(false);
+
+  const allClasses = listClasses(systemSlug);
 
   const filtered = useMemo(() => {
     return allSpells.filter((s) => {
       if (levelFilter !== "all" && s.level !== levelFilter) return false;
       if (schoolFilter !== "all" && s.school !== schoolFilter) return false;
+      if (classFilter !== "all" && !s.classes.includes(classFilter)) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         if (
@@ -89,7 +93,7 @@ export default function SpellsListPage({
       }
       return true;
     });
-  }, [allSpells, search, levelFilter, schoolFilter]);
+  }, [allSpells, search, levelFilter, schoolFilter, classFilter]);
 
   const canCreateHomebrew = isGM && Boolean(activeCampaignId);
 
@@ -172,6 +176,19 @@ export default function SpellsListPage({
           {(Object.keys(SCHOOL_LABELS) as SpellSchool[]).map((s) => (
             <option key={s} value={s}>
               {SCHOOL_LABELS[s]}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={classFilter}
+          onChange={(e) => setClassFilter(e.target.value)}
+          className="h-9 rounded-lg border border-brand-border bg-brand-primary px-3 text-xs text-brand-text focus:border-brand-accent focus:outline-none"
+        >
+          <option value="all">Todas as classes</option>
+          {allClasses.map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {c.name}
             </option>
           ))}
         </select>

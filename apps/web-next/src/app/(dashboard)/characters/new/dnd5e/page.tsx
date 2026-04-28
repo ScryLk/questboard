@@ -3,12 +3,16 @@
 // Wizard de criação de personagem D&D 5e (10 passos). Estado vive em
 // `useDnd5eWizardStore` (não persiste — abandono reinicia). No passo
 // 10 confirma e converte pra `CampaignCharacter` via `useCharacterStore`.
+// Modo edição: `?edit=ID` hidrata o store com os dados existentes e o
+// submit atualiza em vez de criar.
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { useCharacterStore } from "@/stores/characterStore";
 import { useDnd5eWizardStore } from "@/lib/dnd5e-wizard-store";
+import { listRaces } from "@/lib/srd";
 import { WizardProgress } from "@/components/character-wizard/wizard-progress";
 import { WizardFooter } from "@/components/character-wizard/wizard-footer";
 import { Step1System } from "@/components/character-wizard/step-1-system";
@@ -24,13 +28,59 @@ import { Step10Review } from "@/components/character-wizard/step-10-review";
 
 export default function Dnd5eCharacterWizardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
   const step = useDnd5eWizardStore((s) => s.step);
+  const editingCharacterId = useDnd5eWizardStore((s) => s.editingCharacterId);
   const reset = useDnd5eWizardStore((s) => s.reset);
+  const hydrateFromCharacter = useDnd5eWizardStore(
+    (s) => s.hydrateFromCharacter,
+  );
+  const characters = useCharacterStore((s) => s.characters);
 
-  // Reseta ao montar — wizard sempre começa do zero ao entrar.
+  // Reseta ao montar — exceto quando estiver no modo "Editar 5e", aí
+  // hidrata com os dados do personagem.
   useEffect(() => {
+    if (editId) {
+      const character = characters.find((c) => c.id === editId);
+      if (character?.dnd5eData) {
+        // Subtrai bônus de raça pra mostrar o "base score" no point
+        // buy. Como o dnd5eData guarda atributos finais, recalcula a
+        // base subtraindo os bônus de raça.
+        const race = listRaces("dnd5e").find(
+          (r) => r.slug === character.dnd5eData!.raceSlug,
+        );
+        const finalAttrs = character.dnd5eData.attributes;
+        const baseAttrs = (Object.keys(finalAttrs) as Array<keyof typeof finalAttrs>).reduce(
+          (acc, ab) => {
+            acc[ab] = finalAttrs[ab] - (race?.abilityBonuses[ab] ?? 0);
+            return acc;
+          },
+          {} as typeof finalAttrs,
+        );
+        hydrateFromCharacter(editId, {
+          name: character.name,
+          classSlug: character.dnd5eData.classSlug,
+          raceSlug: character.dnd5eData.raceSlug,
+          background: character.dnd5eData.background,
+          alignment: character.dnd5eData.alignment,
+          attributes: baseAttrs,
+          skillProficiencies: character.dnd5eData.skillProficiencies,
+          equipment: character.dnd5eData.equipment.map((e) => e.itemSlug),
+          cantrips: character.dnd5eData.spells.cantrips,
+          firstLevelSpells: character.dnd5eData.spells.firstLevel,
+          personalityTraits: character.dnd5eData.personalityTraits,
+          ideals: character.dnd5eData.ideals,
+          bonds: character.dnd5eData.bonds,
+          flaws: character.dnd5eData.flaws,
+        });
+        return;
+      }
+    }
     reset();
-  }, [reset]);
+  }, [editId, characters, reset, hydrateFromCharacter]);
+
+  const isEditing = Boolean(editingCharacterId);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 pb-20">
@@ -44,14 +94,17 @@ export default function Dnd5eCharacterWizardPage() {
 
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-accent">
-          Novo personagem · D&amp;D 5e
+          {isEditing ? "Editar personagem" : "Novo personagem"} · D&amp;D 5e
         </p>
         <h1 className="mt-1 font-cinzel text-2xl font-bold text-white">
-          Crie seu personagem em 10 passos
+          {isEditing
+            ? "Ajuste o que precisar"
+            : "Crie seu personagem em 10 passos"}
         </h1>
         <p className="mt-1 text-sm text-brand-muted">
-          O motor calcula CA, modificadores, perícias, slots de magia e
-          ataques automaticamente conforme você avança.
+          {isEditing
+            ? "Pulamos pra revisão. Volte pelas pílulas pra editar qualquer passo. O motor recalcula tudo automaticamente."
+            : "O motor calcula CA, modificadores, perícias, slots de magia e ataques automaticamente conforme você avança."}
         </p>
       </header>
 

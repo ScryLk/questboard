@@ -52,6 +52,10 @@ export interface Dnd5eWizardState {
   bonds: string;
   flaws: string;
 
+  /** Quando preenchido, submit final atualiza esse personagem em vez
+   *  de criar um novo. Set pelo modo "Editar 5e" via ?edit=ID. */
+  editingCharacterId: string | null;
+
   // Actions
   setStep: (step: number) => void;
   next: () => void;
@@ -67,6 +71,25 @@ export interface Dnd5eWizardState {
   toggleCantrip: (slug: string, max: number) => void;
   toggleFirstLevelSpell: (slug: string, max: number) => void;
   setDetail: <K extends DetailField>(field: K, value: string) => void;
+  hydrateFromCharacter: (
+    characterId: string,
+    data: {
+      name: string;
+      classSlug: string;
+      raceSlug: string;
+      background: string;
+      alignment?: string;
+      attributes: Record<AbilityKey, number>;
+      skillProficiencies: string[];
+      equipment: string[];
+      cantrips: string[];
+      firstLevelSpells: string[];
+      personalityTraits?: string;
+      ideals?: string;
+      bonds?: string;
+      flaws?: string;
+    },
+  ) => void;
   reset: () => void;
 }
 
@@ -100,6 +123,7 @@ const INITIAL: Omit<Dnd5eWizardState, keyof Actions> = {
   ideals: "",
   bonds: "",
   flaws: "",
+  editingCharacterId: null,
 };
 
 type Actions = Pick<
@@ -118,6 +142,7 @@ type Actions = Pick<
   | "toggleCantrip"
   | "toggleFirstLevelSpell"
   | "setDetail"
+  | "hydrateFromCharacter"
   | "reset"
 >;
 
@@ -198,6 +223,32 @@ export const useDnd5eWizardStore = create<Dnd5eWizardState>((set) => ({
     }),
 
   setDetail: (field, value) => set({ [field]: value } as Partial<Dnd5eWizardState>),
+
+  hydrateFromCharacter: (characterId, data) =>
+    set({
+      ...INITIAL,
+      attributes: { ...data.attributes },
+      raceSlug: data.raceSlug,
+      classSlug: data.classSlug,
+      background: data.background,
+      alignment: data.alignment ?? "",
+      skillProficiencies: data.skillProficiencies,
+      equipment: data.equipment,
+      cantrips: data.cantrips,
+      firstLevelSpells: data.firstLevelSpells,
+      name: data.name,
+      personalityTraits: data.personalityTraits ?? "",
+      ideals: data.ideals ?? "",
+      bonds: data.bonds ?? "",
+      flaws: data.flaws ?? "",
+      editingCharacterId: characterId,
+      // Modo edit: começa direto na revisão pra rever sem refazer tudo.
+      // Usuário pode voltar pelas pílulas se quiser ajustar.
+      step: 10,
+      // Atributos já vêm com bônus de raça aplicados (final). statMethod
+      // "manual" deixa o usuário ajustar livre se quiser.
+      statMethod: "manual",
+    }),
 
   reset: () => set({ ...INITIAL, attributes: { ...INITIAL_ATTRS } }),
 }));

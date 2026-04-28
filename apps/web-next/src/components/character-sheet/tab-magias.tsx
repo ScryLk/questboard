@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ExternalLink, Sparkles } from "lucide-react";
 import type { Dnd5eSheetContext } from "@/hooks/use-dnd5e-derived";
 import { listSpells } from "@/lib/srd";
+import { expendSpellSlot, restoreSpellSlot } from "@/lib/character-actions";
+import { useCharacterStore } from "@/stores/characterStore";
 
 const SCHOOL_LABELS: Record<string, string> = {
   abjuration: "Abjuração",
@@ -21,10 +23,11 @@ function fmtMod(n: number): string {
 }
 
 interface Props {
+  characterId: string;
   ctx: Dnd5eSheetContext;
 }
 
-export function TabMagias({ ctx }: Props) {
+export function TabMagias({ characterId, ctx }: Props) {
   const allSpells = listSpells("dnd5e");
 
   const cantrips = ctx.data.spells.cantrips
@@ -99,16 +102,33 @@ export function TabMagias({ ctx }: Props) {
                     </span>
                   </p>
                   <div className="mt-2 flex justify-center gap-0.5">
-                    {Array.from({ length: total ?? 0 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-2 w-2 rounded-full ${
-                          i < remaining
-                            ? "bg-brand-accent"
-                            : "bg-white/[0.06]"
-                        }`}
-                      />
-                    ))}
+                    {Array.from({ length: total ?? 0 }).map((_, i) => {
+                      const isAvailable = i < remaining;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            // Pip cheio (acessível): clica → gasta.
+                            // Pip vazio: clica → restaura.
+                            if (isAvailable) {
+                              expendSpellSlot(characterId, Number(level));
+                            } else {
+                              restoreSpellSlot(characterId, Number(level));
+                            }
+                          }}
+                          className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                            isAvailable
+                              ? "bg-brand-accent hover:bg-brand-accent/70"
+                              : "bg-white/[0.06] hover:bg-white/[0.12]"
+                          }`}
+                          title={
+                            isAvailable
+                              ? "Gastar slot"
+                              : "Restaurar slot"
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               );

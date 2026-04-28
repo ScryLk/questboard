@@ -99,9 +99,11 @@ export default function CharacterSheetPage({
       )}
       {tab === "combate" && <TabCombate character={character} ctx={ctx} />}
       {tab === "magias" && ctx?.spellcastingAbility && (
-        <TabMagias ctx={ctx} />
+        <TabMagias characterId={character.id} ctx={ctx} />
       )}
-      {tab === "inventario" && <TabInventario ctx={ctx} />}
+      {tab === "inventario" && (
+        <TabInventario characterId={character.id} ctx={ctx} />
+      )}
       {tab === "notas" && <TabNotas character={character} ctx={ctx} />}
     </div>
   );
