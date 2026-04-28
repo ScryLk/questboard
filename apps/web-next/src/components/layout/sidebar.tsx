@@ -39,6 +39,10 @@ const SESSION_NAV = [
   { href: "/notes", label: "Notas", icon: ScrollText },
 ];
 
+const REFERENCE_NAV = [
+  { href: "/compendium", label: "Compêndio", icon: ScrollText },
+];
+
 // ── Conteúdo interno do sidebar (reusado em desktop e mobile) ────────
 
 function SidebarContent({
@@ -101,6 +105,31 @@ function SidebarContent({
         <nav className="flex flex-col gap-0.5">
           {SESSION_NAV.map((item) => {
             const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-brand-accent-muted text-brand-accent"
+                    : "text-brand-muted hover:bg-white/5 hover:text-brand-text"
+                }`}
+              >
+                <Icon className="h-[18px] w-[18px]" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Reference section */}
+        <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-muted">
+          Referência
+        </p>
+        <nav className="flex flex-col gap-0.5">
+          {REFERENCE_NAV.map((item) => {
+            const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
               <Link
