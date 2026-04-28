@@ -37,6 +37,7 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
   const turnActions = useGameplayStore((s) => s.turnActions);
   const wallEdges = useGameplayStore((s) => s.wallEdges);
   const terrainCells = useGameplayStore((s) => s.terrainCells);
+  const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
 
   const token = tokens.find((t) => t.id === pathPlanningTokenId);
 
@@ -62,8 +63,9 @@ export function PathOverlay({ scaledCell, cellSizeFt }: PathOverlayProps) {
       MOCK_MAP.gridCols,
       MOCK_MAP.gridRows,
       cellSizeFt,
+      currentUserIsGM,
     );
-  }, [token, pathPlanningActive, plannedPath, maxFt, wallEdges, terrainCells, cellSizeFt]);
+  }, [token, pathPlanningActive, plannedPath, maxFt, wallEdges, terrainCells, cellSizeFt, currentUserIsGM]);
 
   // Max cost found (for distinguishing limit cells)
   const maxCostInReachable = useMemo(() => {

@@ -752,12 +752,20 @@ export function MapCanvas() {
             events,
           });
         } else {
-          // Distant: use A* to find route
+          // Distant: use A* to find route. GM bypassa paredes/portas
+          // (CLAUDE.md §3 + §10) — sem isso, planejar trajeto longo
+          // através de estruturas com porta fechada falha silenciosamente.
           const result = findPath(
             lastCell.x, lastCell.y, cell.x, cell.y,
             state.wallEdges, state.terrainCells, gridCols, gridRows, cellSizeFt,
+            state.currentUserIsGM,
           );
-          if (!result.found || result.path.length === 0) return;
+          if (!result.found || result.path.length === 0) {
+            state.addToast(
+              "Sem rota até o destino. Verifique paredes e portas trancadas.",
+            );
+            return;
+          }
 
           let prevX = lastCell.x;
           let prevY = lastCell.y;
