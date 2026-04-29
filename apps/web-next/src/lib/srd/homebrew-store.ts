@@ -166,22 +166,30 @@ export const useHomebrewStore = create<HomebrewState>()(
 // ── Selectors agnósticos de campanha ──
 //
 // Usados pelas list/detail pages do compêndio. Quando `campaignId` é
-// null, retornam vazio — homebrew só existe no contexto de campanha.
+// null ou não há entrada na campanha, retornam o mesmo `EMPTY` —
+// referência estável evita o "getSnapshot should be cached" do React
+// 18 quando o selector cria array novo a cada render.
+
+const EMPTY_SPELLS: SrdSpell[] = [];
+const EMPTY_MONSTERS: SrdMonster[] = [];
+const EMPTY_ITEMS: SrdItem[] = [];
 
 export function useHomebrewSpells(campaignId: string | null): SrdSpell[] {
   return useHomebrewStore((s) =>
-    campaignId ? s.spellsByCampaign[campaignId] ?? [] : [],
+    campaignId ? s.spellsByCampaign[campaignId] ?? EMPTY_SPELLS : EMPTY_SPELLS,
   );
 }
 
 export function useHomebrewMonsters(campaignId: string | null): SrdMonster[] {
   return useHomebrewStore((s) =>
-    campaignId ? s.monstersByCampaign[campaignId] ?? [] : [],
+    campaignId
+      ? s.monstersByCampaign[campaignId] ?? EMPTY_MONSTERS
+      : EMPTY_MONSTERS,
   );
 }
 
 export function useHomebrewItems(campaignId: string | null): SrdItem[] {
   return useHomebrewStore((s) =>
-    campaignId ? s.itemsByCampaign[campaignId] ?? [] : [],
+    campaignId ? s.itemsByCampaign[campaignId] ?? EMPTY_ITEMS : EMPTY_ITEMS,
   );
 }

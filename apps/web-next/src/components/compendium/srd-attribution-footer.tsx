@@ -20,14 +20,16 @@ export function SrdAttributionFooter({
   className,
 }: Props) {
   if (variant === "inline") {
+    // Span (não Link) — cards de listagem normalmente são <Link>
+    // wrappers, e <a> aninhado é HTML inválido. Atribuição completa
+    // fica acessível via /legal/srd-attribution no rodapé da página.
     return (
-      <Link
-        href="/legal/srd-attribution"
-        className={`text-[10px] text-brand-muted/70 hover:text-brand-muted ${className ?? ""}`}
+      <span
+        className={`text-[10px] text-brand-muted/70 ${className ?? ""}`}
         title={attribution.text}
       >
         {attribution.text}
-      </Link>
+      </span>
     );
   }
 
