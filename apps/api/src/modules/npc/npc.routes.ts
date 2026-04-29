@@ -4,7 +4,7 @@ import { createNpcService } from "./npc.service.js";
 import { createNpcController } from "./npc.controller.js";
 import {
   requireAnyParticipant,
-  requireGm,
+  requireConversationGm,
 } from "../../middleware/require-session-role.js";
 
 type CharacterParams = { Params: { id: string } };
@@ -66,19 +66,15 @@ export async function npcRoutes(app: FastifyInstance) {
     "/conversations/:cId/messages",
     controller.sendMessage,
   );
+  // gm-override exige GM/CO_GM da sessão linkada à conversa.
+  // Middleware resolve sessionId via Conversation.sessionId.
   app.post<ConversationParams>(
     "/conversations/:cId/gm-override",
+    { preHandler: requireConversationGm },
     controller.gmOverride,
   );
   app.patch<ConversationParams>(
     "/conversations/:cId/finish",
     controller.finishConversation,
   );
-
-  // ── Force GM-only operations ─────────────────────
-  // gm-override exige GM/CO_GM da sessão; esse check fica para
-  // sprint futura (precisa resolver sessionId da conversa primeiro).
-  // Por enquanto, a flag `requireGm` fica documentada aqui mas
-  // efetivada via lookup interno se necessário.
-  void requireGm;
 }

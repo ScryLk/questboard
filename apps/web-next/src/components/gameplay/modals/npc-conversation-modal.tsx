@@ -6,18 +6,29 @@
 // resposta. Botão "Despedir" mostra farewell e fecha.
 
 import { useEffect, useMemo, useRef } from "react";
-import { MessageCircle, MessageSquareDashed, X } from "lucide-react";
+import { Loader2, MessageCircle, MessageSquareDashed, X } from "lucide-react";
 import { useCharacterStore } from "@/stores/characterStore";
 import { useNpcConversationStore } from "@/lib/npc-conversation-store";
+import { useNpcSocketBridge } from "@/lib/npc-socket-bridge";
 import type { DialogueBranch } from "@/types/character";
 
 export function NpcConversationModal() {
+  const mode = useNpcConversationStore((s) => s.mode);
   const activeNpcId = useNpcConversationStore((s) => s.activeNpcId);
   const log = useNpcConversationStore((s) => s.log);
   const finished = useNpcConversationStore((s) => s.finished);
+  const pending = useNpcConversationStore((s) => s.pending);
+  const errorMessage = useNpcConversationStore((s) => s.errorMessage);
   const selectBranch = useNpcConversationStore((s) => s.selectBranch);
+  const selectBranchBackend = useNpcConversationStore(
+    (s) => s.selectBranchBackend,
+  );
   const finish = useNpcConversationStore((s) => s.finish);
+  const finishBackend = useNpcConversationStore((s) => s.finishBackend);
   const close = useNpcConversationStore((s) => s.close);
+
+  // Bridge socket → store quando em modo backend (no-op em local).
+  useNpcSocketBridge();
 
   const npc = useCharacterStore((s) =>
     activeNpcId ? s.characters.find((c) => c.id === activeNpcId) ?? null : null,
@@ -84,11 +95,21 @@ export function NpcConversationModal() {
               <span className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-purple-300">
                 Scripted
               </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                  mode === "backend"
+                    ? "bg-blue-500/15 text-blue-300"
+                    : "bg-white/10 text-brand-muted"
+                }`}
+              >
+                {mode === "backend" ? "Sincronizada" : "Local"}
+              </span>
               {finished && (
                 <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-300">
                   Encerrada
                 </span>
               )}
+              {pending && <Loader2 className="h-3 w-3 animate-spin text-blue-300" />}
             </div>
           </div>
           <button
@@ -151,14 +172,25 @@ export function NpcConversationModal() {
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-brand-muted">
                 Suas opções
               </p>
+              {errorMessage && (
+                <p className="mb-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-300">
+                  {errorMessage}
+                </p>
+              )}
               <div className="space-y-1.5">
                 {branches.map((b) => (
                   <button
                     key={b.id}
-                    onClick={() =>
-                      selectBranch(b.id, b.trigger, b.response, b.isFinal)
+                    onClick={() => {
+                      if (mode === "backend") {
+                        void selectBranchBackend(b.id);
+                      } else {
+                        selectBranch(b.id, b.trigger, b.response, b.isFinal);
+                      }
+                    }}
+                    disabled={
+                      !b.trigger.trim() || !b.response.trim() || pending
                     }
-                    disabled={!b.trigger.trim() || !b.response.trim()}
                     className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-left text-xs text-white transition-colors hover:border-brand-accent/40 hover:bg-brand-accent/5 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <span className="text-brand-accent">›</span>
@@ -178,16 +210,24 @@ export function NpcConversationModal() {
                 ))}
               </div>
               <button
-                onClick={() => finish(npc.dialogueFarewell)}
-                className="mt-2 w-full rounded-lg border border-white/5 px-3 py-1.5 text-[11px] text-brand-muted transition-colors hover:border-white/15 hover:text-brand-text"
+                onClick={() => {
+                  if (mode === "backend") void finishBackend();
+                  else finish(npc.dialogueFarewell);
+                }}
+                disabled={pending}
+                className="mt-2 w-full rounded-lg border border-white/5 px-3 py-1.5 text-[11px] text-brand-muted transition-colors hover:border-white/15 hover:text-brand-text disabled:opacity-50"
               >
                 Despedir-se
               </button>
             </>
           ) : showOptions ? (
             <button
-              onClick={() => finish(npc.dialogueFarewell)}
-              className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-brand-muted transition-colors hover:border-white/20 hover:text-white"
+              onClick={() => {
+                if (mode === "backend") void finishBackend();
+                else finish(npc.dialogueFarewell);
+              }}
+              disabled={pending}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-brand-muted transition-colors hover:border-white/20 hover:text-white disabled:opacity-50"
             >
               Despedir-se (sem opções de conversa cadastradas)
             </button>
@@ -210,7 +250,7 @@ function LogBubble({
   npcName,
   npcColor,
 }: {
-  line: { speaker: "npc" | "player"; text: string; at: string };
+  line: { speaker: "npc" | "player" | "gm"; text: string; at: string };
   npcName: string;
   npcColor: string;
 }) {
@@ -232,6 +272,28 @@ function LogBubble({
             {npcName}
           </p>
           <div className="mt-0.5 rounded-lg rounded-tl-none border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white">
+            <p className="whitespace-pre-wrap">{line.text}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (line.speaker === "gm") {
+    // GM override — diferenciado visualmente. Border amarelo mostra
+    // que foi o mestre que digitou no lugar do NPC.
+    return (
+      <div className="flex gap-2">
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] font-bold text-amber-300"
+          title="Mestre digitou como NPC"
+        >
+          GM
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+            {npcName} <span className="text-amber-300/70">(via mestre)</span>
+          </p>
+          <div className="mt-0.5 rounded-lg rounded-tl-none border border-amber-400/30 bg-amber-500/5 px-3 py-2 text-sm text-white">
             <p className="whitespace-pre-wrap">{line.text}</p>
           </div>
         </div>

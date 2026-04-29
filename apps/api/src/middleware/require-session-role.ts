@@ -113,3 +113,56 @@ export const requireAnyParticipant = requireSessionRole([
   "PLAYER",
   "SPECTATOR",
 ]);
+
+/** Cria um preHandler que resolve a sessão a partir de `params.cId`
+ *  (id de Conversation) e exige um dos `roles`. Usado por endpoints
+ *  /conversations/:cId/* onde a sessão é indireta. Quando a conversa
+ *  não tem sessão linkada, deixa passar (conversa avulsa do GM). */
+export function requireRoleViaConversation(
+  roles: SessionRole[],
+): preHandlerAsyncHookHandler {
+  if (roles.length === 0) {
+    throw new Error(
+      "requireRoleViaConversation: lista de roles não pode ser vazia",
+    );
+  }
+  return async function checkConversationRole(
+    request: FastifyRequest,
+    _reply: FastifyReply,
+  ) {
+    const params = (request.params ?? {}) as Record<string, unknown>;
+    const conversationId = typeof params.cId === "string" ? params.cId : null;
+    if (!conversationId) {
+      throw new BadRequestError(
+        "Identificador da conversa ausente na requisição.",
+      );
+    }
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { sessionId: true },
+    });
+    if (!conversation) throw new NotFoundError("Conversation");
+
+    // Conversa sem sessão (NPC standalone do GM) — só dono do NPC
+    // pode mexer; service valida ownership. Middleware passa.
+    if (!conversation.sessionId) return;
+
+    const role = await resolveSessionRole(conversation.sessionId, request.user.id);
+    if (role === null) {
+      throw new NotFoundError("Conversation");
+    }
+    if (!roles.includes(role)) {
+      throw new ForbiddenError(
+        `Ação requer papel ${roles.join(" ou ")} na sessão (atual: ${role}).`,
+      );
+    }
+    request.sessionRole = role;
+    request.sessionId = conversation.sessionId;
+  };
+}
+
+/** Atalho: GM ou CO_GM da sessão linkada à conversa. */
+export const requireConversationGm = requireRoleViaConversation([
+  "GM",
+  "CO_GM",
+]);
