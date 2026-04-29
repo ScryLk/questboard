@@ -22,6 +22,7 @@ import { audioRoutes } from "./modules/audio/audio.routes.js";
 import { adminRoutes } from "./modules/admin/admin.routes.js";
 import { narrativeRoutes } from "./modules/narrative/narrative.routes.js";
 import { searchRoutes } from "./modules/search/index.js";
+import { npcRoutes } from "./modules/npc/npc.routes.js";
 
 async function buildApp() {
   const app = Fastify({
@@ -67,6 +68,7 @@ async function buildApp() {
       await v1.register(adminRoutes);
       await v1.register(narrativeRoutes);
       await v1.register(searchRoutes);
+      await v1.register(npcRoutes);
     },
     { prefix: "/api/v1" },
   );

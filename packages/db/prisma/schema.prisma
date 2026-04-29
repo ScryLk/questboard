@@ -398,6 +398,7 @@ model Session {
   combatState  CombatState?
   phaseHistory PhaseEvent[]
   auditLog     SessionAuditLog[]
+  conversations Conversation[]
 
   @@index([ownerId])
   @@index([gmId])
@@ -689,12 +690,100 @@ model Character {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  // Diálogo (NPCs). Modo SCRIPTED no MVP — modos AI/HYBRID dependem
+  // de backend Gemini (CLAUDE.md §6.3, fora desta sprint).
+  dialogueEnabled  Boolean             @default(false)
+  dialogueGreeting String?             @db.Text
+  dialogueFarewell String?             @db.Text
+  dialogueNotes    String?             @db.Text
+  dialogueBranches NpcDialogueBranch[]
+  conversations    Conversation[]
+
   template       CharacterTemplate? @relation(fields: [templateId], references: [id])
   sessionPlayers SessionPlayer[]
   tokens         Token[]
 
   @@index([userId])
   @@index([campaignId])
+}
+
+// ─── NPC Dialogue (modo SCRIPTED) ────────────────────────
+
+enum NpcDialogueMode {
+  SCRIPTED // só galhos pré-escritos
+  AI // 100% Gemini (futuro)
+  HYBRID // galhos como dicas, Gemini gera no espírito
+}
+
+enum ConversationSpeaker {
+  NPC
+  PLAYER
+  GM_OVERRIDE // GM digitou diretamente como NPC
+}
+
+/** Galho do diálogo: opção que o jogador clica → resposta do NPC.
+ *  Lista plana, sem nesting profundo no MVP. */
+model NpcDialogueBranch {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  trigger  String  @db.Text // "O que o jogador diz"
+  response String  @db.Text // "O que o NPC responde"
+  isFinal  Boolean @default(false)
+  order    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([characterId])
+}
+
+/** Instância ativa de conversa entre player e NPC numa sessão. */
+model Conversation {
+  id          String          @id @default(cuid())
+  sessionId   String?
+  session     Session?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  npcId       String
+  npc         Character       @relation(fields: [npcId], references: [id], onDelete: Cascade)
+  initiatorId String
+  mode        NpcDialogueMode @default(SCRIPTED)
+
+  /** Reputação acumulada com o NPC (-100 a 100). Atualiza a cada msg
+   *  no modo AI/HYBRID; SCRIPTED mantém em 0. */
+  reputation Int @default(0)
+
+  /** Snapshot do contexto enviado à IA na abertura (modo AI/HYBRID).
+   *  Inclui equipamentos visíveis, HP%, raça/ocupação, persona. */
+  contextSnapshot Json?
+
+  isOpen    Boolean   @default(true)
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  messages ConversationMessage[]
+
+  @@index([sessionId])
+  @@index([npcId])
+}
+
+model ConversationMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  speaker        ConversationSpeaker
+  text           String              @db.Text
+
+  /** Galho usado (modo SCRIPTED). Null em modo AI ou em mensagens
+   *  do player no modo AI. */
+  branchId String?
+
+  /** Emoção detectada na voz (futuro): NEUTRAL, ANGRY, FEARFUL, etc. */
+  detectedEmotion String?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
 }
 
 model CharacterTemplate {

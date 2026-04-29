@@ -10,5 +10,6 @@ export * from "./ai-character.schema";
 export * from "./audio.schema";
 export * from "./combat.schema";
 export * from "./campaign.schema";
+export * from "./npc.schema";
 export * from "./characters/dnd5e";
 export * from "./characters/cosmic-horror";

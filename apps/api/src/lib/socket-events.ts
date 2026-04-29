@@ -117,3 +117,75 @@ export function emitPlayerConnected(p: PlayerPresencePayload): void {
 export function emitPlayerDisconnected(p: PlayerPresencePayload): void {
   emitToSession(p.sessionId, "player:disconnected", p);
 }
+
+// ─── Conversa com NPC (CLAUDE.md §6.3 / §8) ──────────────────
+
+export interface NpcConversationOpenedPayload {
+  conversationId: string;
+  sessionId: string;
+  npcId: string;
+  mode: "SCRIPTED" | "AI" | "HYBRID";
+  initiatorId: string;
+  greeting?: string | null;
+  at: string;
+}
+
+export function emitNpcConversationOpened(p: NpcConversationOpenedPayload): void {
+  emitToSession(p.sessionId, "npc:conversation-opened", p);
+}
+
+export interface NpcThinkingPayload {
+  conversationId: string;
+  sessionId: string;
+}
+
+/** Sinaliza ao frontend que o backend está processando a fala do NPC.
+ *  Modo SCRIPTED é instantâneo, então só emite no AI/HYBRID. Mantido
+ *  no helper pra ficar pronto pra Sprint Gemini. */
+export function emitNpcThinking(p: NpcThinkingPayload): void {
+  emitToSession(p.sessionId, "npc:thinking", p);
+}
+
+export interface NpcConversationMessagePayload {
+  conversationId: string;
+  sessionId: string;
+  message: {
+    id: string;
+    speaker: "NPC" | "PLAYER" | "GM_OVERRIDE";
+    text: string;
+    branchId?: string | null;
+    createdAt: string;
+  };
+  /** Quando true, modal frontend mostra "Encerrar". */
+  finished: boolean;
+}
+
+export function emitNpcMessage(p: NpcConversationMessagePayload): void {
+  emitToSession(p.sessionId, "npc:message", p);
+}
+
+export interface NpcConversationClosedPayload {
+  conversationId: string;
+  sessionId: string;
+  reason: "finished" | "interrupted";
+  at: string;
+}
+
+export function emitNpcConversationClosed(
+  p: NpcConversationClosedPayload,
+): void {
+  emitToSession(p.sessionId, "npc:conversation-closed", p);
+}
+
+export interface NpcReputationChangedPayload {
+  conversationId: string;
+  sessionId: string;
+  delta: number;
+  total: number;
+}
+
+export function emitNpcReputationChanged(
+  p: NpcReputationChangedPayload,
+): void {
+  emitToSession(p.sessionId, "npc:reputation-changed", p);
+}
