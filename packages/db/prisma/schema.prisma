@@ -222,6 +222,7 @@ model User {
   following        UserFollow[]      @relation("UserFollowers")
   notes            Note[]
   audioTracks      AudioTrack[]
+  worldEntities    WorldEntity[]
 
   @@index([externalId])
   @@index([email])
@@ -336,6 +337,7 @@ model Campaign {
   characters     Character[]
   narrativeNodes NarrativeNode[]
   notes          Note[]
+  worldEntities  WorldEntity[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -702,6 +704,7 @@ model Character {
   template       CharacterTemplate? @relation(fields: [templateId], references: [id])
   sessionPlayers SessionPlayer[]
   tokens         Token[]
+  worldEntities  WorldEntity[]      @relation("WorldNpc")
 
   @@index([userId])
   @@index([campaignId])
@@ -819,6 +822,50 @@ model Note {
   @@index([campaignId])
   @@index([authorId])
   @@index([campaignId, visibility])
+}
+
+// ─── World — NPCs, locais, facções, lore ─────────────────
+
+enum WorldEntityKind {
+  NPC
+  LOCATION
+  FACTION
+  LORE
+}
+
+enum WorldDisposition {
+  FRIENDLY
+  NEUTRAL
+  HOSTILE
+  UNKNOWN
+}
+
+model WorldEntity {
+  id          String          @id @default(cuid())
+  campaignId  String
+  campaign    Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User            @relation(fields: [authorId], references: [id])
+  kind        WorldEntityKind
+  name        String          @db.VarChar(150)
+  subtitle    String?         @db.VarChar(200)
+  description String          @db.Text
+  /** Localização — usada por NPCs e ocasionalmente facções. */
+  location    String?         @db.VarChar(200)
+  /** Disposição (default neutral). Faz sentido pra NPC e facção. */
+  disposition WorldDisposition?
+  /** Notas privadas do GM (segredos, motivações ocultas). */
+  notes       String?         @db.Text
+  /** Vínculo opcional com um Character (quando kind=NPC vira ficha). */
+  characterId String?
+  character   Character?      @relation("WorldNpc", fields: [characterId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([campaignId, kind])
+  @@index([authorId])
 }
 
 // ─── Combat ──────────────────────────────────────────────
