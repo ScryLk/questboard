@@ -39,6 +39,83 @@ export interface Dnd5eCharacterPersisted {
   flaws?: string;
 }
 
+// ── Cosmic horror persisted data ──
+//
+// Shape salvo em `CampaignCharacter.cosmicHorrorData` quando o
+// personagem foi criado pelo wizard cosmic-horror. Espelha
+// `cosmicHorrorCharacterSchema` em `@questboard/validators`. A ficha
+// viva re-deriva dodge/HP/MP/SAN max e bônus de dano via engine puro
+// (`@questboard/game-engine` → `cosmicHorror`).
+
+export type CosmicHorrorAttrKey =
+  | "for"
+  | "con"
+  | "tam"
+  | "des"
+  | "apa"
+  | "int"
+  | "pod"
+  | "edu";
+
+export type CosmicHorrorMadnessState =
+  | "SANE"
+  | "TEMPORARY"
+  | "INDEFINITE"
+  | "PERMANENT";
+
+export interface CosmicHorrorWeaponEntry {
+  /** Nome livre — homebrew permitido. */
+  name: string;
+  /** Slug da skill usada (firearms-handgun, brawl, ...). */
+  skillSlug: string;
+  /** Notação de dano, ex: "1d10" ou "1d6+1". */
+  damage: string;
+  range?: string;
+  ammo?: number;
+  notes?: string;
+}
+
+export interface CosmicHorrorCharacterPersisted {
+  occupation: string;
+  age: number;
+  birthplace?: string;
+  residence?: string;
+
+  attributes: Record<CosmicHorrorAttrKey, number>;
+
+  /** Cache de derivados (engine recalcula sob demanda). */
+  hpCurrent: number;
+  hpMax: number;
+  mpCurrent: number;
+  mpMax: number;
+  luck: number;
+
+  // Sanidade
+  sanityCurrent: number;
+  sanityMax: number;
+  sanityStartingMax: number;
+  mythosKnowledge: number;
+  madness: CosmicHorrorMadnessState;
+
+  /** Map slug → valor atual (já com base ou derivação aplicada). */
+  skills: Record<string, number>;
+
+  weapons: CosmicHorrorWeaponEntry[];
+  /** Lista textual livre — itens, livros, fetiches. */
+  belongings: string[];
+  creditRating: number;
+
+  // Backstory (Cthulhu valoriza muito)
+  personalDescription?: string;
+  ideologyBeliefs?: string;
+  significantPeople?: string;
+  meaningfulLocations?: string;
+  treasuredPossessions?: string;
+  traits?: string;
+  injuriesScars?: string;
+  phobiasManias?: string;
+}
+
 export type CharacterCategory = "npc" | "creature";
 
 export type CharacterRole =
@@ -151,6 +228,11 @@ export interface CampaignCharacter {
    *  (`@questboard/game-engine` → `dnd5e.deriveDnd5eCharacter`).
    *  Quando ausente, ficha cai no view genérico baseado em `stats`. */
   dnd5eData?: Dnd5eCharacterPersisted;
+
+  /** Dados específicos do sistema Horror Investigativo (d100). Quando
+   *  presente, ficha viva renderiza tabs cosmic-horror com SAN tracker
+   *  e re-deriva HP/MP/dodge/dmg-bonus via engine. */
+  cosmicHorrorData?: CosmicHorrorCharacterPersisted;
 
   createdAt: string;
   updatedAt: string;

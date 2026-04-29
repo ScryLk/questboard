@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Sparkles, Star, Wand2 } from "lucide-react";
+import { Brain, Plus, Search, Sparkles, Star, Wand2 } from "lucide-react";
 import {
   useCharacterStore,
   createDefaultCharacter,
@@ -118,6 +118,13 @@ export default function CharactersPage() {
           >
             <Wand2 className="h-4 w-4" />
             Wizard 5e
+          </Link>
+          <Link
+            href="/characters/new/cosmic-horror"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 px-4 py-2.5 text-sm font-medium text-fuchsia-300 transition-colors hover:bg-fuchsia-500/20"
+          >
+            <Brain className="h-4 w-4" />
+            Wizard Horror d100
           </Link>
           <button
             onClick={() => openEditor(null)}
