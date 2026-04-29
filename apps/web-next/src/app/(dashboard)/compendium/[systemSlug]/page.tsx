@@ -4,18 +4,25 @@ import { use } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
+  Brain,
+  Briefcase,
   ChevronRight,
+  Eye,
   Search,
   Skull,
   Sparkles,
   Sword,
   Users,
   Wand2,
-  AlertTriangle,
 } from "lucide-react";
-import { getSystem, getSystemCounts } from "@/lib/srd";
+import {
+  type SystemCounts,
+  getSystem,
+  getSystemCounts,
+} from "@/lib/srd";
 import {
   useHomebrewItems,
   useHomebrewMonsters,
@@ -23,14 +30,35 @@ import {
 } from "@/lib/srd/homebrew-store";
 import { useCampaignStore } from "@/lib/campaign-store";
 
-const SECTIONS = [
-  { type: "spells", label: "Magias", icon: Sparkles, count: "spells" as const },
-  { type: "monsters", label: "Monstros", icon: Skull, count: "monsters" as const },
-  { type: "items", label: "Itens", icon: Sword, count: "items" as const },
-  { type: "races", label: "Raças", icon: Users, count: "races" as const },
-  { type: "classes", label: "Classes", icon: Wand2, count: "classes" as const },
-  { type: "conditions", label: "Condições", icon: AlertTriangle, count: "conditions" as const },
+type SectionKey = keyof SystemCounts;
+
+interface SectionDef {
+  type: string;
+  label: string;
+  icon: typeof Sparkles;
+  count: SectionKey;
+}
+
+const DND5E_SECTIONS: SectionDef[] = [
+  { type: "spells", label: "Magias", icon: Sparkles, count: "spells" },
+  { type: "monsters", label: "Monstros", icon: Skull, count: "monsters" },
+  { type: "items", label: "Itens", icon: Sword, count: "items" },
+  { type: "races", label: "Raças", icon: Users, count: "races" },
+  { type: "classes", label: "Classes", icon: Wand2, count: "classes" },
+  { type: "conditions", label: "Condições", icon: AlertTriangle, count: "conditions" },
 ];
+
+const COSMIC_HORROR_SECTIONS: SectionDef[] = [
+  { type: "entities", label: "Entidades do Mythos", icon: Eye, count: "entities" },
+  { type: "occupations", label: "Ocupações", icon: Briefcase, count: "occupations" },
+  { type: "mythos-spells", label: "Feitiços do Mythos", icon: Sparkles, count: "mythosSpells" },
+  { type: "madness", label: "Estados de Loucura", icon: Brain, count: "madness" },
+];
+
+function getSectionsForSystem(systemSlug: string): SectionDef[] {
+  if (systemSlug === "cosmic-horror") return COSMIC_HORROR_SECTIONS;
+  return DND5E_SECTIONS;
+}
 
 export default function SystemOverviewPage({
   params,
@@ -47,22 +75,30 @@ export default function SystemOverviewPage({
   const homebrewMonsters = useHomebrewMonsters(activeCampaignId);
   const homebrewItems = useHomebrewItems(activeCampaignId);
 
-  // Soma SRD oficial + homebrew da campanha ativa pros badges.
-  const counts = {
-    ...baseCounts,
-    spells: baseCounts.spells + homebrewSpells.length,
-    monsters: baseCounts.monsters + homebrewMonsters.length,
-    items: baseCounts.items + homebrewItems.length,
-  };
+  // Soma SRD oficial + homebrew da campanha ativa pros badges (somente
+  // sistemas que usam o homebrew store dnd5e — homebrew cosmic-horror
+  // virá em fatia futura).
+  const counts: SystemCounts =
+    systemSlug === "dnd5e"
+      ? {
+          ...baseCounts,
+          spells: baseCounts.spells + homebrewSpells.length,
+          monsters: baseCounts.monsters + homebrewMonsters.length,
+          items: baseCounts.items + homebrewItems.length,
+        }
+      : baseCounts;
 
-  const homebrewCounts = {
-    spells: homebrewSpells.length,
-    monsters: homebrewMonsters.length,
-    items: homebrewItems.length,
-    races: 0,
-    classes: 0,
-    conditions: 0,
-  };
+  const homebrewCounts: Partial<Record<SectionKey, number>> =
+    systemSlug === "dnd5e"
+      ? {
+          spells: homebrewSpells.length,
+          monsters: homebrewMonsters.length,
+          items: homebrewItems.length,
+        }
+      : {};
+
+  const sections = getSectionsForSystem(systemSlug);
+  const isCosmic = systemSlug === "cosmic-horror";
 
   return (
     <div className="space-y-6">
@@ -86,13 +122,17 @@ export default function SystemOverviewPage({
           <p className="mt-1 text-xs text-brand-muted">
             {system.publisher}
             {system.edition && ` · ${system.edition}`} ·{" "}
-            {system.licenseType === "CC-BY-4.0" ? "CC-BY 4.0" : "Proprietário"}
+            {system.licenseType === "CC-BY-4.0"
+              ? "CC-BY 4.0"
+              : system.licenseType === "PROPRIETARY"
+                ? "Proprietário"
+                : "Domínio público"}
           </p>
           <p className="mt-3 max-w-2xl text-sm text-brand-text/90">
             {system.description}
           </p>
         </div>
-        {system.hasContent && (
+        {system.hasContent && !isCosmic && (
           <Link
             href={`/compendium/${systemSlug}/search`}
             className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white/[0.02] px-3 py-2 text-xs text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-brand-text sm:inline-flex"
@@ -111,9 +151,9 @@ export default function SystemOverviewPage({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {SECTIONS.map(({ type, label, icon: Icon, count }) => {
+        {sections.map(({ type, label, icon: Icon, count }) => {
           const total = counts[count];
-          const hb = homebrewCounts[count];
+          const hb = homebrewCounts[count] ?? 0;
           return (
             <Link
               key={type}
@@ -147,6 +187,13 @@ export default function SystemOverviewPage({
           >
             Atribuição completa
           </Link>
+        </p>
+      )}
+      {isCosmic && (
+        <p className="text-[10px] text-brand-muted/70">
+          Sistema &quot;Horror Investigativo&quot; desenvolvido pelo QuestBoard. Não
+          afiliado a Chaosium Inc. ou Call of Cthulhu®. Inspirado em obras de
+          H.P. Lovecraft (1890–1937), em domínio público.
         </p>
       )}
     </div>

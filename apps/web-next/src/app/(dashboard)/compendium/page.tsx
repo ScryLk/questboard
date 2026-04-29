@@ -39,7 +39,11 @@ export default function CompendiumLandingPage() {
             counts.items +
             counts.races +
             counts.classes +
-            counts.conditions;
+            counts.conditions +
+            counts.entities +
+            counts.occupations +
+            counts.mythosSpells +
+            counts.madness;
 
           return (
             <Link
@@ -75,7 +79,11 @@ export default function CompendiumLandingPage() {
                   {sys.publisher}
                   {sys.edition && ` · ${sys.edition}`}
                   {" · "}
-                  {sys.licenseType === "CC-BY-4.0" ? "CC-BY 4.0" : "Proprietário"}
+                  {sys.licenseType === "CC-BY-4.0"
+                    ? "CC-BY 4.0"
+                    : sys.licenseType === "PROPRIETARY"
+                      ? "Proprietário"
+                      : "Domínio público"}
                 </p>
                 <p className="mt-2 line-clamp-2 text-xs text-brand-muted">
                   {sys.description}
