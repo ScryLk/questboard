@@ -1,8 +1,9 @@
 "use client";
 
-// Ficha viva D&D 5e (frontend-only, dados do useCharacterStore).
-// Quando o backend de Character existir, esta página vira fetch real;
-// por ora reusa o store local + dnd5eData persistido pelo wizard.
+// Ficha viva (frontend-only, dados do useCharacterStore). Roteia
+// internamente entre dnd5e e cosmic-horror baseado nos dados
+// persistidos. Personagens sem dados de sistema caem em fallback
+// genérico.
 
 import { use, useState } from "react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ import { TabCombate } from "@/components/character-sheet/tab-combate";
 import { TabMagias } from "@/components/character-sheet/tab-magias";
 import { TabInventario } from "@/components/character-sheet/tab-inventario";
 import { TabNotas } from "@/components/character-sheet/tab-notas";
+import { CosmicHorrorCharacterSheet } from "@/components/cosmic-horror-sheet/cosmic-horror-character-sheet";
 
 type TabKey = "atributos" | "combate" | "magias" | "inventario" | "notas";
 
@@ -49,7 +51,22 @@ export default function CharacterSheetPage({
 
   if (!character) notFound();
 
-  // Abas Magias só fazem sentido pra conjuradores. Esconde se não.
+  // Cosmic horror tem layout próprio com SAN tracker.
+  if (character.cosmicHorrorData) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-5 pb-10">
+        <Link
+          href="/characters"
+          className="inline-flex items-center gap-1.5 text-xs text-brand-muted transition-colors hover:text-brand-text"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Personagens
+        </Link>
+        <CosmicHorrorCharacterSheet character={character} />
+      </div>
+    );
+  }
+
   const visibleTabs = TABS.filter((t) => {
     if (t.key === "magias" && !ctx?.spellcastingAbility) return false;
     return true;
@@ -67,16 +84,14 @@ export default function CharacterSheetPage({
 
       <SheetHeader character={character} ctx={ctx} />
 
-      {/* Aviso quando não tem dados 5e — wizard de criação preenche isso */}
       {!ctx && (
         <div className="rounded-md border border-brand-warning/30 bg-brand-warning/5 px-4 py-3 text-xs text-brand-warning">
           Esse personagem não foi criado pelo wizard 5e — ficha viva exibe
           apenas valores estáticos. Pra recálculo automático, recrie via
-          /characters/new/dnd5e.
+          /characters/new/dnd5e ou /characters/new/cosmic-horror.
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-brand-border">
         {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
