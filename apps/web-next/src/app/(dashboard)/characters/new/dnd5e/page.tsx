@@ -30,6 +30,8 @@ export default function Dnd5eCharacterWizardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const returnTo = searchParams.get("returnTo");
+  const campaignIdOverride = searchParams.get("campaignId") ?? undefined;
   const step = useDnd5eWizardStore((s) => s.step);
   const editingCharacterId = useDnd5eWizardStore((s) => s.editingCharacterId);
   const reset = useDnd5eWizardStore((s) => s.reset);
@@ -120,7 +122,21 @@ export default function Dnd5eCharacterWizardPage() {
         {step === 7 && <Step7Equipment />}
         {step === 8 && <Step8Spells />}
         {step === 9 && <Step9Details />}
-        {step === 10 && <Step10Review onFinish={() => router.push("/characters")} />}
+        {step === 10 && (
+          <Step10Review
+            campaignIdOverride={campaignIdOverride}
+            onFinish={(newId) => {
+              if (returnTo) {
+                const sep = returnTo.includes("?") ? "&" : "?";
+                router.push(
+                  newId ? `${returnTo}${sep}createdId=${newId}` : returnTo,
+                );
+              } else {
+                router.push("/characters");
+              }
+            }}
+          />
+        )}
       </div>
 
       <WizardFooter />

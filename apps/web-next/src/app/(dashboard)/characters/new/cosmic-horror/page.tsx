@@ -26,6 +26,8 @@ export default function CosmicHorrorWizardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const returnTo = searchParams.get("returnTo");
+  const campaignIdOverride = searchParams.get("campaignId") ?? undefined;
 
   const step = useCosmicHorrorWizardStore((s) => s.step);
   const editingCharacterId = useCosmicHorrorWizardStore(
@@ -108,7 +110,19 @@ export default function CosmicHorrorWizardPage() {
         {step === 6 && <Step6Equipment />}
         {step === 7 && <Step7Backstory />}
         {step === 8 && (
-          <Step8Review onFinish={() => router.push("/characters")} />
+          <Step8Review
+            campaignIdOverride={campaignIdOverride}
+            onFinish={(newId) => {
+              if (returnTo) {
+                const sep = returnTo.includes("?") ? "&" : "?";
+                router.push(
+                  newId ? `${returnTo}${sep}createdId=${newId}` : returnTo,
+                );
+              } else {
+                router.push("/characters");
+              }
+            }}
+          />
         )}
       </div>
 

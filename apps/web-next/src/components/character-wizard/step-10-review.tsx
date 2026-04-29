@@ -54,10 +54,14 @@ function fmtMod(n: number): string {
 }
 
 interface Props {
-  onFinish: () => void;
+  onFinish: (newCharacterId?: string) => void;
+  /** Sobrescreve o `createdByCampaignId` do personagem criado. Usado
+   *  pelo player view pra escopar o aventureiro à sessão (`play:CODE`)
+   *  sem depender da campanha ativa do dashboard. */
+  campaignIdOverride?: string;
 }
 
-export function Step10Review({ onFinish }: Props) {
+export function Step10Review({ onFinish, campaignIdOverride }: Props) {
   const wizard = useDnd5eWizardStore();
   const createCharacter = useCharacterStore((s) => s.createCharacter);
   const updateCharacter = useCharacterStore((s) => s.updateCharacter);
@@ -211,7 +215,7 @@ export function Step10Review({ onFinish }: Props) {
         void preservedHpMax;
         addToast(`${wizard.name.trim()} atualizado.`);
         reset();
-        onFinish();
+        onFinish(wizard.editingCharacterId);
         return;
       }
     }
@@ -238,7 +242,7 @@ export function Step10Review({ onFinish }: Props) {
         savingThrows: klass.savingThrowProficiencies,
         skills: wizard.skillProficiencies,
       },
-      createdByCampaignId: activeCampaignId ?? undefined,
+      createdByCampaignId: campaignIdOverride ?? activeCampaignId ?? undefined,
       dnd5eData: {
         level: 1,
         classSlug: klass.slug,
@@ -274,7 +278,7 @@ export function Step10Review({ onFinish }: Props) {
     createCharacter(newChar);
     addToast(`${newChar.name} criado.`);
     reset();
-    onFinish();
+    onFinish(newChar.id);
   }
 
   if (!klass || !race) {

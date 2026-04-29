@@ -7,55 +7,46 @@ import {
   Zap,
   Footprints,
   AlertTriangle,
-  ExternalLink,
   UserX,
   X,
 } from "lucide-react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
+import { useCharacterStore } from "@/stores/characterStore";
 import { getHpPercent, getHpColor } from "@/lib/gameplay-mock-data";
 import { MOCK_PLAYERS } from "@/lib/gameplay-mock-data";
 import { ALL_CONDITIONS } from "@/lib/gameplay-mock-data";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CosmicHorrorCharacterSheet } from "@/components/cosmic-horror-sheet/cosmic-horror-character-sheet";
+import { useDnd5eDerived } from "@/hooks/use-dnd5e-derived";
+import { SheetHeader } from "@/components/character-sheet/sheet-header";
+import { TabAtributos } from "@/components/character-sheet/tab-atributos";
 import { PlayerTargetTab } from "./PlayerTargetTab";
 
 export function PlayerSheetTab() {
   const myToken = usePlayerViewStore((s) => s.myToken);
   const playerId = usePlayerViewStore((s) => s.playerId);
+  const characterId = usePlayerViewStore((s) => s.characterId);
   const targetTokenId = usePlayerViewStore((s) => s.targetTokenId);
   const visibleTokens = usePlayerViewStore((s) => s.visibleTokens);
   const setTargetTokenId = usePlayerViewStore((s) => s.setTargetTokenId);
 
-  // Sub-toggle "Eu | Alvo" só aparece quando há um alvo selecionado
+  // Personagem persistido pelo wizard (cosmic-horror ou dnd5e). Pode
+  // não existir se o jogador entrou com um pre-made mock.
+  const character = useCharacterStore((s) =>
+    characterId ? s.characters.find((c) => c.id === characterId) : null,
+  );
+
   const target = targetTokenId
     ? visibleTokens.find((t) => t.id === targetTokenId) ?? null
     : null;
   const [view, setView] = useState<"self" | "target">(
     target ? "target" : "self",
   );
-  // Quando seta um alvo novo, muda auto pro view dele
   useEffect(() => {
     if (target) setView("target");
     else setView("self");
   }, [target?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const player = MOCK_PLAYERS.find((p) => p.id === playerId);
-
-  if (!myToken || !player) {
-    return (
-      <EmptyState
-        icon={UserX}
-        title="Sem personagem atribuído"
-        description={
-          <>
-            O mestre ainda não te conectou a um personagem. Enquanto isso,
-            você pode assistir a sessão e usar o chat.
-          </>
-        }
-      />
-    );
-  }
-
-  // Se há alvo + toggle em "target", renderiza a view do alvo
   if (target && view === "target") {
     return (
       <div className="flex h-full flex-col">
@@ -73,6 +64,69 @@ export function PlayerSheetTab() {
           <PlayerTargetTab />
         </div>
       </div>
+    );
+  }
+
+  // ── Cosmic Horror ─────────────────────────────────────────────
+  if (character?.cosmicHorrorData) {
+    return (
+      <div className="flex h-full flex-col">
+        {target && (
+          <SubToggle
+            view="self"
+            onSelf={() => setView("self")}
+            targetName={target.name}
+            onTarget={() => setView("target")}
+            onClear={() => {
+              setTargetTokenId(null);
+              setView("self");
+            }}
+          />
+        )}
+        <div className="flex-1 overflow-y-auto p-3">
+          <CosmicHorrorCharacterSheet character={character} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── D&D 5e ────────────────────────────────────────────────────
+  if (character?.dnd5eData) {
+    return (
+      <div className="flex h-full flex-col">
+        {target && (
+          <SubToggle
+            view="self"
+            onSelf={() => setView("self")}
+            targetName={target.name}
+            onTarget={() => setView("target")}
+            onClear={() => {
+              setTargetTokenId(null);
+              setView("self");
+            }}
+          />
+        )}
+        <div className="flex-1 overflow-y-auto p-3">
+          <Dnd5ePlayerSheet character={character} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Fallback genérico — só placeholder/mock ──────────────────
+  const player = MOCK_PLAYERS.find((p) => p.id === playerId);
+  if (!myToken || !player) {
+    return (
+      <EmptyState
+        icon={UserX}
+        title="Sem personagem atribuído"
+        description={
+          <>
+            O mestre ainda não te conectou a um personagem. Enquanto isso,
+            você pode assistir a sessão e usar o chat.
+          </>
+        }
+      />
     );
   }
 
@@ -94,134 +148,128 @@ export function PlayerSheetTab() {
         />
       )}
       <div className="flex-1 overflow-y-auto">
-        {/* Character header */}
-      <div className="border-b border-brand-border p-4">
-        <div className="flex items-center gap-3">
+        <div className="border-b border-brand-border p-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+              style={{ backgroundColor: player.color + "30", color: player.color }}
+            >
+              {player.avatarInitials}
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-brand-text">{myToken.name}</h2>
+              <p className="text-xs text-brand-muted">
+                {player.class} — Nivel {player.level}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b border-brand-border p-4">
+          <div className="flex items-center gap-2">
+            <Heart className="h-4 w-4" style={{ color: hpColor }} />
+            <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
+              Pontos de Vida
+            </span>
+          </div>
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-            style={{ backgroundColor: player.color + "30", color: player.color }}
+            className="mt-2 overflow-hidden rounded-full bg-white/10"
+            style={{ height: 8 }}
           >
-            {player.avatarInitials}
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${hpPercent}%`, backgroundColor: hpColor }}
+            />
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-brand-text">{myToken.name}</h2>
-            <p className="text-xs text-brand-muted">
-              {player.class} — Nivel {player.level}
-            </p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-lg font-bold tabular-nums text-brand-text">
+              {myToken.hp}
+              <span className="text-sm text-brand-muted">/{myToken.maxHp}</span>
+            </span>
+            <span className="text-[10px] text-brand-muted">
+              {Math.round(hpPercent)}%
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* HP Section */}
-      <div className="border-b border-brand-border p-4">
-        <div className="flex items-center gap-2">
-          <Heart className="h-4 w-4" style={{ color: hpColor }} />
-          <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
-            Pontos de Vida
-          </span>
-        </div>
-
-        {/* HP bar */}
-        <div className="mt-2 overflow-hidden rounded-full bg-white/10" style={{ height: 8 }}>
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${hpPercent}%`, backgroundColor: hpColor }}
+        <div className="grid grid-cols-2 gap-px border-b border-brand-border bg-brand-border">
+          <StatBox
+            icon={<Shield className="h-3.5 w-3.5 text-brand-info" />}
+            label="CA"
+            value={myToken.ac?.toString() ?? "—"}
+          />
+          <StatBox
+            icon={<Footprints className="h-3.5 w-3.5 text-brand-success" />}
+            label="Velocidade"
+            value={`${myToken.speed ?? 30}ft`}
           />
         </div>
-        <div className="mt-1 flex items-baseline justify-between">
-          <span className="text-lg font-bold tabular-nums text-brand-text">
-            {myToken.hp}
-            <span className="text-sm text-brand-muted">/{myToken.maxHp}</span>
-          </span>
-          <span className="text-[10px] text-brand-muted">
-            {Math.round(hpPercent)}%
-          </span>
-        </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-px border-b border-brand-border bg-brand-border">
-        <StatBox
-          icon={<Shield className="h-3.5 w-3.5 text-brand-info" />}
-          label="CA"
-          value={myToken.ac?.toString() ?? "—"}
-        />
-        <StatBox
-          icon={<Footprints className="h-3.5 w-3.5 text-brand-success" />}
-          label="Velocidade"
-          value={`${myToken.speed ?? 30}ft`}
-        />
-      </div>
-
-      {/* Conditions */}
-      <div className="border-b border-brand-border p-4">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-3.5 w-3.5 text-brand-warning" />
-          <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
-            Condições
-          </span>
-        </div>
-        {myToken.conditions.length === 0 ? (
-          <p className="mt-2 text-xs text-brand-muted/60">
-            Nenhuma condição ativa
-          </p>
-        ) : (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {myToken.conditions.map((cond) => {
-              const label =
-                ALL_CONDITIONS.find((c) => c.key === cond)?.label ?? cond;
-              return (
-                <span
-                  key={cond}
-                  className="rounded-full bg-brand-warning/10 px-2 py-0.5 text-[10px] font-medium text-brand-warning"
-                >
-                  {label}
-                </span>
-              );
-            })}
+        <div className="border-b border-brand-border p-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-brand-warning" />
+            <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
+              Condições
+            </span>
           </div>
-        )}
-      </div>
-
-      {/* Iniciativa + atalhos — placeholder honesto.
-          Backend de stats completos e ataques favoritos ainda não existe;
-          ver prompt "HUD + Ficha Completa Multi-Sistema" (PRs #3-#6).
-          TODO: conectar quando houver sistema de ficha por RPG. */}
-      <div className="border-b border-brand-border p-4">
-        <div className="flex items-center gap-2">
-          <Zap className="h-3.5 w-3.5 text-brand-warning" />
-          <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
-            Iniciativa e ataques
-          </span>
+          {myToken.conditions.length === 0 ? (
+            <p className="mt-2 text-xs text-brand-muted/60">
+              Nenhuma condição ativa
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {myToken.conditions.map((cond) => {
+                const label =
+                  ALL_CONDITIONS.find((c) => c.key === cond)?.label ?? cond;
+                return (
+                  <span
+                    key={cond}
+                    className="rounded-full bg-brand-warning/10 px-2 py-0.5 text-[10px] font-medium text-brand-warning"
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <p className="mt-2 text-xs text-brand-muted/60">
-          Disponível quando o sistema de ficha específico (D&amp;D 5e / CoC
-          7e) for conectado. Por enquanto, use dados físicos ou a aba
-          &quot;Dados&quot;.
-        </p>
-      </div>
 
-      {/* CTA ficha completa — modal ainda é mock; botão fica desabilitado
-          até o modal real por sistema existir (PR #4 do prompt multi-sistema). */}
-      <div className="mt-auto border-t border-brand-border p-3">
-        <button
-          disabled
-          title="Em breve: ficha completa por sistema de RPG"
-          className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-brand-border py-2 text-xs font-medium text-brand-muted opacity-50"
-        >
-          <ExternalLink className="h-3 w-3" />
-          Ver ficha completa
-        </button>
-      </div>
+        <div className="border-b border-brand-border p-4">
+          <div className="flex items-center gap-2">
+            <Zap className="h-3.5 w-3.5 text-brand-warning" />
+            <span className="text-xs font-medium uppercase tracking-wider text-brand-muted">
+              Ficha completa
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-brand-muted/60">
+            Você entrou com um personagem pre-made da mesa. Para usar a ficha
+            sistema-específica completa (sanidade, slots de magia, etc.),
+            crie um personagem próprio na tela de entrada.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * Toggle "Eu | {targetName}" — aparece quando há um alvo selecionado.
- * Botão X limpa o alvo e volta pra view do próprio personagem.
- */
+// Wrapper compacto da ficha 5e — só Header + Atributos (mais relevante
+// in-game). O resto fica acessível pela rota /characters/[id] via dashboard
+// quando o player tiver acesso.
+function Dnd5ePlayerSheet({
+  character,
+}: {
+  character: NonNullable<ReturnType<typeof useCharacterStore.getState>["characters"][number]>;
+}) {
+  const ctx = useDnd5eDerived(character);
+  if (!ctx) return null;
+  return (
+    <div className="space-y-3">
+      <SheetHeader character={character} ctx={ctx} />
+      <TabAtributos character={character} ctx={ctx} />
+    </div>
+  );
+}
+
 function SubToggle({
   view,
   targetName,

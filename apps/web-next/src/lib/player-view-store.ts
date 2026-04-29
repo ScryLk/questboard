@@ -164,6 +164,11 @@ export const DEFAULT_PLAYER_VIEW_SETTINGS: PlayerViewSettings = {
 
 export type PlayerTab = "ficha" | "chat" | "dados" | "combate";
 
+// Sistema de regras da campanha. Player view branca a UI conforme
+// (ficha viva, ações disponíveis, vocabulário). Em produção vem do
+// payload de join do GM; por ora player escolhe manualmente no lobby.
+export type PlayerCampaignSystem = "dnd5e" | "cosmic-horror" | null;
+
 // ── Player view state ─────────────────────────────────────────
 
 interface PlayerViewState {
@@ -177,6 +182,7 @@ interface PlayerViewState {
 
   // Session info for lobby/join
   campaignName: string;
+  campaignSystem: PlayerCampaignSystem;
   gmName: string;
   playerCount: number;
   sessionNumber: number;
@@ -286,6 +292,7 @@ interface PlayerViewState {
   addLobbyPlayer: (player: LobbyPlayer) => void;
   removeLobbyPlayer: (playerId: string) => void;
   setCharacterId: (id: string | null) => void;
+  setCampaignSystem: (system: PlayerCampaignSystem) => void;
 
   // Summary
   sessionSummary: SessionSummary | null;
@@ -382,6 +389,7 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   joinStep: "enter-code",
 
   campaignName: "",
+  campaignSystem: null,
   gmName: "",
   playerCount: 0,
   sessionNumber: 0,
@@ -505,6 +513,7 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   removeLobbyPlayer: (playerId) =>
     set((s) => ({ lobbyPlayers: s.lobbyPlayers.filter((p) => p.id !== playerId) })),
   setCharacterId: (id) => set({ characterId: id }),
+  setCampaignSystem: (system) => set({ campaignSystem: system }),
 
   // Summary
   sessionSummary: null,

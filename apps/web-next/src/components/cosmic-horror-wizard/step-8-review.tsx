@@ -22,7 +22,11 @@ import type {
 } from "@/types/character";
 
 interface Props {
-  onFinish: () => void;
+  onFinish: (newCharacterId?: string) => void;
+  /** Sobrescreve o `createdByCampaignId` do personagem criado. Usado
+   *  pelo player view pra escopar o investigador à sessão (`play:CODE`)
+   *  sem depender da campanha ativa do dashboard. */
+  campaignIdOverride?: string;
 }
 
 function deriveBase(
@@ -36,7 +40,7 @@ function deriveBase(
   return skill.base;
 }
 
-export function Step8Review({ onFinish }: Props) {
+export function Step8Review({ onFinish, campaignIdOverride }: Props) {
   const wizard = useCosmicHorrorWizardStore();
   const reset = useCosmicHorrorWizardStore((s) => s.reset);
   const createCharacter = useCharacterStore((s) => s.createCharacter);
@@ -143,31 +147,34 @@ export function Step8Review({ onFinish }: Props) {
         },
       });
       addToast({ message: "Investigador atualizado.", level: "success" });
-    } else {
-      const character: CampaignCharacter = createDefaultCharacter({
-        name: wizard.name,
-        description: occupation.description,
-        category: "npc",
-        createdByCampaignId: activeCampaignId ?? undefined,
-        cosmicHorrorData: persisted,
-        stats: {
-          hp,
-          maxHp: hp,
-          ac: 10,
-          speed: moveRate * 5,
-          str: wizard.attributes.for,
-          dex: wizard.attributes.des,
-          con: wizard.attributes.con,
-          int: wizard.attributes.int,
-          wis: wizard.attributes.pod,
-          cha: wizard.attributes.apa,
-        },
-      });
-      createCharacter(character);
-      addToast({ message: "Investigador criado.", level: "success" });
+      reset();
+      onFinish(wizard.editingCharacterId);
+      return;
     }
+
+    const character: CampaignCharacter = createDefaultCharacter({
+      name: wizard.name,
+      description: occupation.description,
+      category: "npc",
+      createdByCampaignId: campaignIdOverride ?? activeCampaignId ?? undefined,
+      cosmicHorrorData: persisted,
+      stats: {
+        hp,
+        maxHp: hp,
+        ac: 10,
+        speed: moveRate * 5,
+        str: wizard.attributes.for,
+        dex: wizard.attributes.des,
+        con: wizard.attributes.con,
+        int: wizard.attributes.int,
+        wis: wizard.attributes.pod,
+        cha: wizard.attributes.apa,
+      },
+    });
+    createCharacter(character);
+    addToast({ message: "Investigador criado.", level: "success" });
     reset();
-    onFinish();
+    onFinish(character.id);
   }
 
   return (
