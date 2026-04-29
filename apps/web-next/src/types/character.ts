@@ -116,6 +116,16 @@ export interface CosmicHorrorCharacterPersisted {
   phobiasManias?: string;
 }
 
+export interface DialogueBranch {
+  id: string;
+  /** O que o jogador "diz" (texto curto, exibido como botão de opção). */
+  trigger: string;
+  /** O que o NPC responde quando o jogador escolhe essa opção. */
+  response: string;
+  /** Quando true, escolher essa branch encerra a conversa após a resposta. */
+  isFinal?: boolean;
+}
+
 export type CharacterCategory = "npc" | "creature";
 
 export type CharacterRole =
@@ -212,9 +222,15 @@ export interface CampaignCharacter {
   actions: CharacterAction[];
   traits?: string;
 
-  // Dialogo (para NPCs)
+  // Dialogo (para NPCs) — modo SCRIPTED no MVP. Modos AI/HYBRID
+  // dependem de backend Gemini (especificados em CLAUDE.md §6.3).
   dialogueEnabled: boolean;
   dialogueGreeting?: string;
+  dialogueFarewell?: string;
+  /** Galho do diálogo: opção que o jogador clica → resposta do NPC.
+   *  Lista plana — sem nesting profundo no MVP. Branches com
+   *  `isFinal: true` encerram a conversa ao serem escolhidas. */
+  dialogueBranches?: DialogueBranch[];
   dialogueNotes?: string;
 
   // Escopo

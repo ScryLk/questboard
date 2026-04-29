@@ -43,6 +43,9 @@ import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
 import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
 import { AttackFlowModal } from "@/components/gameplay/combat/attack-flow-modal";
 import { useAttackStore } from "@/lib/attack-store";
+import { NpcConversationModal } from "./modals/npc-conversation-modal";
+import { useNpcConversationStore } from "@/lib/npc-conversation-store";
+import { useCharacterStore } from "@/stores/characterStore";
 
 
 export function GameplayLayout() {
@@ -241,12 +244,24 @@ export function GameplayLayout() {
             case "inspect":
               gp.setRightTab("sheet");
               break;
-            case "converse":
-              // Chat com o NPC em contexto. TODO(npc-conversation): quando
-              // a fatia de conversa com IA do NPC existir, abrir modal
-              // dedicado em vez do chat genérico.
-              gp.setRightTab("chat");
+            case "converse": {
+              // Resolve o NPC associado ao token e abre o modal scripted.
+              // Modos AI/HYBRID virão quando o backend Gemini subir.
+              const charStore = useCharacterStore.getState();
+              const npcId = charStore.getTokenCharacterId(target.tokenId);
+              const npc = npcId
+                ? charStore.characters.find((c) => c.id === npcId)
+                : null;
+              if (!npc) {
+                // Sem personagem vinculado — fallback no chat.
+                gp.setRightTab("chat");
+                break;
+              }
+              useNpcConversationStore
+                .getState()
+                .open(npc.id, npc.dialogueGreeting);
               break;
+            }
             case "test":
               // Rolagem livre com contexto do alvo no campo `context`.
               gp.setRightTab("dice");
@@ -265,6 +280,9 @@ export function GameplayLayout() {
 
       {/* Modal de ataque — escuta useAttackStore */}
       <AttackFlowModal />
+
+      {/* Modal de conversa scripted com NPC — escuta useNpcConversationStore */}
+      <NpcConversationModal />
 
       {/* Badge de identidade dev (apenas NODE_ENV=development) */}
       <DevIdentityBadge />
