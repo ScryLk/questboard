@@ -18,6 +18,8 @@ import {
   ShieldAlert,
   Info,
   X,
+  Globe,
+  Headphones,
 } from "lucide-react";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
 import { useMemo } from "react";
@@ -28,6 +30,7 @@ const CAMPAIGN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/maps", label: "Mapas", icon: Map },
   { href: "/story", label: "Historia", icon: BookOpen },
+  { href: "/world", label: "Mundo", icon: Globe },
   { href: "/objects", label: "Objetos", icon: Package },
   { href: "/characters", label: "Personagens", icon: Skull },
   { href: "/players", label: "Jogadores", icon: Users },
@@ -37,6 +40,7 @@ const SESSION_NAV = [
   { href: "/gameplay", label: "Gameplay", icon: Gamepad2 },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/notes", label: "Notas", icon: ScrollText },
+  { href: "/audio", label: "Áudio", icon: Headphones },
 ];
 
 const REFERENCE_NAV = [
