@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../../errors/app-error.js";
 import { redis } from "../../lib/redis.js";
+import { emitCombatHpChanged } from "../../lib/socket-events.js";
 
 export function createCombatService(prisma: PrismaClient) {
   async function assertGM(sessionId: string, userId: string) {
@@ -106,7 +107,7 @@ export function createCombatService(prisma: PrismaClient) {
       return prisma.combatParticipant.update({ where: { id: participantId }, data: changes });
     },
 
-    async damage(_sessionId: string, _userId: string, participantId: string, amount: number) {
+    async damage(sessionId: string, userId: string, participantId: string, amount: number) {
       if (amount <= 0) throw new BadRequestError("Dano deve ser positivo");
 
       const participant = await prisma.combatParticipant.findUnique({ where: { id: participantId } });
@@ -123,14 +124,27 @@ export function createCombatService(prisma: PrismaClient) {
 
       const hpCurrent = Math.max(0, participant.hpCurrent - remaining);
       const isDead = hpCurrent === 0;
-
-      return prisma.combatParticipant.update({
+      const updated = await prisma.combatParticipant.update({
         where: { id: participantId },
         data: { hpCurrent, hpTemp, isDead },
       });
+
+      emitCombatHpChanged({
+        sessionId,
+        participantId,
+        tokenId: updated.tokenId ?? null,
+        hpCurrent: updated.hpCurrent,
+        hpMax: updated.hpMax,
+        hpTemp: updated.hpTemp,
+        delta: -amount,
+        isDead: updated.isDead,
+        by: userId,
+        at: new Date().toISOString(),
+      });
+      return updated;
     },
 
-    async heal(_sessionId: string, _userId: string, participantId: string, amount: number) {
+    async heal(sessionId: string, userId: string, participantId: string, amount: number) {
       if (amount <= 0) throw new BadRequestError("Cura deve ser positiva");
 
       const participant = await prisma.combatParticipant.findUnique({ where: { id: participantId } });
@@ -138,10 +152,24 @@ export function createCombatService(prisma: PrismaClient) {
 
       const hpCurrent = Math.min(participant.hpMax, participant.hpCurrent + amount);
 
-      return prisma.combatParticipant.update({
+      const updated = await prisma.combatParticipant.update({
         where: { id: participantId },
         data: { hpCurrent, isDead: false },
       });
+
+      emitCombatHpChanged({
+        sessionId,
+        participantId,
+        tokenId: updated.tokenId ?? null,
+        hpCurrent: updated.hpCurrent,
+        hpMax: updated.hpMax,
+        hpTemp: updated.hpTemp,
+        delta: amount,
+        isDead: false,
+        by: userId,
+        at: new Date().toISOString(),
+      });
+      return updated;
     },
   };
 }

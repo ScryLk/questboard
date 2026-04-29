@@ -1,6 +1,10 @@
 import type { Namespace, Socket } from "socket.io";
 import { redis } from "../../lib/redis.js";
 import { prisma } from "@questboard/db";
+import {
+  emitPlayerConnected,
+  emitPlayerDisconnected,
+} from "../../lib/socket-events.js";
 
 export function registerSessionHandler(nsp: Namespace, socket: Socket): void {
   const user = socket.data.user;
@@ -35,6 +39,13 @@ export function registerSessionHandler(nsp: Namespace, socket: Socket): void {
     nsp.to(`session:${sessionId}`).emit("presence:joined", {
       userId: user.id,
       displayName: user.displayName,
+    });
+    // Evento canônico do CLAUDE.md §8 (frontend novo escuta esse;
+    // presence:joined fica como compat até migrar).
+    emitPlayerConnected({
+      sessionId,
+      userId: user.id,
+      at: new Date().toISOString(),
     });
   });
 
@@ -77,5 +88,11 @@ async function handleDisconnect(nsp: Namespace, socket: Socket, sessionId: strin
   nsp.to(`session:${sessionId}`).emit("presence:left", {
     userId: user.id,
     displayName: user.displayName,
+  });
+  // Evento canônico do CLAUDE.md §8 (`player:disconnected`).
+  emitPlayerDisconnected({
+    sessionId,
+    userId: user.id,
+    at: new Date().toISOString(),
   });
 }

@@ -9,7 +9,11 @@
 // Lê `sessionId` na seguinte ordem: params.id, params.sessionId,
 // body.sessionId, query.sessionId.
 
-import type { FastifyRequest, FastifyReply, preHandlerHookHandler } from "fastify";
+import type {
+  FastifyRequest,
+  FastifyReply,
+  preHandlerAsyncHookHandler,
+} from "fastify";
 import { prisma } from "@questboard/db";
 import {
   BadRequestError,
@@ -65,7 +69,7 @@ export async function resolveSessionRole(
  *  identificada no request. Throws `ForbiddenError` (403) quando o
  *  user tem role diferente, e `NotFoundError` (404) quando a sessão
  *  não existe. */
-export function requireSessionRole(roles: SessionRole[]): preHandlerHookHandler {
+export function requireSessionRole(roles: SessionRole[]): preHandlerAsyncHookHandler {
   if (roles.length === 0) {
     throw new Error("requireSessionRole: lista de roles não pode ser vazia");
   }

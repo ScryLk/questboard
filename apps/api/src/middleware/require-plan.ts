@@ -8,7 +8,7 @@
 // parseia pra mostrar CTA de upgrade). Ver `plan-gate.ts` pro
 // pattern original.
 
-import type { FastifyRequest, FastifyReply, preHandlerHookHandler } from "fastify";
+import type { FastifyRequest, FastifyReply, preHandlerAsyncHookHandler } from "fastify";
 import { PLAN_LIMITS, type PlanFeature } from "../config/plan-limits.js";
 import { ForbiddenError } from "../errors/app-error.js";
 
@@ -55,7 +55,7 @@ function findMinTierForFeature(feature: PlanFeature): PlanTier {
 /** Cria um preHandler Fastify que valida o plano do `request.user`. */
 export function requirePlan(
   optsOrFeature: RequirePlanOptions | PlanFeature,
-): preHandlerHookHandler {
+): preHandlerAsyncHookHandler {
   const opts: RequirePlanOptions =
     typeof optsOrFeature === "string"
       ? { feature: optsOrFeature }

@@ -1,12 +1,21 @@
 import type { PrismaClient } from "@questboard/db";
+import { randomInt } from "node:crypto";
 import type { CreateSessionInput, UpdateSessionInput } from "./sessions.schema.js";
 import { NotFoundError, ConflictError, BadRequestError } from "../../errors/app-error.js";
 import { redis } from "../../lib/redis.js";
+import {
+  emitSessionStatusChanged,
+  emitSessionSettingsUpdated,
+} from "../../lib/socket-events.js";
+
+// Sem ambíguos (0/O, 1/I) pra facilitar leitura humana de invite code.
+const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function generateShortCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) {
+    code += INVITE_CODE_ALPHABET[randomInt(0, INVITE_CODE_ALPHABET.length)];
+  }
   return code;
 }
 
@@ -77,11 +86,18 @@ export function createSessionsService(prisma: PrismaClient) {
 
     // Permissão (`requireGmOwner`) já validada no router. Service
     // foca em regras de negócio.
-    async update(sessionId: string, _userId: string, input: UpdateSessionInput) {
-      return prisma.session.update({
+    async update(sessionId: string, userId: string, input: UpdateSessionInput) {
+      const updated = await prisma.session.update({
         where: { id: sessionId },
         data: input,
       });
+      emitSessionSettingsUpdated({
+        sessionId,
+        settings: input as Record<string, unknown>,
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
+      return updated;
     },
 
     async delete(sessionId: string, _userId: string) {
@@ -147,6 +163,12 @@ export function createSessionsService(prisma: PrismaClient) {
 
       await redis.hset(`session:${sessionId}:state`, { status: "LIVE", startedAt: Date.now().toString() });
       await this.logAudit(sessionId, userId, "session:started", {});
+      emitSessionStatusChanged({
+        sessionId,
+        status: "LIVE",
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
 
       return updated;
     },
@@ -168,6 +190,12 @@ export function createSessionsService(prisma: PrismaClient) {
       if (keys.length > 0) await redis.del(...keys);
 
       await this.logAudit(sessionId, userId, "session:ended", {});
+      emitSessionStatusChanged({
+        sessionId,
+        status: "ENDED",
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
       return updated;
     },
 
@@ -179,6 +207,12 @@ export function createSessionsService(prisma: PrismaClient) {
       const updated = await prisma.session.update({ where: { id: sessionId }, data: { status: "PAUSED" } });
       await redis.hset(`session:${sessionId}:state`, "status", "PAUSED");
       await this.logAudit(sessionId, userId, "session:paused", {});
+      emitSessionStatusChanged({
+        sessionId,
+        status: "PAUSED",
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
       return updated;
     },
 
@@ -190,6 +224,12 @@ export function createSessionsService(prisma: PrismaClient) {
       const updated = await prisma.session.update({ where: { id: sessionId }, data: { status: "LIVE" } });
       await redis.hset(`session:${sessionId}:state`, "status", "LIVE");
       await this.logAudit(sessionId, userId, "session:resumed", {});
+      emitSessionStatusChanged({
+        sessionId,
+        status: "LIVE",
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
       return updated;
     },
 

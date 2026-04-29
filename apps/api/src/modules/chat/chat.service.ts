@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
-import { NotFoundError, ForbiddenError } from "../../errors/app-error.js";
+import { roll as engineRoll } from "@questboard/game-engine";
+import { NotFoundError, ForbiddenError, BadRequestError } from "../../errors/app-error.js";
+import { emitDiceResult } from "../../lib/socket-events.js";
 
 export function createChatService(prisma: PrismaClient) {
   return {
@@ -74,43 +76,75 @@ export function createChatService(prisma: PrismaClient) {
       formula: string; label?: string; context?: string;
       characterId?: string; isSecret?: boolean;
     }) {
-      // Parse dice formula (e.g., "2d20+5")
-      const match = input.formula.match(/^(\d+)d(\d+)([+-]\d+)?$/);
-      if (!match) {
-        // Just store as-is with total 0 for complex formulas
-        return prisma.diceRoll.create({
-          data: { sessionId, userId, formula: input.formula, results: [], total: 0, label: input.label, context: input.context, characterId: input.characterId, isSecret: input.isSecret ?? false },
-        });
+      // Servidor é authoritative pra rolagem — engine usa
+      // crypto.getRandomValues. Cliente nunca rola seus próprios
+      // resultados (CLAUDE.md regra #4).
+      let result;
+      try {
+        result = engineRoll(input.formula);
+      } catch (err) {
+        throw new BadRequestError(
+          `Notação de dado inválida: "${input.formula}". ` +
+            `Aceita formato como "2d20+5", "1d100", "4d6kh3".`,
+        );
       }
 
-      const count = parseInt(match[1]!, 10);
-      const sides = parseInt(match[2]!, 10);
-      const modifier = match[3] ? parseInt(match[3], 10) : 0;
+      // Achata os termos pra um array simples (compatível com schema
+      // legado `results: number[]`). Frontend que precisar do detalhe
+      // dos termos lê `engineResult` no JSON do diceRequest.
+      const flatRolls = result.terms.flatMap((t) => t.rolls);
+      const modifier = result.flatBonus;
 
-      const results: number[] = [];
-      for (let i = 0; i < count; i++) {
-        results.push(Math.floor(Math.random() * sides) + 1);
-      }
-      const total = results.reduce((sum, r) => sum + r, 0) + modifier;
-      const isNat20 = sides === 20 && count === 1 && results[0] === 20;
-      const isNat1 = sides === 20 && count === 1 && results[0] === 1;
+      // Detecta nat20/nat1 (apenas em rolagem única de d20).
+      const firstTerm = result.terms[0];
+      const isSingleD20 =
+        result.terms.length === 1 &&
+        firstTerm?.sides === 20 &&
+        firstTerm.count === 1;
+      const isNat20 = isSingleD20 && firstTerm.rolls[0] === 20;
+      const isNat1 = isSingleD20 && firstTerm.rolls[0] === 1;
 
-      return prisma.diceRoll.create({
+      const isSecret = input.isSecret ?? false;
+
+      const persisted = await prisma.diceRoll.create({
         data: {
           sessionId,
           userId,
           formula: input.formula,
-          results,
+          results: flatRolls,
           modifier,
-          total,
+          total: result.total,
           label: input.label,
           context: input.context,
           characterId: input.characterId,
-          isSecret: input.isSecret ?? false,
+          isSecret,
           isNat20,
           isNat1,
         },
       });
+
+      // Broadcast — público vai pra sala da sessão; secret vai só
+      // pra sala do GM (`session:<id>:gm`).
+      emitDiceResult(
+        {
+          sessionId,
+          rollId: persisted.id,
+          rolledBy: userId,
+          formula: persisted.formula,
+          rolls: flatRolls,
+          modifier,
+          total: result.total,
+          label: input.label,
+          context: input.context,
+          visibility: isSecret ? "secret" : "public",
+          isNat20,
+          isNat1,
+          at: persisted.createdAt.toISOString(),
+        },
+        { gmRoom: `session:${sessionId}:gm` },
+      );
+
+      return persisted;
     },
 
     async requestDiceRoll(sessionId: string, userId: string, input: {
