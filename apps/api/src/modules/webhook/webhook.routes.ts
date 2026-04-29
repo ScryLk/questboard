@@ -38,6 +38,13 @@ export async function webhookRoutes(app: FastifyInstance) {
 
       if ((eventType === "user.created" || eventType === "user.updated") && data) {
         await userService.syncFromClerk(data as Parameters<typeof userService.syncFromClerk>[0]);
+      } else if (eventType === "user.deleted" && data) {
+        // Clerk envia `id` no payload de delete. Anonimiza preservando
+        // integridade referencial (LGPD soft delete).
+        const clerkId = (data as { id?: string }).id;
+        if (clerkId) {
+          await userService.softDeleteFromClerk(clerkId);
+        }
       }
 
       return reply.status(200).send({ received: true });

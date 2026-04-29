@@ -2,6 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "@questboard/db";
 import { createSessionsService } from "./sessions.service.js";
 import { createSessionsController } from "./sessions.controller.js";
+import {
+  requireGmOwner,
+  requireGm,
+  requireAnyParticipant,
+} from "../../middleware/require-session-role.js";
+
+type SessionParams = { Params: { id: string } };
+type SessionUserParams = { Params: { id: string; userId: string } };
 
 export async function sessionsRoutes(app: FastifyInstance) {
   const service = createSessionsService(prisma);
@@ -11,25 +19,88 @@ export async function sessionsRoutes(app: FastifyInstance) {
   app.post("/sessions", controller.create);
   app.get("/sessions/public", controller.listPublic);
   app.get("/sessions/by-code/:code", controller.findByCode);
-  app.get("/sessions/:id", controller.getById);
-  app.patch("/sessions/:id", controller.update);
-  app.delete("/sessions/:id", controller.delete);
+
+  // Visualização — qualquer participante (incluindo SPECTATOR).
+  app.get<SessionParams>(
+    "/sessions/:id",
+    { preHandler: requireAnyParticipant },
+    controller.getById,
+  );
+
+  // Mutação simples — apenas GM titular (não CO_GM).
+  app.patch<SessionParams>(
+    "/sessions/:id",
+    { preHandler: requireGmOwner },
+    controller.update,
+  );
+  app.delete<SessionParams>(
+    "/sessions/:id",
+    { preHandler: requireGmOwner },
+    controller.delete,
+  );
+
+  // Join não passa pelo middleware (usuário ainda não tem role).
+  // Leave qualquer participante (não-GM titular) pode chamar.
   app.post("/sessions/:id/join", controller.join);
-  app.post("/sessions/:id/leave", controller.leave);
+  app.post<SessionParams>(
+    "/sessions/:id/leave",
+    { preHandler: requireAnyParticipant },
+    controller.leave,
+  );
 
-  // State transitions
-  app.post("/sessions/:id/start", controller.start);
-  app.post("/sessions/:id/end", controller.end);
-  app.post("/sessions/:id/pause", controller.pause);
-  app.post("/sessions/:id/resume", controller.resume);
+  // ─── State transitions — apenas GM titular ────────
+  app.post<SessionParams>(
+    "/sessions/:id/start",
+    { preHandler: requireGmOwner },
+    controller.start,
+  );
+  app.post<SessionParams>(
+    "/sessions/:id/end",
+    { preHandler: requireGmOwner },
+    controller.end,
+  );
+  app.post<SessionParams>(
+    "/sessions/:id/pause",
+    { preHandler: requireGmOwner },
+    controller.pause,
+  );
+  app.post<SessionParams>(
+    "/sessions/:id/resume",
+    { preHandler: requireGmOwner },
+    controller.resume,
+  );
 
-  // Players
-  app.get("/sessions/:id/players", controller.listPlayers);
-  app.post("/sessions/:id/kick/:userId", controller.kick);
-  app.patch("/sessions/:id/players/:userId/role", controller.updatePlayerRole);
+  // ─── Players ─────────────────────────────────────
+  app.get<SessionParams>(
+    "/sessions/:id/players",
+    { preHandler: requireAnyParticipant },
+    controller.listPlayers,
+  );
+  app.post<SessionUserParams>(
+    "/sessions/:id/kick/:userId",
+    { preHandler: requireGm },
+    controller.kick,
+  );
+  app.patch<SessionUserParams>(
+    "/sessions/:id/players/:userId/role",
+    { preHandler: requireGmOwner },
+    controller.updatePlayerRole,
+  );
 
-  // Audit log & Phases
-  app.get("/sessions/:id/audit-log", controller.getAuditLog);
-  app.get("/sessions/:id/phases", controller.listPhases);
-  app.post("/sessions/:id/phases", controller.createPhase);
+  // ─── Audit log & phases ──────────────────────────
+  app.get<SessionParams>(
+    "/sessions/:id/audit-log",
+    { preHandler: requireGm },
+    controller.getAuditLog,
+  );
+  app.get<SessionParams>(
+    "/sessions/:id/phases",
+    { preHandler: requireAnyParticipant },
+    controller.listPhases,
+  );
+  app.post<SessionParams>(
+    "/sessions/:id/phases",
+    { preHandler: requireGm },
+    controller.createPhase,
+  );
 }

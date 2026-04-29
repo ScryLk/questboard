@@ -130,6 +130,34 @@ export function createUserService(prisma: PrismaClient) {
         },
       });
     },
+
+    /** Soft delete disparado pelo webhook `user.deleted` do Clerk.
+     *  Anonimiza email/displayName/avatar pra cumprir LGPD/GDPR
+     *  preservando integridade referencial (sessions, mensagens,
+     *  audit log apontam pra esse user). Mantém o registro mas marca
+     *  `deletedAt` e `isActive=false`. */
+    async softDeleteFromClerk(clerkId: string) {
+      const user = await prisma.user.findUnique({
+        where: { externalId: clerkId },
+        select: { id: true, deletedAt: true },
+      });
+      if (!user) return null; // idempotente: webhook duplicado é noop
+      if (user.deletedAt) return user; // já deletado
+
+      const anonEmail = `deleted+${user.id}@questboard.local`;
+      return prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: anonEmail,
+          username: null,
+          displayName: "Usuário removido",
+          avatarUrl: null,
+          bio: null,
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+    },
   };
 }
 

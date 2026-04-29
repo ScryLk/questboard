@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@questboard/db";
 import type { CreateSessionInput, UpdateSessionInput } from "./sessions.schema.js";
-import { NotFoundError, ForbiddenError, ConflictError, BadRequestError } from "../../errors/app-error.js";
+import { NotFoundError, ConflictError, BadRequestError } from "../../errors/app-error.js";
 import { redis } from "../../lib/redis.js";
 
 function generateShortCode(): string {
@@ -75,28 +75,16 @@ export function createSessionsService(prisma: PrismaClient) {
       return session;
     },
 
-    async update(sessionId: string, userId: string, input: UpdateSessionInput) {
-      const session = await prisma.session.findUnique({
-        where: { id: sessionId },
-        select: { ownerId: true },
-      });
-      if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode editar a sessão");
-
+    // Permissão (`requireGmOwner`) já validada no router. Service
+    // foca em regras de negócio.
+    async update(sessionId: string, _userId: string, input: UpdateSessionInput) {
       return prisma.session.update({
         where: { id: sessionId },
         data: input,
       });
     },
 
-    async delete(sessionId: string, userId: string) {
-      const session = await prisma.session.findUnique({
-        where: { id: sessionId },
-        select: { ownerId: true },
-      });
-      if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode deletar a sessão");
-
+    async delete(sessionId: string, _userId: string) {
       return prisma.session.delete({ where: { id: sessionId } });
     },
 
@@ -126,6 +114,8 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async leave(sessionId: string, userId: string) {
+      // Middleware já confirmou que user é participante. Bloqueio
+      // específico de GM titular fica aqui (regra de negócio).
       const session = await prisma.session.findUnique({
         where: { id: sessionId },
         select: { ownerId: true },
@@ -141,11 +131,14 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     // ─── State Transitions ────────────────────────────
+    // Permissão GM (`requireGmOwner`) validada nos routes. Service
+    // valida apenas transições de estado válidas.
     async start(sessionId: string, userId: string) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true, status: true } });
+      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { status: true } });
       if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode iniciar a sessão");
-      if (session.status !== "IDLE" && session.status !== "PAUSED") throw new BadRequestError(`Não pode iniciar sessão com status ${session.status}`);
+      if (session.status !== "IDLE" && session.status !== "PAUSED") {
+        throw new BadRequestError(`Não pode iniciar sessão com status ${session.status}`);
+      }
 
       const updated = await prisma.session.update({
         where: { id: sessionId },
@@ -159,10 +152,11 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async end(sessionId: string, userId: string) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true, status: true } });
+      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { status: true } });
       if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode encerrar a sessão");
-      if (session.status !== "LIVE" && session.status !== "PAUSED") throw new BadRequestError(`Não pode encerrar sessão com status ${session.status}`);
+      if (session.status !== "LIVE" && session.status !== "PAUSED") {
+        throw new BadRequestError(`Não pode encerrar sessão com status ${session.status}`);
+      }
 
       const updated = await prisma.session.update({
         where: { id: sessionId },
@@ -178,9 +172,8 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async pause(sessionId: string, userId: string) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true, status: true } });
+      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { status: true } });
       if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode pausar");
       if (session.status !== "LIVE") throw new BadRequestError("Sessão não está LIVE");
 
       const updated = await prisma.session.update({ where: { id: sessionId }, data: { status: "PAUSED" } });
@@ -190,9 +183,8 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async resume(sessionId: string, userId: string) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true, status: true } });
+      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { status: true } });
       if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode retomar");
       if (session.status !== "PAUSED") throw new BadRequestError("Sessão não está pausada");
 
       const updated = await prisma.session.update({ where: { id: sessionId }, data: { status: "LIVE" } });
@@ -213,9 +205,9 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async kick(sessionId: string, userId: string, targetUserId: string) {
+      // Permissão GM/CO_GM validada no router (`requireGm`).
       const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
       if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode expulsar");
       if (session.ownerId === targetUserId) throw new BadRequestError("O GM não pode se expulsar");
 
       const player = await prisma.sessionPlayer.findUnique({
@@ -227,11 +219,8 @@ export function createSessionsService(prisma: PrismaClient) {
       await this.logAudit(sessionId, userId, "player:kicked", { targetUserId });
     },
 
-    async updatePlayerRole(sessionId: string, userId: string, targetUserId: string, role: string) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
-      if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode alterar roles");
-
+    async updatePlayerRole(sessionId: string, _userId: string, targetUserId: string, role: string) {
+      // Permissão GM titular validada no router (`requireGmOwner`).
       const player = await prisma.sessionPlayer.findUnique({
         where: { userId_sessionId: { userId: targetUserId, sessionId } },
       });
@@ -248,11 +237,8 @@ export function createSessionsService(prisma: PrismaClient) {
       return prisma.sessionAuditLog.create({ data: { sessionId, actorId, event, data } });
     },
 
-    async getAuditLog(sessionId: string, userId: string, limit = 50) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
-      if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode ver audit log");
-
+    async getAuditLog(sessionId: string, _userId: string, limit = 50) {
+      // Permissão GM/CO_GM validada no router (`requireGm`).
       return prisma.sessionAuditLog.findMany({
         where: { sessionId },
         orderBy: { createdAt: "desc" },
@@ -268,11 +254,8 @@ export function createSessionsService(prisma: PrismaClient) {
       });
     },
 
-    async createPhase(sessionId: string, userId: string, input: { type: string; label: string; notes?: string }) {
-      const session = await prisma.session.findUnique({ where: { id: sessionId }, select: { ownerId: true } });
-      if (!session) throw new NotFoundError("Session");
-      if (session.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode criar fases");
-
+    async createPhase(sessionId: string, _userId: string, input: { type: string; label: string; notes?: string }) {
+      // Permissão GM/CO_GM validada no router (`requireGm`).
       // End current active phase
       const activePhase = await prisma.phaseEvent.findFirst({
         where: { sessionId, endedAt: null },
