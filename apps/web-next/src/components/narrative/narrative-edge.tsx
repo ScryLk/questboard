@@ -56,7 +56,6 @@ function NarrativeEdgeComponent({
       />
 
       {label && (
-        // @ts-expect-error React 19 JSX compat
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan pointer-events-auto absolute rounded-full border border-white/10 bg-[#1A1A2E] px-2 py-0.5 text-[10px] text-brand-muted"

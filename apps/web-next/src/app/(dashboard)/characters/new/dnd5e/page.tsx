@@ -1,12 +1,14 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 // Wizard de criação de personagem D&D 5e (10 passos). Estado vive em
 // `useDnd5eWizardStore` (não persiste — abandono reinicia). No passo
 // 10 confirma e converte pra `CampaignCharacter` via `useCharacterStore`.
 // Modo edição: `?edit=ID` hidrata o store com os dados existentes e o
 // submit atualiza em vez de criar.
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -27,6 +29,14 @@ import { Step9Details } from "@/components/character-wizard/step-9-details";
 import { Step10Review } from "@/components/character-wizard/step-10-review";
 
 export default function Dnd5eCharacterWizardPage() {
+  return (
+    <Suspense fallback={null}>
+      <WizardInner />
+    </Suspense>
+  );
+}
+
+function WizardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");

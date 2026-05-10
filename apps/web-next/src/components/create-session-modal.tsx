@@ -496,7 +496,6 @@ export function CreateSessionModal({
               {/* Right column — QR Code */}
               <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-brand-border bg-[#0A0A0F] p-5">
                 <div className="rounded-lg bg-white p-3" data-qr-container>
-                  {/* @ts-expect-error React 19 type mismatch with qrcode.react */}
                   <QRCodeSVG
                     value={`https://questboard.app/join/${generatedCode}`}
                     size={148}

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 // Busca cross-content do compêndio. Filtra magias, monstros, itens,
 // raças, classes e condições por nome (pt + en) e descrição. Visual:
 // resultados agrupados por tipo, com link pro detalhe canônico.

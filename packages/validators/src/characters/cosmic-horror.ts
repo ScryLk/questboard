@@ -6,16 +6,8 @@
 
 import { z } from "zod";
 
-const ATTRIBUTE_KEYS = [
-  "for",
-  "con",
-  "tam",
-  "des",
-  "apa",
-  "int",
-  "pod",
-  "edu",
-] as const;
+// ATTRIBUTE_KEYS removido — slugs vivem em `@questboard/constants`
+// (`COSMIC_HORROR_ATTRIBUTES`). Schema usa shape literal abaixo.
 
 const MADNESS_STATES = [
   "SANE",

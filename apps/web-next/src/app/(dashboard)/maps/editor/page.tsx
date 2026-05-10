@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DesktopOnlyNotice } from "@/components/layout/desktop-only-notice";
 import {
@@ -187,6 +189,14 @@ const objectIconMap = new Map(MAP_OBJECT_CATALOG.map((o) => [o.type, o.icon]));
 // ── Component ────────────────────────────────────────────────────────
 
 export default function MapEditorPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapEditorInner />
+    </Suspense>
+  );
+}
+
+function MapEditorInner() {
   const searchParams = useSearchParams();
   const mapIdParam = searchParams.get("id");
   const aiAutoOpenParam = searchParams.get("ai");

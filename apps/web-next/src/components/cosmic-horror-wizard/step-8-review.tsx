@@ -87,14 +87,11 @@ export function Step8Review({ onFinish, campaignIdOverride }: Props) {
 
   function handleFinish() {
     if (!occupation) {
-      addToast({ message: "Selecione uma ocupação primeiro.", level: "error" });
+      addToast("Selecione uma ocupação primeiro.");
       return;
     }
     if (wizard.luck === null) {
-      addToast({
-        message: "Role a Sorte antes de criar.",
-        level: "error",
-      });
+      addToast("Role a Sorte antes de criar.");
       return;
     }
 
@@ -146,7 +143,7 @@ export function Step8Review({ onFinish, campaignIdOverride }: Props) {
           cha: wizard.attributes.apa,
         },
       });
-      addToast({ message: "Investigador atualizado.", level: "success" });
+      addToast("Investigador atualizado.");
       reset();
       onFinish(wizard.editingCharacterId);
       return;
@@ -172,7 +169,7 @@ export function Step8Review({ onFinish, campaignIdOverride }: Props) {
       },
     });
     createCharacter(character);
-    addToast({ message: "Investigador criado.", level: "success" });
+    addToast("Investigador criado.");
     reset();
     onFinish(character.id);
   }

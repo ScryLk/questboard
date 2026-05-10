@@ -48,7 +48,6 @@ export function QRCodeModal({
         )}
 
         <div className="rounded-2xl bg-white p-6">
-          {/* @ts-expect-error React 19 type mismatch with qrcode.react */}
           <QRCodeSVG
             value={value}
             size={400}

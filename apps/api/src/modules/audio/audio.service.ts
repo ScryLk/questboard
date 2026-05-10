@@ -53,8 +53,19 @@ export function createAudioService(prisma: PrismaClient) {
 
       return prisma.sessionAudio.upsert({
         where: { sessionId },
-        create: { sessionId, isPlaying: true, currentTrack: track, volume: volume ?? 0.7 },
-        update: { isPlaying: true, currentTrack: track, volume: volume ?? undefined },
+        // Track é Record<string, unknown> do controller; Prisma aceita
+        // como InputJsonValue após cast (shape é JSON-safe).
+        create: {
+          sessionId,
+          isPlaying: true,
+          currentTrack: track as unknown as object,
+          volume: volume ?? 0.7,
+        },
+        update: {
+          isPlaying: true,
+          currentTrack: track as unknown as object,
+          volume: volume ?? undefined,
+        },
       });
     },
 

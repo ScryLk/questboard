@@ -1,11 +1,13 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 // Wizard de criação de personagem Horror Investigativo (8 passos).
 // Estado vive em `useCosmicHorrorWizardStore` (não persiste — abandono
 // reinicia). No passo 8 confirma e converte pra `CampaignCharacter` via
 // `useCharacterStore`. Modo edição: `?edit=ID` hidrata e atualiza.
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -23,6 +25,15 @@ import { Step7Backstory } from "@/components/cosmic-horror-wizard/step-7-backsto
 import { Step8Review } from "@/components/cosmic-horror-wizard/step-8-review";
 
 export default function CosmicHorrorWizardPage() {
+  // Suspense necessário no Next 15 pra useSearchParams (CSR bailout).
+  return (
+    <Suspense fallback={null}>
+      <WizardInner />
+    </Suspense>
+  );
+}
+
+function WizardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");

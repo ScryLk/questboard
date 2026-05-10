@@ -44,7 +44,7 @@ export function createCharacterService(prisma: PrismaClient) {
           level: input.level ?? 1,
           avatarUrl: input.avatarUrl,
           campaignId: input.campaignId,
-          attributes: input.attributes ?? {},
+          attributes: (input.attributes ?? {}) as unknown as object,
         },
       });
     },
@@ -54,7 +54,7 @@ export function createCharacterService(prisma: PrismaClient) {
       if (!character) throw new NotFoundError("Character");
       if (character.userId !== userId) throw new ForbiddenError("Sem permissão");
 
-      return prisma.character.update({ where: { id: characterId }, data: input });
+      return prisma.character.update({ where: { id: characterId }, data: input as unknown as object });
     },
 
     async delete(characterId: string, userId: string) {
@@ -72,7 +72,7 @@ export function createCharacterService(prisma: PrismaClient) {
 
       return prisma.character.update({
         where: { id: characterId },
-        data: { resources },
+        data: { resources: resources as unknown as object },
       });
     },
   };

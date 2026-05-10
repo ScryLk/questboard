@@ -274,7 +274,14 @@ export function createSessionsService(prisma: PrismaClient) {
 
     // ─── Audit Log ───────────────────────────────────
     async logAudit(sessionId: string, actorId: string | null, event: string, data: Record<string, unknown>) {
-      return prisma.sessionAuditLog.create({ data: { sessionId, actorId, event, data } });
+      return prisma.sessionAuditLog.create({
+        data: {
+          sessionId,
+          actorId,
+          event,
+          data: data as unknown as object,
+        },
+      });
     },
 
     async getAuditLog(sessionId: string, _userId: string, limit = 50) {

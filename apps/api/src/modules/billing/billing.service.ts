@@ -122,7 +122,7 @@ export function createBillingService(prisma: PrismaClient) {
           userId: "",
           type: type ?? "unknown",
           mpEventId: String(body.id ?? dataId),
-          payload: body as Record<string, unknown>,
+          payload: body as unknown as object,
         },
       });
 

@@ -25,7 +25,6 @@ function ConsequenceNodeComponent(props: any) {
       }`}
       style={customColor ? { borderColor: `${customColor}60`, borderWidth: 1 } : undefined}
     >
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="target" position={Position.Top} className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" />
 
       {/* Header */}
@@ -46,7 +45,6 @@ function ConsequenceNodeComponent(props: any) {
         )}
       </div>
 
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="source" position={Position.Bottom} className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" />
     </div>
   );

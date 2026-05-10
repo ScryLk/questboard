@@ -21,7 +21,6 @@ function ChapterNodeComponent(props: any) {
         border: `1px solid ${color}40`,
       }}
     >
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="target" position={Position.Top} className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" />
 
       <div className="flex items-center justify-center gap-3 px-5 py-3">
@@ -35,7 +34,6 @@ function ChapterNodeComponent(props: any) {
         <div className="h-px flex-1" style={{ background: `${color}40` }} />
       </div>
 
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="source" position={Position.Bottom} className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" />
     </div>
   );

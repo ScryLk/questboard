@@ -14,8 +14,17 @@ export function registerAudioHandler(nsp: Namespace, socket: Socket): void {
 
     await prisma.sessionAudio.upsert({
       where: { sessionId },
-      create: { sessionId, isPlaying: true, currentTrack: data.track as Record<string, unknown>, volume: data.volume ?? 0.7 },
-      update: { isPlaying: true, currentTrack: data.track as Record<string, unknown>, volume: data.volume ?? 0.7 },
+      create: {
+        sessionId,
+        isPlaying: true,
+        currentTrack: data.track as unknown as object,
+        volume: data.volume ?? 0.7,
+      },
+      update: {
+        isPlaying: true,
+        currentTrack: data.track as unknown as object,
+        volume: data.volume ?? 0.7,
+      },
     });
 
     nsp.to(`session:${sessionId}`).emit("audio:play", data);

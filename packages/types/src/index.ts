@@ -16,5 +16,18 @@ export * from "./campaign";
 export * from "./feed";
 export * from "./narrative";
 export * from "./search";
-export * from "./dnd5e";
+// `SavingThrowResult` colide com o exportado de `./combat` (forma
+// genérica). Re-exportamos a versão dnd5e renomeada pra evitar
+// ambiguidade enquanto os módulos não convergem num só shape.
+export type { SavingThrowResult as Dnd5eSavingThrowResult } from "./dnd5e";
+export type {
+  BreakdownEntry,
+  ArmorClassResult,
+  AttackAttributeOrigin,
+  AttackBonusResult,
+  SkillModifierResult,
+  SpellSlotsByLevel,
+  Dnd5eAttackEntry,
+  Dnd5eDerivedStats,
+} from "./dnd5e";
 export * from "./cosmic-horror";

@@ -221,9 +221,12 @@ export function useAttackActions() {
           : undefined;
         const multipliers: DamageMultipliers | null = character?.stats
           ? {
-              resistances: character.stats.damageResistances ?? [],
-              immunities: character.stats.damageImmunities ?? [],
-              vulnerabilities: character.stats.damageVulnerabilities ?? [],
+              // Cast: stats.damage*Resistances vem como string[] genérico
+              // (CampaignCharacter.stats); engine só usa entradas que
+              // casam com AttackDamageType e ignora silenciosamente as demais.
+              resistances: (character.stats.damageResistances ?? []) as AttackDamageType[],
+              immunities: (character.stats.damageImmunities ?? []) as AttackDamageType[],
+              vulnerabilities: (character.stats.damageVulnerabilities ?? []) as AttackDamageType[],
             }
           : null;
 

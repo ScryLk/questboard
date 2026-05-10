@@ -47,8 +47,8 @@ export function createChatService(prisma: PrismaClient) {
           characterName: input.characterName,
           characterAvatar: input.characterAvatar,
           recipientIds: input.recipientIds ?? [],
-          diceRequest: input.diceRequest ?? undefined,
-          diceResult: input.diceResult ?? undefined,
+          diceRequest: (input.diceRequest ?? undefined) as unknown as object | undefined,
+          diceResult: (input.diceResult ?? undefined) as unknown as object | undefined,
         },
         include: {
           user: { select: { id: true, displayName: true, avatarUrl: true } },

@@ -102,12 +102,16 @@ export function createMapService(prisma: PrismaClient) {
       if (!token) throw new NotFoundError("Token");
 
       // Owner or GM can update
-      const session = await prisma.session.findUnique({ where: { id: token.map.sessionId }, select: { ownerId: true } });
+      if (!token.map.sessionId) throw new NotFoundError("Session do mapa");
+      const session = await prisma.session.findUnique({
+        where: { id: token.map.sessionId },
+        select: { ownerId: true },
+      });
       const isGM = session?.ownerId === userId;
       const isOwner = token.ownerId === userId;
       if (!isGM && !isOwner) throw new ForbiddenError("Sem permissão para editar este token");
 
-      return prisma.token.update({ where: { id: tokenId }, data: input });
+      return prisma.token.update({ where: { id: tokenId }, data: input as unknown as object });
     },
 
     async deleteToken(sessionId: string, userId: string, tokenId: string) {
@@ -130,7 +134,7 @@ export function createMapService(prisma: PrismaClient) {
           data: areas.map((a) => ({
             mapId,
             type: a.type as "HIDDEN" | "REVEALED" | "PARTIAL",
-            cells: a.cells as Record<string, unknown>,
+            cells: a.cells as unknown as object,
           })),
         });
       }

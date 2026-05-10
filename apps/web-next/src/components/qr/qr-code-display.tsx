@@ -63,7 +63,6 @@ export function QRCodeDisplay({
     <div className="flex flex-col items-center gap-4">
       {/* QR Code */}
       <div className="rounded-xl bg-white p-4" ref={containerRef} data-qr-container>
-        {/* @ts-expect-error React 19 type mismatch with qrcode.react */}
         <QRCodeSVG
           value={value}
           size={size}

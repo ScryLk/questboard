@@ -126,9 +126,7 @@ function NarrativeCanvasInner() {
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        {/* @ts-expect-error React 19 JSX compat */}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1E1E2A" />
-        {/* @ts-expect-error React 19 JSX compat */}
         <Controls
           showInteractive={false}
           className="!border-brand-border !bg-brand-surface !shadow-lg"

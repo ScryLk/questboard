@@ -3,6 +3,7 @@ import type {
   MapTool,
   RightPanelTab,
   ChatChannel,
+  Combatant,
   CombatState,
   GameToken,
   ChatMessage,

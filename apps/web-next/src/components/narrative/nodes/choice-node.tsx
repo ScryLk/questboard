@@ -27,7 +27,6 @@ function ChoiceNodeComponent(props: any) {
       } ${selected ? "ring-2 ring-brand-accent shadow-[0_0_24px_rgba(108,92,231,0.35)]" : ""}`}
       style={customColor ? { borderColor: customColor } : undefined}
     >
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="target" position={Position.Top} className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" />
 
       {/* Header */}
@@ -44,11 +43,8 @@ function ChoiceNodeComponent(props: any) {
       </div>
 
       {/* Multiple source handles for branches */}
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="source" position={Position.Bottom} id="left" className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" style={{ left: "30%" }} />
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="source" position={Position.Bottom} id="center" className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" style={{ left: "50%" }} />
-      {/* @ts-expect-error React 19 JSX compat */}
       <Handle type="source" position={Position.Bottom} id="right" className="!bg-brand-accent !border-brand-surface !w-2.5 !h-2.5" style={{ left: "70%" }} />
     </div>
   );
