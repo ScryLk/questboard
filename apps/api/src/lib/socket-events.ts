@@ -189,3 +189,68 @@ export function emitNpcReputationChanged(
 ): void {
   emitToSession(p.sessionId, "npc:reputation-changed", p);
 }
+
+// ─── Behavior (CLAUDE.md §6.2) ──────────────────────────────
+
+export interface BehaviorTickPayload {
+  behaviorId: string;
+  sessionId: string;
+  ts: number;
+  positions: Array<{
+    tokenId: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    facing: number;
+  }>;
+}
+
+export function emitBehaviorTick(p: BehaviorTickPayload): void {
+  emitToSession(p.sessionId, "npc:behavior-tick", p);
+}
+
+export interface BehaviorTokenEventPayload {
+  behaviorId: string;
+  sessionId: string;
+  tokenId: string;
+  at: string;
+}
+
+export function emitNpcEscaped(p: BehaviorTokenEventPayload): void {
+  emitToSession(p.sessionId, "npc:escaped", p);
+}
+
+export function emitNpcTrapped(p: BehaviorTokenEventPayload): void {
+  emitToSession(p.sessionId, "npc:trapped", p);
+}
+
+export interface DoorEventPayload {
+  sessionId: string;
+  doorId: string;
+  tokenId: string;
+  at: string;
+}
+
+export function emitDoorNpcOpened(p: DoorEventPayload): void {
+  emitToSession(p.sessionId, "door:npc-opened", p);
+}
+
+export function emitDoorNpcBroken(p: DoorEventPayload): void {
+  emitToSession(p.sessionId, "door:npc-broken", p);
+}
+
+export interface BehaviorLifecyclePayload {
+  behaviorId: string;
+  sessionId: string;
+  type: string;
+  at: string;
+}
+
+export function emitBehaviorStarted(p: BehaviorLifecyclePayload): void {
+  emitToSession(p.sessionId, "npc:behavior-started", p);
+}
+
+export function emitBehaviorEnded(p: BehaviorLifecyclePayload): void {
+  emitToSession(p.sessionId, "npc:behavior-ended", p);
+}

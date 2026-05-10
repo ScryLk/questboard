@@ -25,6 +25,7 @@ import { searchRoutes } from "./modules/search/index.js";
 import { npcRoutes } from "./modules/npc/npc.routes.js";
 import { notesRoutes } from "./modules/notes/notes.routes.js";
 import { worldRoutes } from "./modules/world/world.routes.js";
+import { behaviorRoutes } from "./modules/behavior/behavior.routes.js";
 
 async function buildApp() {
   const app = Fastify({
@@ -73,6 +74,7 @@ async function buildApp() {
       await v1.register(npcRoutes);
       await v1.register(notesRoutes);
       await v1.register(worldRoutes);
+      await v1.register(behaviorRoutes);
     },
     { prefix: "/api/v1" },
   );

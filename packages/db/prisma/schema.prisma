@@ -401,6 +401,7 @@ model Session {
   phaseHistory PhaseEvent[]
   auditLog     SessionAuditLog[]
   conversations Conversation[]
+  behaviors    BehaviorInstance[]
 
   @@index([ownerId])
   @@index([gmId])
@@ -822,6 +823,55 @@ model Note {
   @@index([campaignId])
   @@index([authorId])
   @@index([campaignId, visibility])
+}
+
+// ─── NPC Behavior (CLAUDE.md §6.2) ──────────────────────
+
+enum NpcBehaviorType {
+  IDLE
+  CROWD
+  PATROL
+  GUARD
+  FLEE
+  PANIC
+  RIOT
+  FOLLOW
+  SEARCH
+}
+
+enum BehaviorStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+/** Instância ativa de comportamento de NPCs em sessão. Estado em
+ *  RAM/Redis durante o loop (tick 150-200ms); flush periódico aqui
+ *  a cada 30s + ao encerrar. */
+model BehaviorInstance {
+  id        String          @id @default(cuid())
+  sessionId String
+  session   Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type      NpcBehaviorType
+  status    BehaviorStatus  @default(ACTIVE)
+
+  /** IDs de Token participantes. */
+  tokenIds  String[]
+
+  /** Parâmetros narrativos (alvo de fuga, ponto de patrulha, raio
+   *  do guard). Gerados pela Gemini ao iniciar (Sprint 6) ou
+   *  fornecidos manualmente pelo GM. */
+  params    Json            @default("{}")
+
+  /** Cache do estado da última flush — posições, paths, headings.
+   *  Snapshot pra recovery quando o worker reinicia. */
+  lastSnapshot Json?
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([sessionId])
+  @@index([status])
 }
 
 // ─── World — NPCs, locais, facções, lore ─────────────────

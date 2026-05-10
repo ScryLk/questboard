@@ -3,6 +3,7 @@ export * from "./dice/index";
 export * from "./fog/index";
 export * from "./combat/index";
 export * from "./character/index";
+export * as behavior from "./behavior/index";
 
 // Sistemas de regras (motor puro). Cada sistema vive em
 // `systems/<slug>/` e exporta calculadores específicos. Importadores
