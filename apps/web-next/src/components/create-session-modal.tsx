@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle,
   Copy,
@@ -20,6 +20,8 @@ import { useMapScale, type UnitSystem } from "@/lib/map-scale-store";
 interface CreateSessionModalProps {
   open: boolean;
   onClose: () => void;
+  /** Slug do sistema pré-preenchido (vindo do compêndio, por ex.). */
+  prefilledSystem?: string | null;
 }
 
 type ModalStep = "form" | "confirmation";
@@ -49,7 +51,11 @@ function generateCode(): string {
   return code;
 }
 
-export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
+export function CreateSessionModal({
+  open,
+  onClose,
+  prefilledSystem,
+}: CreateSessionModalProps) {
   const [step, setStep] = useState<ModalStep>("form");
   const [title, setTitle] = useState("A Torre de Ravenloft");
   const [date, setDate] = useState("2026-03-15");
@@ -58,6 +64,16 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
   const [selectedMap, setSelectedMap] = useState("Torre de Ravenloft");
   const [notes, setNotes] = useState("");
   const [players, setPlayers] = useState(MOCK_PLAYERS);
+  const [system, setSystem] = useState<string>(prefilledSystem ?? "dnd5e");
+
+  // Atualiza system quando o modal é reaberto via store com prefilled
+  // diferente. `open` no array fecha/abre; ao abrir, restauramos o
+  // prefilled escolhido pelo caller.
+  useEffect(() => {
+    if (open) {
+      setSystem(prefilledSystem ?? "dnd5e");
+    }
+  }, [open, prefilledSystem]);
   const unitSystem = useMapScale((s) => s.unitSystem);
   const unitsPerCell = useMapScale((s) => s.unitsPerCell);
   const setScale = useMapScale((s) => s.setScale);
@@ -80,7 +96,7 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
         },
         body: JSON.stringify({
           name: title,
-          system: "dnd5e",
+          system,
           maxPlayers: players.filter((p) => p.checked).length + 1,
           isPublic: false,
         }),
@@ -175,6 +191,30 @@ export function CreateSessionModal({ open, onClose }: CreateSessionModalProps) {
 
             {/* Body */}
             <div className="space-y-5 p-6">
+              {/* Sistema */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-brand-text">
+                  Sistema
+                </label>
+                <select
+                  value={system}
+                  onChange={(e) => setSystem(e.target.value)}
+                  className="w-full rounded-lg border border-brand-border bg-brand-primary px-4 py-2.5 text-sm text-brand-text outline-none focus:border-brand-accent"
+                >
+                  <option value="dnd5e">Dungeons &amp; Dragons 5e</option>
+                  <option value="cosmic-horror">
+                    Horror Investigativo (d100)
+                  </option>
+                  <option value="tormenta20">Tormenta20</option>
+                  <option value="ordem-paranormal">Ordem Paranormal</option>
+                </select>
+                {prefilledSystem && (
+                  <p className="mt-1 text-[10px] text-brand-accent/80">
+                    Pré-selecionado pelo compêndio.
+                  </p>
+                )}
+              </div>
+
               {/* Title */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-brand-text">

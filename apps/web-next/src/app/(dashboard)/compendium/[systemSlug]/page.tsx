@@ -9,12 +9,14 @@ import {
   BookOpen,
   Brain,
   Briefcase,
+  CalendarPlus,
   ChevronRight,
   Eye,
   Search,
   Skull,
   Sparkles,
   Sword,
+  UserPlus,
   Users,
   Wand2,
 } from "lucide-react";
@@ -29,6 +31,7 @@ import {
   useHomebrewSpells,
 } from "@/lib/srd/homebrew-store";
 import { useCampaignStore } from "@/lib/campaign-store";
+import { useCreateSessionModalStore } from "@/lib/create-session-modal-store";
 
 type SectionKey = keyof SystemCounts;
 
@@ -74,6 +77,16 @@ export default function SystemOverviewPage({
   const homebrewSpells = useHomebrewSpells(activeCampaignId);
   const homebrewMonsters = useHomebrewMonsters(activeCampaignId);
   const homebrewItems = useHomebrewItems(activeCampaignId);
+  const openCreateSession = useCreateSessionModalStore((s) => s.open);
+
+  // Wizard suportado por sistema (`null` = sem wizard wired ainda;
+  // botão fica desabilitado com tooltip "em breve").
+  const characterWizardPath: string | null =
+    systemSlug === "dnd5e"
+      ? "/characters/new/dnd5e"
+      : systemSlug === "cosmic-horror"
+        ? "/characters/new/cosmic-horror"
+        : null;
 
   // Soma SRD oficial + homebrew da campanha ativa pros badges (somente
   // sistemas que usam o homebrew store dnd5e — homebrew cosmic-horror
@@ -149,6 +162,35 @@ export default function SystemOverviewPage({
           preciso adicionar conteúdo homebrew na sua campanha.
         </div>
       )}
+
+      {/* Atalhos — criar conteúdo já com o sistema selecionado. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {characterWizardPath ? (
+          <Link
+            href={characterWizardPath}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-brand-accent/40 bg-brand-accent/10 px-3 py-2 text-xs font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Criar personagem em {system.shortName}
+          </Link>
+        ) : (
+          <button
+            disabled
+            title="Wizard ainda não disponível para esse sistema."
+            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-brand-border bg-white/[0.02] px-3 py-2 text-xs font-medium text-brand-muted opacity-60"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Criar personagem em {system.shortName}
+          </button>
+        )}
+        <button
+          onClick={() => openCreateSession(systemSlug)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border bg-white/[0.02] px-3 py-2 text-xs font-medium text-brand-text transition-colors hover:border-brand-accent/40 hover:bg-brand-accent/5"
+        >
+          <CalendarPlus className="h-3.5 w-3.5" />
+          Criar sessão neste sistema
+        </button>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sections.map(({ type, label, icon: Icon, count }) => {

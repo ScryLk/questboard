@@ -13,6 +13,7 @@ import {
   Gamepad2,
   MessageSquare,
   ScrollText,
+  StickyNote,
   Castle,
   Plus,
   ShieldAlert,
@@ -39,7 +40,7 @@ const CAMPAIGN_NAV = [
 const SESSION_NAV = [
   { href: "/gameplay", label: "Gameplay", icon: Gamepad2 },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/notes", label: "Notas", icon: ScrollText },
+  { href: "/notes", label: "Notas", icon: StickyNote },
   { href: "/audio", label: "Áudio", icon: Headphones },
 ];
 
