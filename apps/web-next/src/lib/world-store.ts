@@ -43,71 +43,9 @@ function generateId(): string {
   return `world_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-const SEED: WorldEntity[] = [
-  {
-    id: "world_seed_npc1",
-    campaignId: "camp_seed_strahd",
-    kind: "npc",
-    name: "Taverneiro Brom",
-    subtitle: "Humano · Taverneiro",
-    location: "Taverna do Dragão Adormecido",
-    disposition: "friendly",
-    description:
-      "Taverneiro veterano, ex-soldado. Conhece todos os fofocas da vila e troca rumores por uma rodada de cerveja.",
-    notes: "Tem mapa antigo escondido sob o balcão.",
-    createdAt: "2026-04-20T12:00:00Z",
-    updatedAt: "2026-04-20T12:00:00Z",
-  },
-  {
-    id: "world_seed_npc2",
-    campaignId: "camp_seed_strahd",
-    kind: "npc",
-    name: "Eldrith, a Sábia",
-    subtitle: "Elfa · Conselheira",
-    location: "Torre da Magia",
-    disposition: "neutral",
-    description:
-      "Anciã de longas memórias. Nunca dá resposta direta — sempre uma adivinha.",
-    createdAt: "2026-04-20T13:00:00Z",
-    updatedAt: "2026-04-20T13:00:00Z",
-  },
-  {
-    id: "world_seed_npc3",
-    campaignId: "camp_seed_strahd",
-    kind: "npc",
-    name: "Garuk Sangue-Frio",
-    subtitle: "Orc · Líder Bandido",
-    location: "Montanhas Negras",
-    disposition: "hostile",
-    description:
-      "Antigo capitão imperial caído em desgraça. Comanda um bando de saqueadores nas estradas.",
-    createdAt: "2026-04-21T09:00:00Z",
-    updatedAt: "2026-04-21T09:00:00Z",
-  },
-  {
-    id: "world_seed_loc1",
-    campaignId: "camp_seed_strahd",
-    kind: "location",
-    name: "Vila de Barovia",
-    subtitle: "Vila pequena · Sombria",
-    description:
-      "Vila enevoada perpetuamente cinzenta. Ruas de terra, poucos visitantes, todos os habitantes evitam contato visual.",
-    createdAt: "2026-04-19T10:00:00Z",
-    updatedAt: "2026-04-19T10:00:00Z",
-  },
-  {
-    id: "world_seed_fac1",
-    campaignId: "camp_seed_strahd",
-    kind: "faction",
-    name: "Ordem da Lua Prateada",
-    subtitle: "Guarda mágica",
-    disposition: "friendly",
-    description:
-      "Confraria de magos defensores do reino. Operam discretamente — só intervêm contra ameaças sobrenaturais.",
-    createdAt: "2026-04-18T14:00:00Z",
-    updatedAt: "2026-04-18T14:00:00Z",
-  },
-];
+// Store inicia vazio — dados vêm do backend via `useBackendWorld`
+// (apps/api/src/modules/world) ou da UI quando GM cria.
+const SEED: WorldEntity[] = [];
 
 export const useWorldStore = create<WorldState>()(
   persist(

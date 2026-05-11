@@ -26,19 +26,12 @@ interface CreateSessionModalProps {
 
 type ModalStep = "form" | "confirmation";
 
-const MOCK_PLAYERS = [
-  { id: "p1", name: "Maria Santos", character: "Eldrin", checked: true },
-  { id: "p2", name: "Pedro Costa", character: "Kira Ironfist", checked: true },
-  { id: "p3", name: "Ana Costa", character: "Zael", checked: true },
-  { id: "p4", name: "Joao Oliveira", character: "Theron", checked: true },
-];
+// Listas vazias por default — quando o backend (apps/api/src/modules
+// /campaign/members + maps) estiver wired, o modal vai puxar membros
+// da campanha ativa e mapas existentes.
+const MOCK_PLAYERS: Array<{ id: string; name: string; character: string; checked: boolean }> = [];
 
-const MOCK_MAPS = [
-  "Torre de Ravenloft",
-  "Taverna do Dragao",
-  "Floresta Svalich",
-  "Nenhum",
-];
+const MOCK_MAPS: string[] = ["Nenhum"];
 
 const DURATIONS = ["2 horas", "3 horas", "4 horas", "5 horas", "6 horas"];
 

@@ -7,156 +7,33 @@ import type {
 import { ACHIEVEMENTS } from "@/constants/achievements";
 import { getLevelFromXP, getXPProgress, getNextReward } from "@/lib/profile-level";
 
-// ── Mock Profile Data ──
+// ── Default profile ──
+//
+// Profile vazio padrão. Quando autenticado via Clerk, dados vêm de
+// apps/api/src/modules/user (sync via webhook user.created).
 
 const MOCK_PROFILE: PublicProfile = {
-  id: "user-1",
-  username: "lucas",
-  displayName: "Lucas",
-  bio: "Mestre de RPG desde 2015. Apaixonado por narrativas sombrias e combate tático.",
+  id: "",
+  username: "",
+  displayName: "",
+  bio: "",
   avatarUrl: undefined,
-  memberSince: "2025-04-01",
-  xp: 4850,
-
-  adventurerStats: {
-    sessionsPlayed: 42,
-    hoursPlayed: 136,
-    campaignsJoined: 4,
-    charactersCreated: 7,
-    questsCompleted: 28,
-    criticalHits: 14,
-  },
-
-  gmStats: {
-    sessionsRun: 35,
-    hoursRun: 112,
-    campaignsCreated: 3,
-    playersHosted: 18,
-    encountersDesigned: 28,
-    averageRating: 4.7,
-    totalReviews: 12,
-  },
-
-  characters: [
-    {
-      id: "char-1",
-      name: "Thalion Sombravento",
-      class: "Guerreiro",
-      level: 8,
-      race: "Meio-Elfo",
-      campaignName: "A Maldição de Strahd",
-      status: "active",
-    },
-    {
-      id: "char-2",
-      name: "Miriel Luzeterna",
-      class: "Clériga",
-      level: 12,
-      race: "Humana",
-      campaignName: "Tumba da Aniquilação",
-      status: "retired",
-    },
-    {
-      id: "char-3",
-      name: "Vex Shadowmere",
-      class: "Ladino",
-      level: 5,
-      race: "Tiefling",
-      campaignName: "Waterdeep: Dragon Heist",
-      status: "deceased",
-    },
-  ],
-
-  campaigns: [
-    {
-      id: "camp-1",
-      name: "A Maldição de Strahd",
-      system: "D&D 5e",
-      coverGradient: "linear-gradient(135deg, #1A0A20 0%, #4A1040 50%, #2A0A30 100%)",
-      playerCount: 5,
-      sessionCount: 12,
-      status: "active",
-      progress: 65,
-      role: "gm",
-    },
-    {
-      id: "camp-2",
-      name: "Tumba da Aniquilação",
-      system: "D&D 5e",
-      coverGradient: "linear-gradient(135deg, #0A1A0A 0%, #1A4A1A 50%, #0A2A0A 100%)",
-      playerCount: 4,
-      sessionCount: 24,
-      status: "completed",
-      progress: 100,
-      role: "player",
-    },
-    {
-      id: "camp-3",
-      name: "Waterdeep: Dragon Heist",
-      system: "D&D 5e",
-      coverGradient: "linear-gradient(135deg, #0A0A1A 0%, #1A1A4A 50%, #0A0A2A 100%)",
-      playerCount: 6,
-      sessionCount: 8,
-      status: "paused",
-      progress: 35,
-      role: "player",
-    },
-  ],
-
-  achievements: ACHIEVEMENTS,
-
-  reviews: [
-    {
-      id: "rev-1",
-      authorName: "Ana",
-      rating: 5,
-      comment: "Melhor mestre que já joguei! Narrativas incríveis e sempre bem preparado.",
-      campaignName: "A Maldição de Strahd",
-      date: "2026-02-15",
-    },
-    {
-      id: "rev-2",
-      authorName: "Pedro",
-      rating: 5,
-      comment: "Mapas detalhados e encontros desafiadores. Recomendo demais!",
-      campaignName: "A Maldição de Strahd",
-      date: "2026-01-20",
-    },
-    {
-      id: "rev-3",
-      authorName: "Mariana",
-      rating: 4,
-      comment: "Ótimo mestre, sessões sempre divertidas. Às vezes corre um pouco com o ritmo.",
-      campaignName: "Tumba da Aniquilação",
-      date: "2025-11-10",
-    },
-    {
-      id: "rev-4",
-      authorName: "Carlos",
-      rating: 5,
-      comment: "Atmosfera de horror perfeita em Strahd. Cada sessão me dá arrepios!",
-      campaignName: "A Maldição de Strahd",
-      date: "2026-03-01",
-    },
-    {
-      id: "rev-5",
-      authorName: "Juliana",
-      rating: 4,
-      comment: "Muito criativo com homebrew. Personagens NPCs memoráveis.",
-      campaignName: "A Maldição de Strahd",
-      date: "2025-12-05",
-    },
-  ],
-
+  memberSince: new Date().toISOString().slice(0, 10),
+  xp: 0,
+  adventurerStats: { sessionsPlayed: 0, hoursPlayed: 0, campaignsJoined: 0, charactersCreated: 0, questsCompleted: 0, criticalHits: 0 },
+  gmStats: { sessionsRun: 0, hoursRun: 0, campaignsCreated: 0, playersHosted: 0, encountersDesigned: 0, averageRating: 0, totalReviews: 0 },
+  characters: [],
+  campaigns: [],
+  achievements: [],
+  reviews: [],
   equipped: {
-    frameId: "frame-arcane-glow",
-    bannerId: "banner-crimson-throne",
-    titleId: "title-hero",
+    frameId: null,
+    bannerId: null,
+    titleId: null,
     backgroundId: null,
-    diceSkinId: "dice-obsidian",
+    diceSkinId: null,
   },
-
-  gmStyleTags: ["narrativo", "horror", "mapas-detalhados", "tático"],
+  gmStyleTags: [],
 };
 
 // ── Store ──

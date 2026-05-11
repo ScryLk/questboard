@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Swords, ArrowLeft } from "lucide-react";
 
-// Mock session data lookup
+// Sessões resolvidas via backend (GET /sessions/by-code/:code).
+// Página estática inicia vazia; quando o backend integrar a
+// rota /join/[code] vira fetch ou redirect.
 const MOCK_SESSIONS: Record<
   string,
   {
@@ -13,26 +15,7 @@ const MOCK_SESSIONS: Record<
     confirmed: number;
     max: number;
   }
-> = {
-  B7M2X4: {
-    name: "A Torre de Ravenloft",
-    order: 13,
-    campaignName: "A Maldicao de Strahd",
-    date: "Sab 15/03/2026 as 20:00",
-    gm: "Lucas Silva",
-    confirmed: 3,
-    max: 4,
-  },
-  A3K9F2: {
-    name: "Wave Echo Cave",
-    order: 4,
-    campaignName: "Lost Mine of Phandelver",
-    date: "Seg 17/03/2026 as 19:00",
-    gm: "Ana Costa",
-    confirmed: 2,
-    max: 3,
-  },
-};
+> = {};
 
 interface JoinPageProps {
   params: Promise<{ code: string }>;

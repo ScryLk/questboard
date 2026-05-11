@@ -11,13 +11,9 @@ interface JoinCodeModalProps {
 type DetectedType = "campaign" | "session" | null;
 type SubmitState = "idle" | "loading" | "error" | "success";
 
-const MOCK_CODES: Record<string, { type: "campaign" | "session"; label: string }> = {
-  QB7K3M: { type: "campaign", label: "Campanha encontrada! Faca login para continuar" },
-  QB9M2B: { type: "campaign", label: "Campanha encontrada! Faca login para continuar" },
-  QB4T8R: { type: "campaign", label: "Campanha encontrada! Faca login para continuar" },
-  B7M2X4: { type: "session", label: "Sessao encontrada! Faca login para continuar" },
-  A3K9F2: { type: "session", label: "Sessao encontrada! Faca login para continuar" },
-};
+// Códigos válidos vêm do backend via GET /sessions/by-code/:code +
+// GET /campaigns?code=:code. Lista local fica vazia.
+const MOCK_CODES: Record<string, { type: "campaign" | "session"; label: string }> = {};
 
 export function JoinCodeModal({ open, onClose }: JoinCodeModalProps) {
   const router = useRouter();

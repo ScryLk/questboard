@@ -30,39 +30,9 @@ function generateId(): string {
   return `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-// Seed pra mantermos as notas mock que viviam na page até o backend chegar.
-const SEED: CampaignNote[] = [
-  {
-    id: "note_seed_1",
-    campaignId: "camp_seed_strahd",
-    title: "Pistas sobre a Cripta",
-    category: "plot",
-    content: "Os jogadores encontraram 3 pistas durante a investigação...",
-    isGmOnly: true,
-    createdAt: "2026-04-25T12:00:00Z",
-    updatedAt: "2026-04-25T12:00:00Z",
-  },
-  {
-    id: "note_seed_2",
-    campaignId: "camp_seed_strahd",
-    title: "Inventário da Loja",
-    category: "item",
-    content: "Poção de Cura (50po), Poção de Resistência ao Fogo (75po)...",
-    isGmOnly: false,
-    createdAt: "2026-04-26T10:00:00Z",
-    updatedAt: "2026-04-26T10:00:00Z",
-  },
-  {
-    id: "note_seed_3",
-    campaignId: "camp_seed_strahd",
-    title: "Motivações do Vilão",
-    category: "npc",
-    content: "Eldrith quer encontrar o artefato para...",
-    isGmOnly: true,
-    createdAt: "2026-04-22T18:00:00Z",
-    updatedAt: "2026-04-22T18:00:00Z",
-  },
-];
+// Store inicia vazio — dados vêm do backend via `useBackendNotes`
+// (apps/api/src/modules/notes) ou da UI quando GM cria.
+const SEED: CampaignNote[] = [];
 
 export const useNotesStore = create<NotesState>()(
   persist(

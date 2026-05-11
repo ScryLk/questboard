@@ -54,136 +54,17 @@ function makeSlug(name: string): string {
   return `${base}-${suffix}`;
 }
 
-// ── Mock seed ──
-
-const NOW = new Date();
+// ── Seed inicial ──
+//
+// Owner default usado quando a UI cria campanhas em modo offline
+// (sem backend). Quando o backend Clerk/api está ligado, o owner
+// real vem de `useUser()` do Clerk.
 export const MOCK_OWNER_ID = "dev-user-default";
 export const MOCK_OWNER_NAME = "Lucas (você)";
 
-function ownerMember(at: Date): CampaignMember {
-  return {
-    userId: MOCK_OWNER_ID,
-    displayName: MOCK_OWNER_NAME,
-    avatarUrl: null,
-    role: "GM",
-    characterId: null,
-    joinedAt: at,
-    invitedBy: null,
-  };
-}
-
-const STRAHD_CREATED = new Date(NOW.getTime() - 1000 * 60 * 60 * 24 * 30);
-const TORMENTA_CREATED = new Date(NOW.getTime() - 1000 * 60 * 60 * 24 * 5);
-
-const MOCK_CAMPAIGNS: CampaignDetailed[] = [
-  {
-    id: "camp_seed_strahd",
-    ownerId: MOCK_OWNER_ID,
-    name: "A Maldição de Strahd",
-    slug: null,
-    system: "dnd5e",
-    visibility: "PRIVATE",
-    joinCode: null,
-    coverImageUrl: null,
-    synopsis:
-      "Um pesadelo gótico em Barovia. Os jogadores chegam à terra amaldiçoada do conde Strahd e precisam reunir os artefatos sagrados para enfrentá-lo.",
-    tags: ["horror", "dark-fantasy", "investigacao"],
-    language: "pt-BR",
-    frequency: "WEEKLY",
-    expectedLength: "LONG",
-    ageRating: "T16",
-    contentWarnings: ["horror", "death"],
-    safetyTools: ["OPEN_DOOR", "X_CARD"],
-    isSoloStory: false,
-    externalChat: { discord: "https://discord.gg/strahd-mock" },
-    publicPitch: null,
-    status: "active",
-    createdAt: STRAHD_CREATED,
-    updatedAt: new Date(NOW.getTime() - 1000 * 60 * 60 * 24 * 2),
-    archivedAt: null,
-    memberCount: 4,
-    sessionCount: 12,
-    members: [
-      ownerMember(STRAHD_CREATED),
-      {
-        userId: "u_ana",
-        displayName: "Ana Carolina",
-        avatarUrl: null,
-        role: "CO_GM",
-        characterId: null,
-        joinedAt: new Date(STRAHD_CREATED.getTime() + 1000 * 60 * 60 * 24),
-        invitedBy: MOCK_OWNER_ID,
-      },
-      {
-        userId: "u_bia",
-        displayName: "Beatriz Lima",
-        avatarUrl: null,
-        role: "PLAYER",
-        characterId: null,
-        joinedAt: new Date(STRAHD_CREATED.getTime() + 1000 * 60 * 60 * 24 * 2),
-        invitedBy: MOCK_OWNER_ID,
-      },
-      {
-        userId: "u_caio",
-        displayName: "Caio Mendes",
-        avatarUrl: null,
-        role: "PLAYER",
-        characterId: null,
-        joinedAt: new Date(STRAHD_CREATED.getTime() + 1000 * 60 * 60 * 24 * 3),
-        invitedBy: MOCK_OWNER_ID,
-      },
-    ],
-  },
-  {
-    id: "camp_seed_tormenta_oneshot",
-    ownerId: MOCK_OWNER_ID,
-    name: "Os Caçadores de Lenore",
-    slug: null,
-    system: "tormenta20",
-    visibility: "CODE",
-    joinCode: "TRMN24XK",
-    coverImageUrl: null,
-    synopsis:
-      "Um one-shot intenso na Vila de Lenore. Lobos rondam a floresta e algo pior dorme nas catacumbas.",
-    tags: ["high-fantasy", "investigacao"],
-    language: "pt-BR",
-    frequency: "ONESHOT",
-    expectedLength: "ONESHOT",
-    ageRating: "T14",
-    contentWarnings: [],
-    safetyTools: ["OPEN_DOOR", "X_CARD"],
-    isSoloStory: false,
-    externalChat: null,
-    publicPitch: null,
-    status: "active",
-    createdAt: TORMENTA_CREATED,
-    updatedAt: new Date(NOW.getTime() - 1000 * 60 * 60 * 24 * 1),
-    archivedAt: null,
-    memberCount: 3,
-    sessionCount: 1,
-    members: [
-      ownerMember(TORMENTA_CREATED),
-      {
-        userId: "u_dani",
-        displayName: "Danielle Costa",
-        avatarUrl: null,
-        role: "PLAYER",
-        characterId: null,
-        joinedAt: new Date(TORMENTA_CREATED.getTime() + 1000 * 60 * 60 * 12),
-        invitedBy: null, // entrou por código
-      },
-      {
-        userId: "u_eduardo",
-        displayName: "Eduardo Soares",
-        avatarUrl: null,
-        role: "PLAYER",
-        characterId: null,
-        joinedAt: new Date(TORMENTA_CREATED.getTime() + 1000 * 60 * 60 * 24),
-        invitedBy: null,
-      },
-    ],
-  },
-];
+// Store inicia vazio — campanhas vêm do backend (apps/api/src/modules/
+// campaign) ou são criadas pelo wizard de "Nova Campanha".
+const MOCK_CAMPAIGNS: CampaignDetailed[] = [];
 
 // ── State ──
 
@@ -258,6 +139,16 @@ export const useCampaignStore = create<CampaignStoreState>()(
             : null;
         const slug = visibility === "PUBLIC" ? makeSlug(draft.name) : null;
 
+        const ownerMember: CampaignMember = {
+          userId: ownerId,
+          displayName: MOCK_OWNER_NAME,
+          avatarUrl: null,
+          role: "GM",
+          characterId: null,
+          joinedAt: now,
+          invitedBy: null,
+        };
+
         const campaign: CampaignDetailed = {
           id: makeId(),
           ownerId,
@@ -284,7 +175,7 @@ export const useCampaignStore = create<CampaignStoreState>()(
           archivedAt: null,
           memberCount: 1,
           sessionCount: 0,
-          members: [ownerMember(now)],
+          members: [ownerMember],
         };
 
         set((s) => ({ campaigns: [campaign, ...s.campaigns] }));

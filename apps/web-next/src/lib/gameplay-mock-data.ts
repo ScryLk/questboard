@@ -567,50 +567,9 @@ export const MOCK_SESSION: SessionInfo = {
   status: "live",
 };
 
-// Jogadores mock pra dev — ids `p1/p2/p3` batem com o default do
-// player-view-store (`playerId: "p1"`) e com o seletor do DevIdentityBadge.
-// Quando o backend subir, isso vira dado real de `CampaignMember`.
-export const MOCK_PLAYERS: GamePlayer[] = [
-  {
-    id: "p1",
-    name: "Lucas Kepler",
-    character: "Elara",
-    class: "Mago",
-    level: 5,
-    hp: 28,
-    maxHp: 28,
-    ac: 13,
-    status: "online",
-    avatarInitials: "LK",
-    color: "#6C5CE7",
-  },
-  {
-    id: "p2",
-    name: "Maria Santos",
-    character: "Thorin",
-    class: "Guerreiro",
-    level: 5,
-    hp: 48,
-    maxHp: 48,
-    ac: 18,
-    status: "online",
-    avatarInitials: "MS",
-    color: "#00B894",
-  },
-  {
-    id: "p3",
-    name: "Pedro Costa",
-    character: "Lyra",
-    class: "Ladina",
-    level: 5,
-    hp: 32,
-    maxHp: 32,
-    ac: 15,
-    status: "online",
-    avatarInitials: "PC",
-    color: "#FDCB6E",
-  },
-];
+// Jogadores: vazio por padrão. Backend (apps/api/src/modules/sessions
+// /players) preenche via socket player:joined / player:left.
+export const MOCK_PLAYERS: GamePlayer[] = [];
 
 export const MOCK_TOKENS: GameToken[] = [];
 
@@ -643,11 +602,8 @@ export interface SessionMapItem {
   isActive: boolean;
 }
 
-export const MOCK_SESSION_MAPS: SessionMapItem[] = [
-  { id: "map-1", name: "Cena 1", gridCols: 25, gridRows: 25, thumbnail: null, category: "Dungeon", isActive: true },
-  { id: "map-2", name: "Sala do Trono", gridCols: 30, gridRows: 20, thumbnail: null, category: "Dungeon", isActive: false },
-  { id: "map-3", name: "Floresta Svalich", gridCols: 40, gridRows: 30, thumbnail: null, category: "Overworld", isActive: false },
-];
+// Mapas da sessão: backend (apps/api/src/modules/map) lista via REST.
+export const MOCK_SESSION_MAPS: SessionMapItem[] = [];
 
 // ── Helpers ──────────────────────────────────────────
 

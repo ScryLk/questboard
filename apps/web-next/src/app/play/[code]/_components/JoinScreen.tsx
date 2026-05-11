@@ -11,16 +11,10 @@ import {
 import { useCharacterStore } from "@/stores/characterStore";
 import type { CampaignCharacter } from "@/types/character";
 
-// Mock pre-made (mantidos como atalho rápido — desaparecem se o
-// jogador criou personagens próprios).
-const MOCK_CHARACTERS: LobbyCharacter[] = [
-  { id: "c1", name: "Thorin", class: "Guerreiro", level: 5, emoji: "⚔️", taken: false },
-  { id: "c2", name: "Elara", class: "Maga", level: 5, emoji: "🧙", taken: false },
-  { id: "c3", name: "Zara", class: "Ladina", level: 5, emoji: "🗡️", taken: false },
-  { id: "c4", name: "Kael", class: "Clérigo", level: 5, emoji: "✨", taken: false },
-  { id: "c5", name: "Lyra", class: "Barda", level: 5, emoji: "🎵", taken: false },
-  { id: "c6", name: "Draven", class: "Paladino", level: 5, emoji: "🛡️", taken: false },
-];
+// Lista vazia por default — player vê empty state com botão "Criar
+// personagem novo". Backend (apps/api/src/modules/sessions/players)
+// futuramente vai listar personagens pre-made da campanha.
+const MOCK_CHARACTERS: LobbyCharacter[] = [];
 
 interface JoinScreenProps {
   sessionCode: string;

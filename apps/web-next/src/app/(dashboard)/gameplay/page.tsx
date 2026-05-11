@@ -3,26 +3,17 @@
 import Link from "next/link";
 import { Gamepad2, Play, Clock, Users } from "lucide-react";
 
-const MOCK_RECENT_SESSIONS = [
-  {
-    id: "sess_s04",
-    number: 13,
-    name: "A Torre de Ravenloft",
-    campaign: "A Maldicao de Strahd",
-    players: 4,
-    lastPlayed: "Hoje, 19:30",
-    status: "live" as const,
-  },
-  {
-    id: "sess_s03",
-    number: 12,
-    name: "Travessia pelo Vale",
-    campaign: "A Maldicao de Strahd",
-    players: 4,
-    lastPlayed: "28 Fev, 20:00",
-    status: "ended" as const,
-  },
-];
+// Sessões recentes vêm do backend (apps/api/src/modules/sessions).
+// Inicia vazio — empty state convida a criar nova sessão.
+const MOCK_RECENT_SESSIONS: Array<{
+  id: string;
+  number: number;
+  name: string;
+  campaign: string;
+  players: number;
+  lastPlayed: string;
+  status: "live" | "ended" | "scheduled";
+}> = [];
 
 export default function GameplayPage() {
   return (

@@ -19,50 +19,7 @@ const MOODS: { key: Mood; label: string }[] = [
   { key: "epic", label: "Epico" },
 ];
 
-const MOCK_TRACKS = [
-  {
-    id: "t1",
-    name: "Batalha Sombria",
-    mood: "combat",
-    duration: "3:42",
-    playing: true,
-  },
-  {
-    id: "t2",
-    name: "Taverna Animada",
-    mood: "tavern",
-    duration: "4:15",
-    playing: false,
-  },
-  {
-    id: "t3",
-    name: "Floresta Misteriosa",
-    mood: "exploration",
-    duration: "5:01",
-    playing: false,
-  },
-  {
-    id: "t4",
-    name: "Sussurros no Escuro",
-    mood: "mystery",
-    duration: "3:28",
-    playing: false,
-  },
-  {
-    id: "t5",
-    name: "Marcha dos Herois",
-    mood: "epic",
-    duration: "4:55",
-    playing: false,
-  },
-  {
-    id: "t6",
-    name: "Emboscada na Estrada",
-    mood: "combat",
-    duration: "2:58",
-    playing: false,
-  },
-];
+const MOCK_TRACKS: Array<{ id: string; name: string; mood: string; duration: string; playing: boolean }> = [];
 
 export function SoundtrackModal({ onClose }: SoundtrackModalProps) {
   const [search, setSearch] = useState("");
