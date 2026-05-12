@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Cinzel } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { ptBR } from "@clerk/localizations";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -15,17 +17,34 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-return (
-  <html lang="pt-BR">
-    <head>
-      <link rel="manifest" href="/manifest.json" />
-      <meta name="theme-color" content="#0A0A0F" />
-      <meta name="apple-mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    </head>
-    <body className={`${inter.variable} ${cinzel.variable} antialiased`}>
-      {children}
-    </body>
-  </html>
-);
+  return (
+    <ClerkProvider
+      localization={ptBR}
+      appearance={{
+        variables: {
+          colorPrimary: "#6C5CE7",
+          colorBackground: "#0A0A0F",
+          colorInputBackground: "#16161D",
+          colorInputText: "#FFFFFF",
+          colorText: "#FFFFFF",
+        },
+      }}
+      signInUrl="/login"
+      signUpUrl="/login"
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+    >
+      <html lang="pt-BR">
+        <head>
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content="#0A0A0F" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        </head>
+        <body className={`${inter.variable} ${cinzel.variable} antialiased`}>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
+  );
 }

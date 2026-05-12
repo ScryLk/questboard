@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
 import { useMemo } from "react";
+import { useUser } from "@clerk/nextjs";
 import { useCampaignStore } from "@/lib/campaign-store";
 import { useCampaignModalsStore } from "@/lib/campaign-modals-store";
 
@@ -179,19 +180,52 @@ function SidebarContent({
         </Link>
       </div>
 
-      {/* User */}
+      {/* User — dados vêm do Clerk via useUser() */}
+      <SidebarUserCard />
+    </>
+  );
+}
+
+function SidebarUserCard() {
+  const { user, isLoaded } = useUser();
+  const plan = useCampaignStore((s) => s.currentPlan);
+  if (!isLoaded || !user) {
+    return (
       <div className="border-t border-brand-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-accent/20 text-sm font-bold text-brand-accent">
-            LS
-          </div>
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-brand-text">Lucas</p>
-            <p className="text-xs text-brand-muted">Plano: Aventureiro</p>
+          <div className="h-9 w-9 animate-pulse rounded-full bg-white/5" />
+          <div className="flex-1">
+            <div className="h-3 w-20 animate-pulse rounded bg-white/5" />
           </div>
         </div>
       </div>
-    </>
+    );
+  }
+  const initials = (user.firstName?.[0] ?? user.username?.[0] ?? "U") +
+    (user.lastName?.[0] ?? "");
+  return (
+    <div className="border-t border-brand-border px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand-accent/20 text-sm font-bold text-brand-accent">
+          {user.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.imageUrl}
+              alt={user.fullName ?? "Usuário"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials.toUpperCase()
+          )}
+        </div>
+        <div className="flex-1 text-sm">
+          <p className="truncate font-medium text-brand-text">
+            {user.fullName ?? user.username ?? "Usuário"}
+          </p>
+          <p className="text-xs text-brand-muted">Plano: {plan}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

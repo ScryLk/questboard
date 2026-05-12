@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Menu, Plus, Users, ScrollText } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { GlobalSearch } from "@/components/search/global-search";
 import { useActiveCampaignId } from "@/lib/active-campaign";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
@@ -95,9 +96,15 @@ export function Header({ onCreateSession }: HeaderProps) {
           <Bell className="h-4 w-4" />
         </button>
 
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-accent/20 text-xs font-bold text-brand-accent">
-          LS
-        </div>
+        {/* Avatar + menu de conta (sign-out, perfil). Renderiza
+            shell até o Clerk carregar pra evitar CLS. */}
+        <UserButton
+          appearance={{
+            elements: {
+              avatarBox: "h-8 w-8",
+            },
+          }}
+        />
       </div>
     </header>
   );
