@@ -694,6 +694,10 @@ model Character {
   race       String? @db.VarChar(50)
   class      String? @db.VarChar(50)
   level      Int     @default(1)
+  /// XP acumulado neste personagem. Tabela de threshold mora em
+  /// @questboard/engine (xpRequiredForLevel). Level-ups são feitos
+  /// pelo backend ao detectar que currentXp >= threshold.
+  currentXp  Int     @default(0)
   avatarUrl  String?
   bannerUrl  String?
   templateId String?

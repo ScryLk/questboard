@@ -7,6 +7,7 @@ import {
   emitSessionStatusChanged,
   emitSessionSettingsUpdated,
 } from "../../lib/socket-events.js";
+import { invalidateCampaignDashboardCache } from "../campaign/dashboard.service.js";
 
 // Sem ambíguos (0/O, 1/I) pra facilitar leitura humana de invite code.
 const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -56,7 +57,7 @@ export function createSessionsService(prisma: PrismaClient) {
     },
 
     async create(userId: string, input: CreateSessionInput) {
-      return prisma.session.create({
+      const created = await prisma.session.create({
         data: {
           ...input,
           ownerId: userId,
@@ -70,6 +71,13 @@ export function createSessionsService(prisma: PrismaClient) {
           },
         },
       });
+
+      // Próxima sessão / contadores no dashboard mudaram.
+      if (created.campaignId) {
+        void invalidateCampaignDashboardCache(created.campaignId);
+      }
+
+      return created;
     },
 
     async findByCode(inviteCode: string) {
@@ -188,6 +196,11 @@ export function createSessionsService(prisma: PrismaClient) {
       // Cleanup Redis state
       const keys = await redis.keys(`session:${sessionId}:*`);
       if (keys.length > 0) await redis.del(...keys);
+
+      // Dashboard cache stale — total/duração/sessões recentes mudaram.
+      if (updated.campaignId) {
+        void invalidateCampaignDashboardCache(updated.campaignId);
+      }
 
       await this.logAudit(sessionId, userId, "session:ended", {});
       emitSessionStatusChanged({

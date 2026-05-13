@@ -1,177 +1,265 @@
 "use client";
 
+// Dashboard global — totais, próxima sessão, story progress, sessões
+// recentes e card condicional ao role. Pull do endpoint agregado
+// `/campaigns/:id/dashboard` usando a campanha ativa selecionada no
+// header. Sem dados? CTA pra escolher/criar campanha.
+
 import Link from "next/link";
 import { BookOpen, Calendar, Clock, TrendingUp, Users } from "lucide-react";
-import { useStoryProgress } from "@/stores/storyStore";
 import { ProfileWidget } from "@/components/profile/profile-widget";
-
-const KPI_CARDS = [
-  { label: "Sessoes", value: "12", icon: Calendar, color: "text-brand-accent" },
-  { label: "Horas Jogadas", value: "36h", icon: Clock, color: "text-brand-success" },
-  { label: "Nivel Medio", value: "5.2", icon: TrendingUp, color: "text-brand-warning" },
-  { label: "Proxima Sessao", value: "Sab 15/03 20:00", icon: Users, color: "text-brand-info" },
-];
-
-const SESSIONS = [
-  {
-    order: 12,
-    date: "08/03/2026",
-    title: "O Castelo de Amber",
-    duration: "3h 45m",
-    status: "Completa" as const,
-  },
-  {
-    order: 11,
-    date: "01/03/2026",
-    title: "Vinhedos Malditos",
-    duration: "4h 10m",
-    status: "Completa" as const,
-  },
-  {
-    order: 13,
-    date: "15/03/2026",
-    title: "A Torre de Ravenloft",
-    duration: "--",
-    status: "Agendada" as const,
-  },
-  {
-    order: 10,
-    date: "22/02/2026",
-    title: "O Moinho de Ossos",
-    duration: "3h 20m",
-    status: "Completa" as const,
-  },
-  {
-    order: 9,
-    date: "15/02/2026",
-    title: "A Vila de Vallaki",
-    duration: "4h 30m",
-    status: "Completa" as const,
-  },
-];
-
-function statusBadge(status: "Completa" | "Agendada" | "Ao Vivo") {
-  switch (status) {
-    case "Completa":
-      return "bg-brand-muted/15 text-brand-muted";
-    case "Agendada":
-      return "bg-brand-info/15 text-brand-info";
-    case "Ao Vivo":
-      return "bg-brand-success/15 text-brand-success";
-  }
-}
+import { useCampaignStore } from "@/lib/campaign-store";
+import { useCampaignDashboard } from "@/hooks/use-campaign-dashboard";
+import { CharacterXpCard } from "@/components/dashboard/character-xp-card";
+import { GmPanelCard } from "@/components/dashboard/gm-panel-card";
+import { NoCharacterCard } from "@/components/dashboard/no-character-card";
+import {
+  CardSkeleton,
+  DashboardErrorBanner,
+  StatsCardsSkeleton,
+  TableSkeleton,
+} from "@/components/dashboard/dashboard-skeletons";
+import {
+  formatDuration,
+  formatHours,
+  formatNextSession,
+  formatPlayedAt,
+  formatSessionStatus,
+} from "@/lib/dashboard-format";
+import type { DashboardDto } from "@questboard/validators";
 
 export default function DashboardPage() {
-  const story = useStoryProgress();
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  const { data, isLoading, error, refetch } =
+    useCampaignDashboard(activeCampaignId);
+
+  if (!activeCampaignId) {
+    return <NoActiveCampaign />;
+  }
+
+  if (isLoading && !data) {
+    return (
+      <div className="space-y-8">
+        <StatsCardsSkeleton />
+        <CardSkeleton height={120} />
+        <CardSkeleton height={140} />
+        <TableSkeleton />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="space-y-8">
+        <DashboardErrorBanner message={error} onRetry={refetch} />
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <div className="space-y-8">
-      {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {KPI_CARDS.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <div
-              key={kpi.label}
-              className="rounded-xl border border-brand-border bg-brand-surface p-5"
-            >
-              <div className="flex items-center justify-between">
-                <Icon className={`h-5 w-5 ${kpi.color}`} />
-              </div>
-              <p className="mt-3 text-2xl font-bold text-brand-text">
-                {kpi.value}
-              </p>
-              <p className="mt-1 text-sm text-brand-muted">{kpi.label}</p>
-            </div>
-          );
-        })}
-      </div>
+      <KpiCards totals={data.totals} nextSession={data.nextSession} />
 
-      {/* Profile Widget */}
       <ProfileWidget />
 
-      {/* Story Progress Widget */}
-      <div className="rounded-xl border border-brand-border bg-brand-surface p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-brand-accent" />
-            <h2 className="text-sm font-semibold text-brand-text">
-              Progressão da História
-            </h2>
-          </div>
-          <Link
-            href="/story"
-            className="text-xs text-brand-accent hover:underline"
-          >
-            Ver Roadmap Completo
-          </Link>
-        </div>
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-brand-text">
-            {story.percent}%
-          </span>
-          <span className="text-sm text-brand-muted">
-            {story.completedEvents}/{story.totalEvents} eventos
-          </span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5">
-          <div
-            className="h-full rounded-full bg-brand-accent transition-all"
-            style={{ width: `${story.percent}%` }}
-          />
-        </div>
-        {story.nextEvent && (
-          <p className="mt-2 text-xs text-brand-muted">
-            Próximo:{" "}
-            <span className="font-medium text-brand-text">
-              {story.nextEvent.title}
-            </span>
-          </p>
-        )}
-      </div>
+      <RoleAwareCard data={data} campaignId={activeCampaignId} />
 
-      {/* Sessions Table */}
-      <div className="rounded-xl border border-brand-border bg-brand-surface">
-        <div className="flex items-center justify-between border-b border-brand-border px-6 py-4">
-          <h2 className="text-lg font-semibold text-brand-text">
-            Sessoes Recentes
+      <StoryProgress storyProgress={data.storyProgress} />
+
+      <SessionsTable recentSessions={data.recentSessions} />
+    </div>
+  );
+}
+
+// ── Subcomponentes ─────────────────────────────────────────────
+
+function KpiCards({
+  totals,
+  nextSession,
+}: {
+  totals: DashboardDto["totals"];
+  nextSession: DashboardDto["nextSession"];
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiCard
+        icon={Calendar}
+        color="text-brand-accent"
+        label="Sessões"
+        value={totals.sessions.toString()}
+      />
+      <KpiCard
+        icon={Clock}
+        color="text-brand-success"
+        label="Horas Jogadas"
+        value={formatHours(totals.hoursPlayed)}
+      />
+      <KpiCard
+        icon={TrendingUp}
+        color="text-brand-warning"
+        label="Nível Médio"
+        value={
+          totals.averagePlayerLevel !== null
+            ? totals.averagePlayerLevel.toFixed(1)
+            : "—"
+        }
+      />
+      <KpiCard
+        icon={Users}
+        color="text-brand-info"
+        label="Próxima Sessão"
+        value={
+          nextSession ? formatNextSession(nextSession.scheduledFor) : "Nenhuma"
+        }
+        hint={!nextSession ? "Agende uma sessão pra começar" : undefined}
+      />
+    </div>
+  );
+}
+
+function KpiCard({
+  icon: Icon,
+  color,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-surface p-5">
+      <div className="flex items-center justify-between">
+        <Icon className={`h-5 w-5 ${color}`} />
+      </div>
+      <p className="mt-3 text-2xl font-bold text-brand-text">{value}</p>
+      <p className="mt-1 text-sm text-brand-muted">{label}</p>
+      {hint && <p className="mt-1 text-[11px] text-brand-muted">{hint}</p>}
+    </div>
+  );
+}
+
+function RoleAwareCard({
+  data,
+  campaignId,
+}: {
+  data: DashboardDto;
+  campaignId: string;
+}) {
+  if (data.viewerRole === "GM" || data.viewerRole === "CO_GM") {
+    if (!data.gmPanel) return null;
+    return <GmPanelCard stats={data.gmPanel} campaignId={campaignId} />;
+  }
+  if (data.viewerRole === "PLAYER") {
+    if (data.userCharacter) {
+      return <CharacterXpCard character={data.userCharacter} />;
+    }
+    return <NoCharacterCard campaignId={campaignId} />;
+  }
+  // SPECTATOR: nada.
+  return null;
+}
+
+function StoryProgress({
+  storyProgress,
+}: {
+  storyProgress: DashboardDto["storyProgress"];
+}) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-surface p-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-brand-accent" />
+          <h2 className="text-sm font-semibold text-brand-text">
+            Progressão da História
           </h2>
         </div>
+        <Link
+          href="/story"
+          className="text-xs text-brand-accent hover:underline"
+        >
+          Ver Roadmap Completo
+        </Link>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-2xl font-bold text-brand-text">
+          {storyProgress.percentage}%
+        </span>
+        <span className="text-sm text-brand-muted">
+          {storyProgress.completedEvents}/{storyProgress.totalEvents} eventos
+        </span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5">
+        <div
+          className="h-full rounded-full bg-brand-accent transition-all"
+          style={{ width: `${storyProgress.percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
+function SessionsTable({
+  recentSessions,
+}: {
+  recentSessions: DashboardDto["recentSessions"];
+}) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-surface">
+      <div className="flex items-center justify-between border-b border-brand-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-brand-text">
+          Sessões Recentes
+        </h2>
+      </div>
+
+      {recentSessions.length === 0 ? (
+        <div className="px-6 py-12 text-center text-sm text-brand-muted">
+          Nenhuma sessão concluída ainda. Comece sua primeira aventura.
+        </div>
+      ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-brand-border text-left text-xs uppercase tracking-wider text-brand-muted">
                 <th className="px-6 py-3 font-medium">#</th>
                 <th className="px-6 py-3 font-medium">Data</th>
-                <th className="px-6 py-3 font-medium">Titulo</th>
-                <th className="px-6 py-3 font-medium">Duracao</th>
+                <th className="px-6 py-3 font-medium">Título</th>
+                <th className="px-6 py-3 font-medium">Duração</th>
                 <th className="px-6 py-3 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
-              {SESSIONS.map((session) => (
+              {recentSessions.map((session) => (
                 <tr
-                  key={session.order}
+                  key={session.id}
                   className="border-b border-brand-border/50 transition-colors hover:bg-white/[0.02]"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-brand-text">
-                    {session.order}
+                    {session.number}
                   </td>
                   <td className="px-6 py-4 text-sm text-brand-muted">
-                    {session.date}
+                    {formatPlayedAt(session.playedAt)}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-brand-text">
                     {session.title}
                   </td>
                   <td className="px-6 py-4 text-sm text-brand-muted">
-                    {session.duration}
+                    {formatDuration(session.durationMinutes)}
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusBadge(session.status)}`}
+                      className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${
+                        session.status === "ENDED"
+                          ? "bg-brand-muted/15 text-brand-muted"
+                          : "bg-brand-danger/15 text-brand-danger"
+                      }`}
                     >
-                      {session.status}
+                      {formatSessionStatus(session.status)}
                     </span>
                   </td>
                 </tr>
@@ -179,6 +267,28 @@ export default function DashboardPage() {
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+function NoActiveCampaign() {
+  return (
+    <div className="space-y-8">
+      <div className="rounded-xl border border-dashed border-brand-border bg-brand-surface/50 p-8 text-center">
+        <p className="text-base font-medium text-brand-text">
+          Nenhuma campanha ativa selecionada.
+        </p>
+        <p className="mt-2 text-sm text-brand-muted">
+          Selecione uma campanha no menu superior pra ver o dashboard,
+          ou crie uma nova.
+        </p>
+        <Link
+          href="/campaigns"
+          className="mt-4 inline-flex cursor-pointer items-center gap-1 rounded-lg bg-brand-accent px-4 py-2 text-sm font-medium text-white hover:bg-brand-accent-hover"
+        >
+          Ver minhas campanhas
+        </Link>
       </div>
     </div>
   );
