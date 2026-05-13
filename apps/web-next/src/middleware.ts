@@ -28,9 +28,13 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) return;
-  // Protege todas as outras rotas. Quando não autenticado, Clerk
-  // redireciona pra `signInUrl` configurada no ClerkProvider (`/login`).
-  await auth.protect();
+  // Protege todas as outras rotas. `unauthenticatedUrl` força nosso
+  // /login custom em vez do Account Portal hospedado em accounts.dev
+  // (mesmo quando `NEXT_PUBLIC_CLERK_SIGN_IN_URL` não está setado).
+  const url = new URL(request.url);
+  await auth.protect({
+    unauthenticatedUrl: `${url.origin}/login`,
+  });
 });
 
 export const config = {
