@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell, Menu, Plus, Users, ScrollText } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { UserMenu } from "@/components/layout/user-menu";
 import { GlobalSearch } from "@/components/search/global-search";
 import { useActiveCampaignId } from "@/lib/active-campaign";
 import { useMobileSidebar } from "@/lib/mobile-sidebar-store";
@@ -96,15 +96,9 @@ export function Header({ onCreateSession }: HeaderProps) {
           <Bell className="h-4 w-4" />
         </button>
 
-        {/* Avatar + menu de conta (sign-out, perfil). Renderiza
-            shell até o Clerk carregar pra evitar CLS. */}
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox: "h-8 w-8",
-            },
-          }}
-        />
+        {/* Avatar + menu de conta. Mostra o handle (Lucas#TAG) como
+            identidade primária; email + Clerk profile ficam no menu. */}
+        <UserMenu />
       </div>
     </header>
   );
