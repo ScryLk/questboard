@@ -30,7 +30,7 @@ export default function RootLayout({
         },
       }}
       signInUrl="/login"
-      signUpUrl="/login"
+      signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
     >
