@@ -12,6 +12,9 @@ interface State {
   data: DashboardDto | null;
   isLoading: boolean;
   error: string | null;
+  /** True quando o backend retornou 404 — a campanha selecionada não existe
+   *  mais (ex: foi deletada, ou localStorage tem id stale após reset do DB). */
+  notFound: boolean;
 }
 
 interface UseCampaignDashboardResult extends State {
@@ -27,6 +30,7 @@ export function useCampaignDashboard(
     data: null,
     isLoading: campaignId !== null,
     error: null,
+    notFound: false,
   });
   const triggerRef = useRef(0);
 
@@ -37,7 +41,7 @@ export function useCampaignDashboard(
 
   useEffect(() => {
     if (!campaignId) {
-      setState({ data: null, isLoading: false, error: null });
+      setState({ data: null, isLoading: false, error: null, notFound: false });
       return;
     }
 
@@ -48,15 +52,22 @@ export function useCampaignDashboard(
       try {
         const dto = await getCampaignDashboard(campaignId!);
         if (cancelled) return;
-        setState({ data: dto, isLoading: false, error: null });
+        setState({ data: dto, isLoading: false, error: null, notFound: false });
       } catch (err) {
         if (cancelled) return;
+        const status = (err as { statusCode?: number }).statusCode;
+        // 404 = campanha não existe; UI mostra empty state específico.
+        if (status === 404) {
+          setState({ data: null, isLoading: false, error: null, notFound: true });
+          return;
+        }
         setState({
           data: null,
           isLoading: false,
           error:
             (err as { message?: string }).message ??
             "Não foi possível carregar o dashboard.",
+          notFound: false,
         });
       }
     }

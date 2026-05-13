@@ -30,11 +30,18 @@ import type { DashboardDto } from "@questboard/validators";
 
 export default function DashboardPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
-  const { data, isLoading, error, refetch } =
+  const clearActive = useCampaignStore((s) => s.setActiveCampaignId);
+  const { data, isLoading, error, notFound, refetch } =
     useCampaignDashboard(activeCampaignId);
 
   if (!activeCampaignId) {
     return <NoActiveCampaign />;
+  }
+
+  // Campanha local aponta pra ID que não existe mais no backend
+  // (ex: DB resetado, ou deletada). Limpa local e mostra empty state.
+  if (notFound) {
+    return <StaleCampaign onClear={() => clearActive(null)} />;
   }
 
   if (isLoading && !data) {
@@ -268,6 +275,37 @@ function SessionsTable({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function StaleCampaign({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="space-y-8">
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
+        <p className="text-base font-medium text-amber-300">
+          A campanha selecionada não existe mais.
+        </p>
+        <p className="mt-2 text-sm text-brand-muted">
+          Pode ter sido excluída ou o banco foi resetado. Limpe a seleção
+          local e escolha outra campanha.
+        </p>
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            className="cursor-pointer rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/25"
+          >
+            Limpar seleção
+          </button>
+          <Link
+            href="/campaigns"
+            className="cursor-pointer rounded-lg bg-brand-accent px-4 py-2 text-sm font-medium text-white hover:bg-brand-accent-hover"
+          >
+            Ver campanhas
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
