@@ -15,4 +15,14 @@ export async function userRoutes(app: FastifyInstance) {
   app.patch("/users/me/notifications/:id", controller.markNotificationRead);
   app.post("/users/me/devices", controller.registerDevice);
   app.delete("/users/me/devices/:id", controller.removeDevice);
+
+  // Handle (Name#TAG)
+  app.get("/users/me/handle", controller.getMyHandle);
+  app.patch("/users/me/username", controller.updateUsername);
+  app.post("/users/me/tag/reroll", controller.rerollTag);
+  app.get("/users/search", controller.searchByHandle);
+  app.get<{ Params: { username: string; tag: string } }>(
+    "/users/by-handle/:username/:tag",
+    controller.resolveHandle,
+  );
 }

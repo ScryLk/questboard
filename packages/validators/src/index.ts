@@ -15,5 +15,6 @@ export * from "./notes.schema";
 export * from "./world.schema";
 export * from "./behavior.schema";
 export * from "./media.schema";
+export * from "./user-handle.schema";
 export * from "./characters/dnd5e";
 export * from "./characters/cosmic-horror";

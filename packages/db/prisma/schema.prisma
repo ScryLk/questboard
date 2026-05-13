@@ -176,7 +176,22 @@ model User {
   id          String   @id @default(cuid())
   externalId  String   @unique // Clerk user ID
   email       String   @unique
-  username    String?  @unique @db.VarChar(30)
+  /// Handle name (Riot-style). Pode repetir entre usuários — o
+  /// discriminador é `tag`. Unique funcional case-insensitive em
+  /// (LOWER(username), UPPER(tag)) criado via migration raw.
+  username    String   @db.VarChar(30)
+  /// Discriminador de 4 chars [A-Z2-9] (sem I/O pra evitar confusão).
+  /// Forma o handle "Lucas#7H2K" junto com username.
+  tag         String   @db.VarChar(5)
+  /// Última vez que o usuário trocou o username. Usado pra aplicar
+  /// cooldown (30 dias).
+  usernameChangedAt DateTime?
+  /// Última vez que o usuário rerolou o tag (mantendo o username).
+  /// Cooldown se aplica após 1 reroll grátis.
+  tagChangedAt DateTime?
+  /// Quantas vezes o usuário já rerolou o tag (sem trocar username).
+  /// 1ª é grátis; depois cooldown 30 dias.
+  tagRerollsUsed Int @default(0)
   displayName String   @db.VarChar(80)
   avatarUrl   String?
   bio         String?  @db.VarChar(500)

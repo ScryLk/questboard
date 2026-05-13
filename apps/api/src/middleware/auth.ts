@@ -35,7 +35,8 @@ export async function verifyAuth(
           data: {
             externalId: devUserId,
             email: `${devUserId}@dev.local`,
-            username: devUserId.slice(0, 20),
+            username: devUserId.slice(0, 16).replace(/[^a-z0-9_-]/gi, "") || "devuser",
+            tag: "DEV1",
             displayName: "Dev User",
           },
           select: { id: true, externalId: true, email: true, plan: true, role: true, isBanned: true },

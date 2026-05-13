@@ -11,6 +11,7 @@ import {
 import { Camera, ChevronRight, ExternalLink, LogOut, Palette, Trash2 } from "lucide-react";
 import { CosmeticPreview } from "@/components/profile/cosmetic-preview";
 import { CosmeticSelectorModal } from "@/components/profile/cosmetic-selector-modal";
+import { HandleSection } from "./HandleSection";
 
 export function ProfileSection() {
   const { profile, updateProfile } = useSettingsStore();
@@ -48,6 +49,8 @@ export function ProfileSection() {
           </div>
         </div>
       </SettingsSection>
+
+      <HandleSection />
 
       <SettingsSection title="Informações">
         <SettingsInput

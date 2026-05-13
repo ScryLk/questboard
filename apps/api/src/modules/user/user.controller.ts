@@ -61,5 +61,48 @@ export function createUserController(userService: UserService) {
       await userService.removeDevice(request.user.id, request.params.id);
       return reply.status(204).send();
     },
+
+    // ── Handle (Name#TAG) ──────────────────────────────────────
+
+    async getMyHandle(request: FastifyRequest, reply: FastifyReply) {
+      const handle = await userService.getMyHandle(request.user.id);
+      return reply.send(createSuccessResponse(handle));
+    },
+
+    async updateUsername(request: FastifyRequest, reply: FastifyReply) {
+      const body = request.body as { username?: string };
+      if (typeof body?.username !== "string") {
+        throw new BadRequestError("Campo `username` obrigatório.");
+      }
+      const result = await userService.updateUsername(
+        request.user.id,
+        body.username,
+      );
+      return reply.send(createSuccessResponse(result));
+    },
+
+    async rerollTag(request: FastifyRequest, reply: FastifyReply) {
+      const result = await userService.rerollTag(request.user.id);
+      return reply.send(createSuccessResponse(result));
+    },
+
+    async searchByHandle(request: FastifyRequest, reply: FastifyReply) {
+      const query = request.query as { q?: string; limit?: string };
+      const q = (query.q ?? "").toString();
+      const limit = query.limit ? parseInt(query.limit, 10) : undefined;
+      const results = await userService.searchByHandle(q, limit);
+      return reply.send(createSuccessResponse(results));
+    },
+
+    async resolveHandle(
+      request: FastifyRequest<{
+        Params: { username: string; tag: string };
+      }>,
+      reply: FastifyReply,
+    ) {
+      const { username, tag } = request.params;
+      const result = await userService.resolveHandle(username, tag);
+      return reply.send(createSuccessResponse(result));
+    },
   };
 }
