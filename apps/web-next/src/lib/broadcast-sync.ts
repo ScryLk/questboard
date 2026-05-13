@@ -35,6 +35,8 @@ export type BroadcastMessageType =
   | "gm:heal-applied"        // Heal applied to token
   | "gm:move-approved"       // GM aprovou pedido de movimento do player
   | "gm:move-rejected"       // GM rejeitou pedido de movimento do player
+  | "gm:media-show"          // GM exibiu mídia (vídeo) pra todos
+  | "gm:media-hide"          // GM ocultou mídia
   // Player → GM
   | "player:move"            // Player moves token (legado: move direto)
   | "player:move-request"    // Player pede pro GM aprovar um movimento

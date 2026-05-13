@@ -26,6 +26,7 @@ import { npcRoutes } from "./modules/npc/npc.routes.js";
 import { notesRoutes } from "./modules/notes/notes.routes.js";
 import { worldRoutes } from "./modules/world/world.routes.js";
 import { behaviorRoutes } from "./modules/behavior/behavior.routes.js";
+import { mediaRoutes } from "./modules/media/media.routes.js";
 
 async function buildApp() {
   const app = Fastify({
@@ -75,6 +76,7 @@ async function buildApp() {
       await v1.register(notesRoutes);
       await v1.register(worldRoutes);
       await v1.register(behaviorRoutes);
+      await v1.register(mediaRoutes);
     },
     { prefix: "/api/v1" },
   );

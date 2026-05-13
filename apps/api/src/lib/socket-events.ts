@@ -254,3 +254,29 @@ export function emitBehaviorStarted(p: BehaviorLifecyclePayload): void {
 export function emitBehaviorEnded(p: BehaviorLifecyclePayload): void {
   emitToSession(p.sessionId, "npc:behavior-ended", p);
 }
+
+// ─── Broadcast de mídia (vídeo) ──────────────────────────────
+
+export interface MediaShowPayload {
+  sessionId: string;
+  provider: "youtube" | "vimeo" | "mp4" | "unknown";
+  embedUrl: string;
+  originalUrl: string;
+  title?: string;
+  startedAt: string;
+  by: string;
+}
+
+export function emitMediaShow(p: MediaShowPayload): void {
+  emitToSession(p.sessionId, "media:show", p);
+}
+
+export interface MediaHidePayload {
+  sessionId: string;
+  at: string;
+  by: string;
+}
+
+export function emitMediaHide(p: MediaHidePayload): void {
+  emitToSession(p.sessionId, "media:hide", p);
+}

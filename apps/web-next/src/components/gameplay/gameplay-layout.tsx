@@ -46,6 +46,9 @@ import { useAttackStore } from "@/lib/attack-store";
 import { NpcConversationModal } from "./modals/npc-conversation-modal";
 import { useNpcConversationStore } from "@/lib/npc-conversation-store";
 import { useCharacterStore } from "@/stores/characterStore";
+import { MediaBroadcastModal } from "./modals/media-broadcast-modal";
+import { MediaBroadcastOverlay } from "./media-broadcast-overlay";
+import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
 
 
 export function GameplayLayout() {
@@ -55,6 +58,7 @@ export function GameplayLayout() {
   // principal de gameplay geralmente é GM, mas se alguém abrir essa rota
   // com ?as=player1, o hook respeita e vira listener (dev only).
   useGameplayBroadcastSync();
+  useMediaBroadcastDevSync();
 
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);
@@ -283,6 +287,12 @@ export function GameplayLayout() {
 
       {/* Modal de conversa scripted com NPC — escuta useNpcConversationStore */}
       <NpcConversationModal />
+
+      {/* Broadcast de vídeo — overlay aparece pra todos; modal só GM.
+          sessionId=null → modo local (dev offline). Quando backend
+          estiver wired, passar o id real da sessão ativa. */}
+      <MediaBroadcastModal sessionId={null} />
+      <MediaBroadcastOverlay />
 
       {/* Badge de identidade dev (apenas NODE_ENV=development) */}
       <DevIdentityBadge />

@@ -10,6 +10,7 @@ import { BroadcastSync } from "@/components/player-view/connection/BroadcastSync
 import { DevIdentityBadge } from "@/components/gameplay/dev-identity-badge";
 import { useIdentityFromUrl } from "@/lib/gameplay-sync/use-identity-from-url";
 import { useGameplayBroadcastSync } from "@/lib/gameplay-sync/use-gameplay-broadcast-sync";
+import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
 import { JoinScreen } from "./_components/JoinScreen";
 import { LobbyScreen } from "./_components/LobbyScreen";
 import { EndScreen } from "./_components/EndScreen";
@@ -19,6 +20,7 @@ export default function PlayerSessionPage() {
   // Em produção, isso será substituído por Socket.IO autenticado.
   useIdentityFromUrl();
   useGameplayBroadcastSync();
+  useMediaBroadcastDevSync();
 
   const params = useParams();
   const searchParams = useSearchParams();

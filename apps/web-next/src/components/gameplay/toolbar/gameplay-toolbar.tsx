@@ -20,12 +20,14 @@ import {
   Share2,
   Volume2,
   Sparkles,
+  Tv,
   XCircle,
   BookOpen,
 } from "lucide-react";
 import type { MapTool, SessionInfo } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { ModalName } from "@/lib/gameplay-store";
+import { useMediaBroadcastStore } from "@/lib/media-broadcast-store";
 import { GameTooltip } from "@/components/ui/game-tooltip";
 import { SessionNameWithProgress } from "./session-name-with-progress";
 import { GameplayGlobalSearch } from "./gameplay-global-search";
@@ -74,6 +76,8 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
   const toggleGrid = useGameplayStore((s) => s.toggleGrid);
   const gridVisible = useGameplayStore((s) => s.gridVisible);
   const openModal = useGameplayStore((s) => s.openModal);
+  const openMediaComposer = useMediaBroadcastStore((s) => s.openComposer);
+  const mediaActive = useMediaBroadcastStore((s) => s.active);
 
   const handleToolClick = useCallback(
     (tool: MapTool) => {
@@ -164,6 +168,21 @@ export function GameplayToolbar({ session }: GameplayToolbarProps) {
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <GameplayGlobalSearch />
         <div className="mx-1 h-5 w-px bg-brand-border" />
+        <GameTooltip
+          label={mediaActive ? "Exibindo video" : "Exibir video"}
+          side="bottom"
+        >
+          <button
+            onClick={openMediaComposer}
+            className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+              mediaActive
+                ? "bg-brand-accent/15 text-brand-accent hover:bg-brand-accent/25"
+                : "text-brand-muted hover:bg-white/[0.06] hover:text-brand-text"
+            }`}
+          >
+            <Tv className="h-4 w-4" />
+          </button>
+        </GameTooltip>
         {SESSION_ACTIONS.map(({ icon: Icon, label, modal }) => (
           <GameTooltip key={label} label={label} side="bottom">
             <button

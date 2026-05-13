@@ -19,6 +19,7 @@ import { DiceCentralReveal } from "@/components/dice/DiceCentralReveal";
 import { MoveConfirmBar } from "./MoveConfirmBar";
 import { RadialMenu } from "@/components/shared/radial-menu";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
+import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -144,6 +145,9 @@ export function PlayerViewLayout() {
       {/* Modal overlays */}
       {activeScene && <SceneCardOverlay scene={activeScene} />}
       {sessionPaused && <SessionPausedOverlay />}
+
+      {/* Mídia broadcast — GM exibe vídeo pra todos */}
+      <MediaBroadcastOverlay />
     </div>
   );
 }

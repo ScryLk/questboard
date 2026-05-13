@@ -386,6 +386,11 @@ model Session {
   startedAt   DateTime?
   endedAt     DateTime?
 
+  /** Mídia ativa exibida pra todos os jogadores (vídeo broadcast).
+   *  null quando nada está sendo exibido. Shape:
+   *  { provider, embedUrl, originalUrl, title?, startedAt, by }. */
+  activeMedia Json?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
