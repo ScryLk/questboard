@@ -20,6 +20,7 @@ import { MoveConfirmBar } from "./MoveConfirmBar";
 import { RadialMenu } from "@/components/shared/radial-menu";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
+import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -29,6 +30,10 @@ export function PlayerViewLayout() {
   const combat = usePlayerViewStore((s) => s.combat);
   const screenShake = usePlayerViewStore((s) => s.screenShake);
   const pendingWhisper = usePlayerViewStore((s) => s.pendingWhisper);
+  const backendSessionId = usePlayerViewStore((s) => s.backendSessionId);
+
+  // Socket bridge: liga media:show/hide à store quando há backend.
+  useMediaSocketBridge(backendSessionId);
 
   // Transition to end screen when session ends
   useEffect(() => {

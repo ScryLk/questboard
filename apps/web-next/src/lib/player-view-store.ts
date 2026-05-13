@@ -174,6 +174,9 @@ export type PlayerCampaignSystem = "dnd5e" | "cosmic-horror" | null;
 interface PlayerViewState {
   // Connection
   sessionCode: string;
+  /** UUID da Session no backend (preenchido após join handshake REST).
+   *  Dev/offline fica null e cai no BroadcastChannel. */
+  backendSessionId: string | null;
   playerId: string;
   playerName: string;
   characterId: string | null;
@@ -244,6 +247,7 @@ interface PlayerViewState {
 
   // Connection
   setSessionCode: (code: string) => void;
+  setBackendSessionId: (id: string | null) => void;
   setPlayerName: (name: string) => void;
   /** Seta o id do jogador atual. Usado pelo `useIdentityFromUrl` pra
    *  alinhar com `?as=p1|p2|p3` (e com `token.playerId` do GM). */
@@ -382,6 +386,7 @@ export interface GMSyncPayload {
 export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   // Connection
   sessionCode: "",
+  backendSessionId: null,
   playerId: "p1", // default to player 1 for mock
   playerName: "",
   characterId: "p1",
@@ -442,6 +447,7 @@ export const usePlayerViewStore = create<PlayerViewState>((set, get) => ({
   // ── Actions ──
 
   setSessionCode: (code) => set({ sessionCode: code }),
+  setBackendSessionId: (id) => set({ backendSessionId: id }),
   setPlayerName: (name) => set({ playerName: name }),
   setPlayerId: (id) => set({ playerId: id }),
   joinSession: (code, name) =>

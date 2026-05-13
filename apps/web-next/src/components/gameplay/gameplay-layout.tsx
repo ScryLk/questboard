@@ -49,6 +49,8 @@ import { useCharacterStore } from "@/stores/characterStore";
 import { MediaBroadcastModal } from "./modals/media-broadcast-modal";
 import { MediaBroadcastOverlay } from "./media-broadcast-overlay";
 import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
+import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
+import { useParams } from "next/navigation";
 
 
 export function GameplayLayout() {
@@ -59,6 +61,12 @@ export function GameplayLayout() {
   // com ?as=player1, o hook respeita e vira listener (dev only).
   useGameplayBroadcastSync();
   useMediaBroadcastDevSync();
+
+  // Backend wiring: usamos sessionId da URL pra REST + socket. Quando
+  // ausente (rotas de teste), cai no modo local (dev offline).
+  const routeParams = useParams<{ sessionId?: string }>();
+  const sessionId = routeParams?.sessionId ?? null;
+  useMediaSocketBridge(sessionId);
 
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);
@@ -289,9 +297,9 @@ export function GameplayLayout() {
       <NpcConversationModal />
 
       {/* Broadcast de vídeo — overlay aparece pra todos; modal só GM.
-          sessionId=null → modo local (dev offline). Quando backend
-          estiver wired, passar o id real da sessão ativa. */}
-      <MediaBroadcastModal sessionId={null} />
+          sessionId vem da rota /gameplay/[sessionId]; null cai em modo
+          local (BroadcastChannel) pra dev offline. */}
+      <MediaBroadcastModal sessionId={sessionId} />
       <MediaBroadcastOverlay />
 
       {/* Badge de identidade dev (apenas NODE_ENV=development) */}
