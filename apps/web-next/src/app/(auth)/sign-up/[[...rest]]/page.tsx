@@ -21,8 +21,8 @@ export default function SignUpPage() {
             formFieldLabel: "text-gray-300",
             formFieldInput: "bg-white/[0.04] border border-white/10 text-white",
             formButtonPrimary:
-              "bg-[#2D7FF9] hover:bg-[#2670e0] text-white",
-            footerActionLink: "text-[#2D7FF9] hover:text-[#5B9CFB]",
+              "bg-brand-accent hover:bg-brand-accent-hover text-white cursor-pointer",
+            footerActionLink: "text-brand-accent hover:text-brand-accent-hover",
           },
         }}
         routing="path"

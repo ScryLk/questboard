@@ -124,7 +124,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={!isLoaded || pending || !email || !password}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#2D7FF9] px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2670e0] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-accent px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-accent-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending ? (
               <>
@@ -216,7 +216,7 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className="w-full rounded-lg border border-white/10 bg-[#0D0D12] px-3 py-3 pl-10 text-sm text-white outline-none placeholder:text-brand-muted focus:border-[#2D7FF9]/60"
+        className="w-full rounded-lg border border-white/10 bg-[#0D0D12] px-3 py-3 pl-10 text-sm text-white outline-none placeholder:text-brand-muted focus:border-brand-accent/60"
       />
     </label>
   );
@@ -243,7 +243,7 @@ function OAuthButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={`Entrar com ${label}`}
-      className="flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] py-3 text-white transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] py-3 text-white transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
     </button>
