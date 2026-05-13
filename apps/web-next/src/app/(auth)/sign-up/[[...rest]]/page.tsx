@@ -34,6 +34,7 @@ export default function SignUpPage() {
   const [step, setStep] = useState<Step>("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<OAuthStrategy | null>(null);
@@ -42,6 +43,10 @@ export default function SignUpPage() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!isLoaded || pending) return;
+    if (password !== confirmPassword) {
+      setError("As senhas não conferem.");
+      return;
+    }
     setError(null);
     setPending(true);
     try {
@@ -221,6 +226,21 @@ export default function SignUpPage() {
           autoComplete="new-password"
           required
         />
+        <Field
+          icon={<Lock className="h-4 w-4" />}
+          type="password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          placeholder="repetir senha"
+          autoComplete="new-password"
+          required
+        />
+
+        {confirmPassword.length > 0 && password !== confirmPassword && (
+          <p className="text-[11px] text-rose-300">
+            As senhas não conferem.
+          </p>
+        )}
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-[11px] text-rose-300">
@@ -231,7 +251,11 @@ export default function SignUpPage() {
         <button
           type="submit"
           disabled={
-            !isLoaded || pending || !email || password.length < 8
+            !isLoaded ||
+            pending ||
+            !email ||
+            password.length < 8 ||
+            password !== confirmPassword
           }
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-accent px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
