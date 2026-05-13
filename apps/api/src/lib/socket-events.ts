@@ -281,6 +281,32 @@ export function emitMediaHide(p: MediaHidePayload): void {
   emitToSession(p.sessionId, "media:hide", p);
 }
 
+// ─── Chat ─────────────────────────────────────────────────────
+
+export interface ChatMessagePayload {
+  sessionId: string;
+  message: {
+    id: string;
+    userId: string;
+    channel: "GENERAL" | "IN_CHARACTER" | "WHISPER" | "GM_ONLY" | "GROUP";
+    contentType: string;
+    content: string;
+    characterName?: string | null;
+    characterAvatar?: string | null;
+    recipientIds: string[];
+    createdAt: string;
+    user: {
+      id: string;
+      displayName: string;
+      avatarUrl: string | null;
+    };
+  };
+}
+
+export function emitChatMessage(p: ChatMessagePayload): void {
+  emitToSession(p.sessionId, "chat:message", p);
+}
+
 // ─── XP / Level-up ───────────────────────────────────────────
 
 export interface CharacterXpChangedPayload {

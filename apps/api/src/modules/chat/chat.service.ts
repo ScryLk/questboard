@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
 import { roll as engineRoll } from "@questboard/game-engine";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../../errors/app-error.js";
-import { emitDiceResult } from "../../lib/socket-events.js";
+import { emitChatMessage, emitDiceResult } from "../../lib/socket-events.js";
 
 export function createChatService(prisma: PrismaClient) {
   return {
@@ -36,7 +36,7 @@ export function createChatService(prisma: PrismaClient) {
       contentType?: string; diceRequest?: Record<string, unknown>;
       diceResult?: Record<string, unknown>;
     }) {
-      return prisma.message.create({
+      const created = await prisma.message.create({
         data: {
           sessionId,
           userId,
@@ -54,6 +54,27 @@ export function createChatService(prisma: PrismaClient) {
           user: { select: { id: true, displayName: true, avatarUrl: true } },
         },
       });
+
+      // Broadcast pra sala da sessão. Frontend escuta `chat:message`
+      // e adiciona localmente (com dedup pelo `id` quando o emissor
+      // já fez optimistic update).
+      emitChatMessage({
+        sessionId,
+        message: {
+          id: created.id,
+          userId: created.userId,
+          channel: created.channel,
+          contentType: created.contentType,
+          content: created.content,
+          characterName: created.characterName,
+          characterAvatar: created.characterAvatar,
+          recipientIds: created.recipientIds,
+          createdAt: created.createdAt.toISOString(),
+          user: created.user,
+        },
+      });
+
+      return created;
     },
 
     async deleteMessage(sessionId: string, userId: string, messageId: string) {
