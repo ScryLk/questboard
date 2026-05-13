@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cinzel } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ptBR } from "@clerk/localizations";
+import { SettingsEffects } from "@/components/settings/settings-effects";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -42,6 +43,7 @@ export default function RootLayout({
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         </head>
         <body className={`${inter.variable} ${cinzel.variable} antialiased`}>
+          <SettingsEffects />
           {children}
         </body>
       </html>

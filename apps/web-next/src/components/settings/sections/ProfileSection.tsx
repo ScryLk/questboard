@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useSettingsStore } from "@/lib/settings-store";
 import { useProfileStore } from "@/stores/profileStore";
 import {
@@ -8,46 +9,181 @@ import {
   SettingsInput,
   SettingsRadio,
 } from "../controls";
-import { Camera, ChevronRight, ExternalLink, LogOut, Palette, Trash2 } from "lucide-react";
+import {
+  Camera,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  LogOut,
+  Palette,
+  Trash2,
+} from "lucide-react";
 import { CosmeticPreview } from "@/components/profile/cosmetic-preview";
 import { CosmeticSelectorModal } from "@/components/profile/cosmetic-selector-modal";
 import { HandleSection } from "./HandleSection";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { updateProfile as patchProfile, uploadAvatar } from "@/lib/profile-api";
+
+/** Debounce simples por chave — evita spam de PATCH quando o usuário
+ *  digita. */
+function useDebouncedSync<T>(
+  value: T,
+  onSync: (v: T) => Promise<void>,
+  delayMs = 800,
+) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const id = setTimeout(() => {
+      void onSync(value);
+    }, delayMs);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+}
 
 export function ProfileSection() {
   const { profile, updateProfile } = useSettingsStore();
   const publicProfile = useProfileStore((s) => s.profile);
   const openCosmeticSelector = useProfileStore((s) => s.openCosmeticSelector);
+  const { user } = useUser();
+  const clerk = useClerk();
+  const router = useRouter();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Hidrata email do Clerk uma vez (read-only — não editável aqui).
+  useEffect(() => {
+    if (user?.primaryEmailAddress?.emailAddress && !profile.email) {
+      updateProfile({ email: user.primaryEmailAddress.emailAddress });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  async function pushProfile(input: { displayName?: string; bio?: string }) {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      await patchProfile(input);
+    } catch (err) {
+      setSyncError(
+        (err as { message?: string }).message ?? "Falha ao salvar.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Sync displayName/bio debounced.
+  useDebouncedSync(profile.displayName, async (v) => {
+    if (v) await pushProfile({ displayName: v });
+  });
+  useDebouncedSync(profile.bio, async (v) => {
+    await pushProfile({ bio: v ?? "" });
+  });
+
+  async function handleAvatarFile(file: File) {
+    setUploadingAvatar(true);
+    setSyncError(null);
+    try {
+      const r = await uploadAvatar(file);
+      updateProfile({ avatar: r.avatarUrl });
+    } catch (err) {
+      setSyncError(
+        (err as { message?: string }).message ?? "Falha no upload.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function handleSignOut() {
+    await clerk.signOut(() => router.push("/login"));
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-heading text-xl font-bold text-white">Perfil e Conta</h2>
-        <p className="mt-1 text-sm text-gray-500">Gerencie suas informações pessoais e segurança.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-heading text-xl font-bold text-white">
+            Perfil e Conta
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Gerencie suas informações pessoais e segurança.
+          </p>
+        </div>
+        {syncing && (
+          <span className="flex items-center gap-1 text-[11px] text-brand-muted">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Salvando...
+          </span>
+        )}
+        {syncError && (
+          <span className="text-[11px] text-rose-300">{syncError}</span>
+        )}
       </div>
 
       <SettingsSection title="Foto de Perfil">
         <div className="flex items-center gap-4">
           <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-brand-accent/20 text-brand-accent">
             {profile.avatar ? (
-              <img src={profile.avatar} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatar}
+                alt="Avatar"
+                className="h-full w-full rounded-full object-cover"
+              />
             ) : (
               <Camera className="h-6 w-6" />
             )}
+            {uploadingAvatar && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
-            <button className="rounded-lg bg-brand-accent/10 px-3 py-1.5 text-sm text-brand-accent hover:bg-brand-accent/20">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleAvatarFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="cursor-pointer rounded-lg bg-brand-accent/10 px-3 py-1.5 text-sm text-brand-accent hover:bg-brand-accent/20 disabled:opacity-50"
+            >
               Alterar
             </button>
             {profile.avatar && (
               <button
+                type="button"
                 onClick={() => updateProfile({ avatar: null })}
-                className="rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-400 hover:bg-white/10"
+                disabled={uploadingAvatar}
+                className="cursor-pointer rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-400 hover:bg-white/10 disabled:opacity-50"
               >
                 Remover
               </button>
             )}
           </div>
         </div>
+        <p className="mt-2 text-[11px] text-brand-muted">
+          PNG, JPG ou WebP. Máx 5 MB.
+        </p>
       </SettingsSection>
 
       <HandleSection />
@@ -60,13 +196,30 @@ export function ProfileSection() {
           onChange={(v) => updateProfile({ displayName: v })}
           placeholder="Seu nome"
         />
-        <SettingsInput
-          label="Email"
-          value={profile.email}
-          onChange={(v) => updateProfile({ email: v })}
-          type="email"
-          placeholder="seu@email.com"
-        />
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-300">
+              Email
+            </span>
+            <input
+              type="email"
+              value={profile.email}
+              readOnly
+              className="w-full cursor-not-allowed rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-sm text-gray-500 outline-none"
+            />
+            <p className="mt-1 text-[11px] text-brand-muted">
+              Pra mudar o email, use{" "}
+              <button
+                type="button"
+                onClick={() => clerk.openUserProfile()}
+                className="cursor-pointer underline hover:text-white"
+              >
+                Gerenciar conta
+              </button>
+              .
+            </p>
+          </label>
+        </div>
         <SettingsInput
           label="Título / Bio"
           description="Aparece no seu perfil público."
@@ -112,8 +265,9 @@ export function ProfileSection() {
         />
         <div className="mt-3 flex items-center gap-3">
           <button
+            type="button"
             onClick={() => openCosmeticSelector("frame")}
-            className="flex items-center gap-2 rounded-lg bg-brand-accent/10 px-3 py-1.5 text-sm text-brand-accent hover:bg-brand-accent/20"
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-accent/10 px-3 py-1.5 text-sm text-brand-accent hover:bg-brand-accent/20"
           >
             <Palette className="h-4 w-4" />
             Personalizar
@@ -131,27 +285,60 @@ export function ProfileSection() {
       <CosmeticSelectorModal />
 
       <SettingsSection title="Segurança">
-        <ActionRow label="Alterar Senha" />
-        <ActionRow label="Autenticação em 2 fatores" badge="OFF" />
-        <ActionRow label="Sessões ativas" />
-        <button className="mt-2 w-full rounded-lg border border-brand-danger/20 bg-brand-danger/5 px-4 py-2.5 text-sm text-brand-danger hover:bg-brand-danger/10">
+        <ActionRow
+          label="Alterar Senha"
+          onClick={() => clerk.openUserProfile()}
+        />
+        <ActionRow
+          label="Autenticação em 2 fatores"
+          badge={user?.twoFactorEnabled ? "ON" : "OFF"}
+          onClick={() => clerk.openUserProfile()}
+        />
+        <ActionRow
+          label="Sessões ativas"
+          onClick={() => clerk.openUserProfile()}
+        />
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="mt-2 w-full cursor-pointer rounded-lg border border-brand-danger/20 bg-brand-danger/5 px-4 py-2.5 text-sm text-brand-danger hover:bg-brand-danger/10"
+        >
           <LogOut className="mr-2 inline-block h-4 w-4" />
-          Desconectar todos os dispositivos
+          Desconectar deste dispositivo
         </button>
       </SettingsSection>
 
       <SettingsSection title="Conta">
         <div className="flex items-center justify-between py-2">
           <div>
-            <span className="text-sm font-medium text-white">Plano atual: Gratuito</span>
-            <p className="mt-0.5 text-xs text-gray-500">Upgrade para desbloquear recursos premium.</p>
+            <span className="text-sm font-medium text-white">
+              Plano atual: Gratuito
+            </span>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Upgrade para desbloquear recursos premium.
+            </p>
           </div>
-          <button className="rounded-lg bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accent-hover">
+          <Link
+            href="/billing"
+            className="cursor-pointer rounded-lg bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accent-hover"
+          >
             Upgrade
-          </button>
+          </Link>
         </div>
         <div className="border-t border-white/5 pt-3">
-          <button className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-brand-danger hover:bg-brand-danger/5">
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                confirm(
+                  "Tem certeza? Sua conta será marcada pra remoção. Esta ação é irreversível.",
+                )
+              ) {
+                clerk.openUserProfile();
+              }
+            }}
+            className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-brand-danger hover:bg-brand-danger/5"
+          >
             <span className="flex items-center gap-2">
               <Trash2 className="h-4 w-4" />
               Excluir conta
@@ -164,13 +351,33 @@ export function ProfileSection() {
   );
 }
 
-function ActionRow({ label, badge }: { label: string; badge?: string }) {
+function ActionRow({
+  label,
+  badge,
+  onClick,
+}: {
+  label: string;
+  badge?: string;
+  onClick?: () => void;
+}) {
   return (
-    <button className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm text-white hover:bg-white/5">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm text-white hover:bg-white/5"
+    >
       <span>{label}</span>
       <div className="flex items-center gap-2">
         {badge && (
-          <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-gray-400">{badge}</span>
+          <span
+            className={`rounded px-2 py-0.5 text-xs ${
+              badge === "ON"
+                ? "bg-emerald-500/10 text-emerald-300"
+                : "bg-white/10 text-gray-400"
+            }`}
+          >
+            {badge}
+          </span>
         )}
         <ChevronRight className="h-4 w-4 text-gray-500" />
       </div>

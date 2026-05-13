@@ -60,15 +60,22 @@ export async function apiRequest<T>(
   const url = `${baseUrl}${API_PREFIX}${path}`;
   const token = await (opts.getToken ?? defaultGetToken)();
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  // FormData precisa ir cru — sem Content-Type (browser seta com boundary)
+  // nem JSON.stringify. Body de objeto regular vira JSON.
+  const isFormData =
+    typeof FormData !== "undefined" && opts.body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (!isFormData) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(url, {
     method: opts.method ?? "GET",
     headers,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    body: opts.body
+      ? isFormData
+        ? (opts.body as BodyInit)
+        : JSON.stringify(opts.body)
+      : undefined,
     signal: opts.signal,
   });
 
