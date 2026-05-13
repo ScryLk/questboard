@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
 import { NotFoundError, ForbiddenError } from "../../errors/app-error.js";
 import { PLAN_LIMITS } from "../../config/plan-limits.js";
+import { invalidateCampaignDashboardCache } from "../campaign/dashboard.service.js";
 
 type PlanKey = keyof typeof PLAN_LIMITS;
 
@@ -34,7 +35,7 @@ export function createCharacterService(prisma: PrismaClient) {
         }
       }
 
-      return prisma.character.create({
+      const created = await prisma.character.create({
         data: {
           userId,
           name: input.name,
@@ -47,6 +48,11 @@ export function createCharacterService(prisma: PrismaClient) {
           attributes: (input.attributes ?? {}) as unknown as object,
         },
       });
+      if (created.campaignId) {
+        // Afeta totals.averagePlayerLevel + gmPanel.npcsCreated.
+        void invalidateCampaignDashboardCache(created.campaignId);
+      }
+      return created;
     },
 
     async update(characterId: string, userId: string, input: Record<string, unknown>) {
@@ -54,7 +60,12 @@ export function createCharacterService(prisma: PrismaClient) {
       if (!character) throw new NotFoundError("Character");
       if (character.userId !== userId) throw new ForbiddenError("Sem permissão");
 
-      return prisma.character.update({ where: { id: characterId }, data: input as unknown as object });
+      const updated = await prisma.character.update({ where: { id: characterId }, data: input as unknown as object });
+      // Se o usuário mudou level/currentXp via update genérico, refletir.
+      if (updated.campaignId && ("level" in input || "currentXp" in input)) {
+        void invalidateCampaignDashboardCache(updated.campaignId);
+      }
+      return updated;
     },
 
     async delete(characterId: string, userId: string) {
@@ -62,7 +73,11 @@ export function createCharacterService(prisma: PrismaClient) {
       if (!character) throw new NotFoundError("Character");
       if (character.userId !== userId) throw new ForbiddenError("Sem permissão");
 
-      return prisma.character.update({ where: { id: characterId }, data: { deletedAt: new Date() } });
+      const updated = await prisma.character.update({ where: { id: characterId }, data: { deletedAt: new Date() } });
+      if (updated.campaignId) {
+        void invalidateCampaignDashboardCache(updated.campaignId);
+      }
+      return updated;
     },
 
     async updateResources(characterId: string, userId: string, resources: Record<string, unknown>) {

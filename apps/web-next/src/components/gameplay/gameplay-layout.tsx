@@ -49,6 +49,7 @@ import { useCharacterStore } from "@/stores/characterStore";
 import { MediaBroadcastModal } from "./modals/media-broadcast-modal";
 import { MediaBroadcastOverlay } from "./media-broadcast-overlay";
 import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
+import { LevelUpToast } from "@/components/character/level-up-toast";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 import { useParams } from "next/navigation";
 
@@ -301,6 +302,10 @@ export function GameplayLayout() {
           local (BroadcastChannel) pra dev offline. */}
       <MediaBroadcastModal sessionId={sessionId} />
       <MediaBroadcastOverlay />
+
+      {/* Toast de level-up — escuta socket; aparece pro dono do
+          personagem quando o XP cruzar threshold. */}
+      <LevelUpToast />
 
       {/* Badge de identidade dev (apenas NODE_ENV=development) */}
       <DevIdentityBadge />

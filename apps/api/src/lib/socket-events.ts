@@ -280,3 +280,23 @@ export interface MediaHidePayload {
 export function emitMediaHide(p: MediaHidePayload): void {
   emitToSession(p.sessionId, "media:hide", p);
 }
+
+// ─── XP / Level-up ───────────────────────────────────────────
+
+export interface CharacterXpChangedPayload {
+  sessionId: string;
+  characterId: string;
+  ownerUserId: string;
+  delta: number;
+  newXp: number;
+  newLevel: number;
+  leveledUp: boolean;
+  by: string;
+  at: string;
+}
+
+/** Emite quando GM ajusta XP de um personagem. Frontend usa pra mostrar
+ *  toast de XP/level-up se `ownerUserId === current user`. */
+export function emitCharacterXpChanged(p: CharacterXpChangedPayload): void {
+  emitToSession(p.sessionId, "character:xp-changed", p);
+}

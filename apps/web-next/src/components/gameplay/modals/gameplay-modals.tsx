@@ -1,5 +1,6 @@
 "use client";
 
+import { useParams } from "next/navigation";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { CreateSceneModal } from "./create-scene-modal";
 import { SceneCardBuilderModal } from "./scene-card-builder-modal";
@@ -21,6 +22,8 @@ import { CharacterEditorModal } from "./character-editor/character-editor-modal"
 export function GameplayModals() {
   const activeModal = useGameplayStore((s) => s.activeModal);
   const closeModal = useGameplayStore((s) => s.closeModal);
+  const params = useParams<{ sessionId?: string }>();
+  const sessionId = params?.sessionId ?? null;
 
   if (!activeModal) return null;
 
@@ -36,7 +39,7 @@ export function GameplayModals() {
     case "startCombat":
       return <StartCombatModal onClose={closeModal} />;
     case "endSession":
-      return <EndSessionModal onClose={closeModal} />;
+      return <EndSessionModal onClose={closeModal} sessionId={sessionId} />;
     case "shareSession":
       return <ShareSessionModal onClose={closeModal} />;
     case "invitePlayers":

@@ -21,6 +21,7 @@ import { RadialMenu } from "@/components/shared/radial-menu";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
+import { LevelUpToast } from "@/components/character/level-up-toast";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -153,6 +154,9 @@ export function PlayerViewLayout() {
 
       {/* Mídia broadcast — GM exibe vídeo pra todos */}
       <MediaBroadcastOverlay />
+
+      {/* Toast de level-up — socket bridge */}
+      <LevelUpToast />
     </div>
   );
 }

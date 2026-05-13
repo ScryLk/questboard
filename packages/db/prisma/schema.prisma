@@ -730,9 +730,35 @@ model Character {
   sessionPlayers SessionPlayer[]
   tokens         Token[]
   worldEntities  WorldEntity[]      @relation("WorldNpc")
+  xpAwards       XpAward[]
 
   @@index([userId])
   @@index([campaignId])
+}
+
+// ─── XP Award (audit trail) ──────────────────────────────
+//
+// Cada concessão/subtração de XP gera uma linha aqui. Histórico fica
+// visível pro jogador na ficha; GM pode auditar. Soft-delete não
+// existe — mexer em XP é raro o suficiente pra preservar tudo.
+
+model XpAward {
+  id          String @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  /// Quem deu (GM ou CO_GM). Não usa relation explícita pra permitir
+  /// que o usuário seja deletado sem perder o histórico.
+  awardedById String
+  /// Sessão associada (se foi lump sum no fim de sessão). Null = ajuste manual.
+  sessionId   String?
+  /// Pode ser negativo (subtração com motivo).
+  delta       Int
+  /// Obrigatório quando delta < 0; livre quando >= 0.
+  reason      String? @db.VarChar(500)
+  createdAt   DateTime @default(now())
+
+  @@index([characterId, createdAt])
+  @@index([sessionId])
 }
 
 // ─── NPC Dialogue (modo SCRIPTED) ────────────────────────
