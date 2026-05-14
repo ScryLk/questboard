@@ -1,12 +1,11 @@
 "use client";
 
 import { Target, ExternalLink } from "lucide-react";
+import { useParams } from "next/navigation";
 import { useGameplayStore } from "@/lib/gameplay-store";
-import {
-  MOCK_PLAYERS,
-  getAlignmentColor,
-} from "@/lib/gameplay-mock-data";
+import { getAlignmentColor } from "@/lib/gameplay-mock-data";
 import type { GameToken } from "@/lib/gameplay-mock-data";
+import { useSessionPlayers } from "@/hooks/use-session-players";
 import { HealthBlock } from "./blocks/health-block";
 import { DefenseBlock } from "./blocks/defense-block";
 import { ConditionsBlock } from "./blocks/conditions-block";
@@ -38,6 +37,10 @@ export function TargetPanel() {
   );
   const openModal = useGameplayStore((s) => s.openModal);
 
+  const routeParams = useParams<{ sessionId?: string }>();
+  const sessionId = routeParams?.sessionId ?? null;
+  const { players: sessionPlayers } = useSessionPlayers(sessionId);
+
   const token: GameToken | undefined =
     selectedTokenIds.length > 0
       ? tokens.find((t) => t.id === selectedTokenIds[0])
@@ -46,7 +49,15 @@ export function TargetPanel() {
   if (!token) return <EmptyState />;
 
   const player = token.playerId
-    ? MOCK_PLAYERS.find((p) => p.id === token.playerId)
+    ? sessionPlayers.find((p) => p.userId === token.playerId)
+    : undefined;
+  const playerInitials = player
+    ? player.user.displayName
+        .split(" ")
+        .map((s) => s[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
     : undefined;
   const isNpc = !token.playerId;
   const isMyPc =
@@ -83,7 +94,7 @@ export function TargetPanel() {
             color: borderColor,
           }}
         >
-          {player?.avatarInitials ?? token.name.slice(0, 2).toUpperCase()}
+          {playerInitials ?? token.name.slice(0, 2).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-brand-text">
@@ -91,7 +102,7 @@ export function TargetPanel() {
           </p>
           <p className="text-[11px] text-brand-muted">
             {typeLabel} · {alignmentLabel}
-            {player && ` · ${player.class} Nv. ${player.level}`}
+            {player && ` · ${player.user.displayName}`}
           </p>
           {/* Dica de atribuição — só GM vendo NPC sem dono. */}
           {currentUserIsGM && isNpc && (

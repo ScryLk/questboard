@@ -27,9 +27,10 @@ import type {
 } from "@/lib/gameplay-mock-data";
 import {
   ALL_CONDITIONS,
-  MOCK_PLAYERS,
   getAlignmentColor,
 } from "@/lib/gameplay-mock-data";
+import { useParams } from "next/navigation";
+import { useSessionPlayers } from "@/hooks/use-session-players";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useActionFeedStore } from "@/lib/action-feed-store";
 import { useCombatStore } from "@/lib/combat-store";
@@ -82,6 +83,15 @@ export function TokenContextMenu({
   const [submenu, setSubmenu] = useState<Submenu>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showWhisper, setShowWhisper] = useState(false);
+
+  // Lista de players reais da sessão (PLAYER role only — GM/CO_GM
+  // não são "donos" de tokens; viram NPCs do mestre).
+  const routeParams = useParams<{ sessionId?: string }>();
+  const sessionId = routeParams?.sessionId ?? null;
+  const { players: sessionPlayers } = useSessionPlayers(sessionId);
+  const eligiblePlayers = sessionPlayers.filter(
+    (p) => p.role === "PLAYER",
+  );
 
   // Fechar flyout com delay pra permitir deslocamento diagonal do mouse
   // até ele. Sem isso, hover em itens no caminho dispara setSubmenu(null)
@@ -502,7 +512,7 @@ export function TokenContextMenu({
               icon={UserCheck}
               label={
                 token.playerId
-                  ? `Dono: ${MOCK_PLAYERS.find((p) => p.id === token.playerId)?.name ?? token.playerId}`
+                  ? `Dono: ${eligiblePlayers.find((p) => p.userId === token.playerId)?.user.displayName ?? token.playerId}`
                   : "Atribuir a jogador"
               }
               hasSubmenu
@@ -705,35 +715,44 @@ export function TokenContextMenu({
               <span className="flex-1">Nenhum (NPC)</span>
             </button>
             <div className="mx-2 my-1 h-px bg-brand-border/50" />
-            {MOCK_PLAYERS.length === 0 ? (
+            {eligiblePlayers.length === 0 ? (
               <div className="px-3 py-2 text-[10px] text-brand-muted/70">
                 Nenhum jogador na sessão. Convide antes.
               </div>
             ) : (
-              MOCK_PLAYERS.map((p) => {
-                const active = token.playerId === p.id;
+              eligiblePlayers.map((p) => {
+                const active = token.playerId === p.userId;
+                const initials = p.user.displayName
+                  .split(" ")
+                  .map((s) => s[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase();
                 return (
                   <button
-                    key={p.id}
+                    key={p.userId}
                     onClick={() => {
-                      setTokenPlayerId(token.id, p.id);
+                      setTokenPlayerId(token.id, p.userId);
                       onClose();
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs text-brand-text hover:bg-white/[0.05]"
                   >
-                    <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
-                      style={{
-                        backgroundColor: p.color + "30",
-                        color: p.color,
-                      }}
-                    >
-                      {p.avatarInitials}
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-accent/20 text-[9px] font-bold text-brand-accent">
+                      {p.user.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.user.avatarUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials
+                      )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">{p.name}</span>
+                      <span className="block truncate">{p.user.displayName}</span>
                       <span className="block truncate text-[10px] text-brand-muted">
-                        {p.class} · Nv. {p.level}
+                        Jogador
                       </span>
                     </span>
                     {active && (
