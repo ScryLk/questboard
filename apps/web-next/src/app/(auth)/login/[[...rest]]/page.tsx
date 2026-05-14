@@ -7,7 +7,7 @@
 // (factor-one, sso-callback, etc).
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { useSignIn } from "@clerk/nextjs/legacy";
@@ -22,11 +22,22 @@ import {
 } from "../../_components/auth-shell";
 
 const OAUTH_REDIRECT = "/login/sso-callback";
-const SUCCESS_REDIRECT = "/dashboard";
+const DEFAULT_REDIRECT = "/dashboard";
+
+/** Whitelist de prefixos pra `redirect_url` — evita open redirect. */
+function safeRedirectUrl(raw: string | null): string {
+  if (!raw) return DEFAULT_REDIRECT;
+  // Apenas paths internos (começam com "/" e não com "//"
+  // pra rejeitar protocol-relative URLs).
+  if (!raw.startsWith("/") || raw.startsWith("//")) return DEFAULT_REDIRECT;
+  return raw;
+}
 
 export default function LoginPage() {
   const { isLoaded, signIn, setActive } = useSignIn();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const successRedirect = safeRedirectUrl(searchParams.get("redirect_url"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +57,7 @@ export default function LoginPage() {
       });
       if (attempt.status === "complete") {
         await setActive({ session: attempt.createdSessionId });
-        router.push(SUCCESS_REDIRECT);
+        router.push(successRedirect);
       } else {
         setError("Verificação adicional necessária. Tente novamente.");
       }
@@ -68,7 +79,7 @@ export default function LoginPage() {
       await signIn.authenticateWithRedirect({
         strategy,
         redirectUrl: OAUTH_REDIRECT,
-        redirectUrlComplete: SUCCESS_REDIRECT,
+        redirectUrlComplete: successRedirect,
       });
     } catch (err) {
       const message =
@@ -87,7 +98,11 @@ export default function LoginPage() {
       <p className="mt-2 text-center text-sm text-brand-muted">
         Ainda não tem conta?{" "}
         <Link
-          href="/sign-up"
+          href={
+            successRedirect === DEFAULT_REDIRECT
+              ? "/sign-up"
+              : `/sign-up?redirect_url=${encodeURIComponent(successRedirect)}`
+          }
           className="font-medium text-white hover:text-brand-accent"
         >
           Cadastrar

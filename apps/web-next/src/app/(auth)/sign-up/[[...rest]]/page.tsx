@@ -8,7 +8,7 @@
 // `[[...rest]]` catch-all pra Clerk rotear sub-fluxos.
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, KeyRound, Loader2, Lock, Mail } from "lucide-react";
 import { useSignUp } from "@clerk/nextjs/legacy";
@@ -23,13 +23,22 @@ import {
 } from "../../_components/auth-shell";
 
 const OAUTH_REDIRECT = "/login/sso-callback";
-const SUCCESS_REDIRECT = "/dashboard";
+const DEFAULT_REDIRECT = "/dashboard";
+
+/** Whitelist anti open-redirect: aceita só paths internos. */
+function safeRedirectUrl(raw: string | null): string {
+  if (!raw) return DEFAULT_REDIRECT;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return DEFAULT_REDIRECT;
+  return raw;
+}
 
 type Step = "form" | "verify";
 
 export default function SignUpPage() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const successRedirect = safeRedirectUrl(searchParams.get("redirect_url"));
 
   const [step, setStep] = useState<Step>("form");
   const [email, setEmail] = useState("");
@@ -75,7 +84,7 @@ export default function SignUpPage() {
       const attempt = await signUp.attemptEmailAddressVerification({ code });
       if (attempt.status === "complete") {
         await setActive({ session: attempt.createdSessionId });
-        router.push(SUCCESS_REDIRECT);
+        router.push(successRedirect);
       } else {
         setError("Código inválido. Tente novamente.");
       }
@@ -97,7 +106,7 @@ export default function SignUpPage() {
       await signUp.authenticateWithRedirect({
         strategy,
         redirectUrl: OAUTH_REDIRECT,
-        redirectUrlComplete: SUCCESS_REDIRECT,
+        redirectUrlComplete: successRedirect,
       });
     } catch (err) {
       const message =

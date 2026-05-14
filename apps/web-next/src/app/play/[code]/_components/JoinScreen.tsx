@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, Loader2, Plus, Swords, Wand2 } from "lucide-react";
+import { Brain, Loader2, LogIn, Plus, Swords, Wand2 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import {
   usePlayerViewStore,
   type LobbyCharacter,
@@ -56,6 +57,7 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createdId = searchParams.get("createdId");
+  const { isSignedIn, isLoaded } = useUser();
 
   const [name, setName] = useState("");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(
@@ -115,6 +117,19 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
 
   const handleJoin = async () => {
     if (!name.trim() || !selectedCharacterId || !campaignSystem) return;
+
+    // Sem login → redireciona pro login com returnUrl pra voltar pra
+    // essa mesma tela. Após login, Clerk traz o usuário de volta.
+    if (isLoaded && !isSignedIn) {
+      const returnUrl = encodeURIComponent(
+        typeof window !== "undefined"
+          ? window.location.pathname + window.location.search
+          : `/play/${sessionCode}`,
+      );
+      router.push(`/login?redirect_url=${returnUrl}`);
+      return;
+    }
+
     setJoining(true);
     setJoinError(null);
 
@@ -126,13 +141,21 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
       setBackendSessionId(result.sessionId);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
+      if (status === 401) {
+        // Token expirou enquanto preenchia o form — mesma rota: login.
+        const returnUrl = encodeURIComponent(
+          typeof window !== "undefined"
+            ? window.location.pathname + window.location.search
+            : `/play/${sessionCode}`,
+        );
+        router.push(`/login?redirect_url=${returnUrl}`);
+        return;
+      }
       setJoinError(
-        status === 401
-          ? "Faça login pra entrar nessa sessão."
-          : status === 404
-            ? "Sessão não encontrada — verifique o código."
-            : (err as { message?: string }).message ??
-              "Não foi possível entrar na sessão.",
+        status === 404
+          ? "Sessão não encontrada — verifique o código."
+          : (err as { message?: string }).message ??
+            "Não foi possível entrar na sessão.",
       );
       setJoining(false);
       return;
@@ -307,19 +330,31 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
         )}
       </div>
 
-      {/* Join button */}
+      {/* Join button — texto/ícone muda quando precisa de login */}
       <button
         type="button"
         onClick={handleJoin}
         disabled={!canJoin}
-        className="mt-8 w-full max-w-sm rounded-xl bg-brand-accent py-4 text-base font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
+        className="mt-8 flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-brand-accent py-4 text-base font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
       >
         {joining ? (
-          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : isLoaded && !isSignedIn ? (
+          <>
+            <LogIn className="h-5 w-5" />
+            Fazer login pra entrar
+          </>
         ) : (
           "Entrar na Mesa"
         )}
       </button>
+
+      {isLoaded && !isSignedIn && (
+        <p className="mt-3 max-w-sm text-center text-xs text-white/40">
+          Você precisa de uma conta pra entrar na mesa. Volta automático
+          após login.
+        </p>
+      )}
 
       {joinError && (
         <p className="mt-3 max-w-sm text-center text-xs text-rose-300">
