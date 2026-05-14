@@ -19,14 +19,24 @@ let socket: Socket | null = null;
 
 async function defaultGetToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const clerk = (window as unknown as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } })
-    .Clerk;
-  if (clerk?.session?.getToken) {
-    try {
-      return (await clerk.session.getToken()) ?? null;
-    } catch {
-      return null;
+  type ClerkLike = {
+    loaded?: boolean;
+    session?: { getToken?: () => Promise<string | null> };
+  };
+  const win = window as unknown as { Clerk?: ClerkLike };
+  // Polling até 3s — handshake do socket pode disparar antes do
+  // ClerkProvider terminar de montar, especialmente em hot-reload.
+  for (let i = 0; i < 30; i++) {
+    const clerk = win.Clerk;
+    if (clerk?.loaded && clerk.session?.getToken) {
+      try {
+        return (await clerk.session.getToken()) ?? null;
+      } catch {
+        return null;
+      }
     }
+    if (clerk?.loaded && !clerk.session) return null;
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return null;
 }

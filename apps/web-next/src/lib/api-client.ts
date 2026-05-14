@@ -24,18 +24,34 @@ export interface ApiError {
 }
 
 /** Retorna o token Bearer atual. Em browser: leitura do Clerk session
- *  (window.Clerk?.session?.getToken). Quando ausente, retorna null —
- *  endpoints públicos seguem funcionando. */
+ *  (window.Clerk?.session?.getToken). Espera até 3s pelo Clerk
+ *  inicializar — evita o race em que hooks disparam fetch antes do
+ *  ClerkProvider montar. Quando expira, retorna null e endpoints
+ *  públicos seguem funcionando. */
 async function defaultGetToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const clerk = (window as unknown as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } })
-    .Clerk;
-  if (clerk?.session?.getToken) {
-    try {
-      return (await clerk.session.getToken()) ?? null;
-    } catch {
-      return null;
+
+  type ClerkLike = {
+    loaded?: boolean;
+    session?: { getToken?: () => Promise<string | null> };
+  };
+
+  const win = window as unknown as { Clerk?: ClerkLike };
+
+  // Polling curto: até 30 tentativas de 100ms (3s total) esperando
+  // o Clerk carregar.
+  for (let i = 0; i < 30; i++) {
+    const clerk = win.Clerk;
+    if (clerk?.loaded && clerk.session?.getToken) {
+      try {
+        return (await clerk.session.getToken()) ?? null;
+      } catch {
+        return null;
+      }
     }
+    // Sem session = usuário não logado; não adianta esperar.
+    if (clerk?.loaded && !clerk.session) return null;
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return null;
 }
