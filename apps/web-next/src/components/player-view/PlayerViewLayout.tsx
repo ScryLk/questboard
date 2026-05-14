@@ -21,6 +21,7 @@ import { RadialMenu } from "@/components/shared/radial-menu";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
+import { usePlayerTokensBridge } from "@/hooks/use-player-tokens-bridge";
 import { LevelUpToast } from "@/components/character/level-up-toast";
 
 export function PlayerViewLayout() {
@@ -35,6 +36,11 @@ export function PlayerViewLayout() {
 
   // Socket bridge: liga media:show/hide à store quando há backend.
   useMediaSocketBridge(backendSessionId);
+
+  // Backend tokens → playerViewStore.myToken/visibleTokens. Sem isso,
+  // o overlay "Sem personagem atribuído" fica eterno mesmo após o
+  // backend ter criado o Token do char no join.
+  usePlayerTokensBridge(backendSessionId);
 
   // Transition to end screen when session ends
   useEffect(() => {
