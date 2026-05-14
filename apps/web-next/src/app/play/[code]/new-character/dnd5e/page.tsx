@@ -22,6 +22,8 @@ import { Step8Spells } from "@/components/character-wizard/step-8-spells";
 import { Step9Details } from "@/components/character-wizard/step-9-details";
 import { Step10Review } from "@/components/character-wizard/step-10-review";
 import { PlayAuthGate } from "../../_components/PlayAuthGate";
+import { syncCharacterToBackend } from "@/lib/character-sync";
+import { useCharacterStore } from "@/stores/characterStore";
 
 export default function PlayerDnd5eWizardPage() {
   const router = useRouter();
@@ -76,7 +78,21 @@ export default function PlayerDnd5eWizardPage() {
         {step === 10 && (
           <Step10Review
             campaignIdOverride={playCampaignId}
-            onFinish={(newId) => {
+            onFinish={async (newId) => {
+              // Sync silencioso pro backend — falha não bloqueia o
+              // fluxo (player ainda pode entrar sem token).
+              if (newId) {
+                const local = useCharacterStore
+                  .getState()
+                  .characters.find((c) => c.id === newId);
+                if (local) {
+                  try {
+                    await syncCharacterToBackend(local, code);
+                  } catch (err) {
+                    console.warn("[char-sync]", err);
+                  }
+                }
+              }
               const dest = newId
                 ? `${returnTo}?createdId=${newId}`
                 : returnTo;

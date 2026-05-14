@@ -52,6 +52,7 @@ import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
 import { LevelUpToast } from "@/components/character/level-up-toast";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 import { useParams } from "next/navigation";
+import { useTokensBridge } from "@/hooks/use-tokens-bridge";
 
 
 export function GameplayLayout() {
@@ -68,6 +69,11 @@ export function GameplayLayout() {
   const routeParams = useParams<{ sessionId?: string }>();
   const sessionId = routeParams?.sessionId ?? null;
   useMediaSocketBridge(sessionId);
+
+  // Backend tokens → useGameplayStore (canvas Pixi lê do store).
+  // Em sessão real: lista da mapa ativa + socket live updates.
+  // Sem sessionId: noop, store fica com mock local.
+  useTokensBridge(sessionId);
 
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);

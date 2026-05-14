@@ -24,15 +24,19 @@ export interface JoinResult {
 }
 
 /** Junta-se a uma sessão via inviteCode. Backend cria SessionPlayer
- *  e dispara socket `session:player-joined`. Aceita 409 como sucesso
- *  (já é membro). */
-export async function joinSessionByCode(inviteCode: string): Promise<JoinResult> {
+ *  + Token na mapa ativa pra o character (se passado). Dispara
+ *  sockets `session:player-joined` e `token:added`. Aceita 409 como
+ *  sucesso (já é membro). */
+export async function joinSessionByCode(
+  inviteCode: string,
+  characterId?: string,
+): Promise<JoinResult> {
   try {
     // /sessions/:id/join — controller na verdade usa inviteCode do body
     // e ignora o param. Passamos "join" como placeholder.
     const result = await apiRequest<{ sessionId: string }>(
       `/sessions/join/join`,
-      { method: "POST", body: { inviteCode } },
+      { method: "POST", body: { inviteCode, characterId } },
     );
     return { sessionId: result.sessionId, alreadyMember: false };
   } catch (err) {

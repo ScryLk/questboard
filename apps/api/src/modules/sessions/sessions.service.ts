@@ -7,6 +7,7 @@ import {
   emitSessionStatusChanged,
   emitSessionSettingsUpdated,
   emitSessionPlayerJoined,
+  emitTokenAdded,
 } from "../../lib/socket-events.js";
 import { invalidateCampaignDashboardCache } from "../campaign/dashboard.service.js";
 
@@ -73,6 +74,23 @@ export function createSessionsService(prisma: PrismaClient) {
         },
       });
 
+      // Mapa default — toda sessão precisa de pelo menos um mapa pra
+      // colocar tokens quando players entrarem. GM customiza depois.
+      await prisma.map.create({
+        data: {
+          sessionId: created.id,
+          creatorId: userId,
+          name: "Mesa principal",
+          width: 1280,
+          height: 1280,
+          gridType: "SQUARE",
+          gridSize: 64,
+          gridCols: 20,
+          gridRows: 20,
+          isActive: true,
+        },
+      });
+
       // Próxima sessão / contadores no dashboard mudaram.
       if (created.campaignId) {
         void invalidateCampaignDashboardCache(created.campaignId);
@@ -113,7 +131,11 @@ export function createSessionsService(prisma: PrismaClient) {
       return prisma.session.delete({ where: { id: sessionId } });
     },
 
-    async join(inviteCode: string, userId: string) {
+    async join(
+      inviteCode: string,
+      userId: string,
+      opts: { characterId?: string } = {},
+    ) {
       const session = await prisma.session.findUnique({
         where: { inviteCode },
         select: { id: true, maxPlayers: true, _count: { select: { players: true } } },
@@ -129,11 +151,23 @@ export function createSessionsService(prisma: PrismaClient) {
       });
       if (existing) throw new ConflictError("Já está na sessão");
 
+      // Valida que o character (se passado) pertence ao usuário.
+      let character: { id: string; name: string; avatarUrl: string | null } | null = null;
+      if (opts.characterId) {
+        const c = await prisma.character.findFirst({
+          where: { id: opts.characterId, userId, deletedAt: null },
+          select: { id: true, name: true, avatarUrl: true },
+        });
+        if (c) character = c;
+        // Se não existe ou não é dele, ignora (não trava o join).
+      }
+
       const created = await prisma.sessionPlayer.create({
         data: {
           userId,
           sessionId: session.id,
           role: "PLAYER",
+          characterId: character?.id,
         },
         include: {
           user: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -150,6 +184,53 @@ export function createSessionsService(prisma: PrismaClient) {
           user: created.user,
         },
       });
+
+      // Cria Token no mapa ativo da sessão pra o personagem do player.
+      // GM pode reposicionar/customizar; daqui pra frente o token é
+      // a "presença" do personagem na mesa.
+      if (character) {
+        const activeMap = await prisma.map.findFirst({
+          where: { sessionId: session.id, isActive: true, deletedAt: null },
+          select: { id: true },
+        });
+        if (activeMap) {
+          const initials = character.name
+            .split(" ")
+            .map((p) => p[0])
+            .join("")
+            .slice(0, 3)
+            .toUpperCase();
+          const token = await prisma.token.create({
+            data: {
+              mapId: activeMap.id,
+              characterId: character.id,
+              ownerId: userId,
+              label: character.name,
+              initials,
+              imageUrl: character.avatarUrl,
+              x: 0,
+              y: 0,
+              size: 1,
+            },
+          });
+          emitTokenAdded({
+            sessionId: session.id,
+            token: {
+              id: token.id,
+              mapId: token.mapId,
+              characterId: token.characterId,
+              ownerId: token.ownerId,
+              label: token.label,
+              initials: token.initials,
+              imageUrl: token.imageUrl,
+              color: token.color,
+              x: token.x,
+              y: token.y,
+              size: token.size,
+            },
+          });
+        }
+      }
 
       return created;
     },

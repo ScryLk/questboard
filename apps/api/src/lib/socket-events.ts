@@ -300,6 +300,51 @@ export function emitSessionPlayerJoined(p: SessionPlayerJoinedPayload): void {
   emitToSession(p.sessionId, "session:player-joined", p);
 }
 
+// ─── Tokens ────────────────────────────────────────────────────
+
+export interface TokenAddedPayload {
+  sessionId: string;
+  token: {
+    id: string;
+    mapId: string;
+    characterId: string | null;
+    ownerId: string | null;
+    label: string | null;
+    initials: string | null;
+    imageUrl: string | null;
+    color: string;
+    x: number;
+    y: number;
+    size: number;
+  };
+}
+
+export function emitTokenAdded(p: TokenAddedPayload): void {
+  emitToSession(p.sessionId, "token:added", p);
+}
+
+export interface TokenMovedPayload {
+  sessionId: string;
+  tokenId: string;
+  x: number;
+  y: number;
+  by: string;
+  at: string;
+}
+
+export function emitTokenMoved(p: TokenMovedPayload): void {
+  emitToSession(p.sessionId, "token:moved", p);
+}
+
+export interface TokenRemovedPayload {
+  sessionId: string;
+  tokenId: string;
+}
+
+export function emitTokenRemoved(p: TokenRemovedPayload): void {
+  emitToSession(p.sessionId, "token:removed", p);
+}
+
 // ─── Chat ─────────────────────────────────────────────────────
 
 export interface ChatMessagePayload {

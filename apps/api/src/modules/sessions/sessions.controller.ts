@@ -59,7 +59,9 @@ export function createSessionsController(sessionsService: SessionsService) {
       reply: FastifyReply,
     ) {
       const input = joinSessionSchema.parse(request.body);
-      const player = await sessionsService.join(input.inviteCode, getUserId(request));
+      const player = await sessionsService.join(input.inviteCode, getUserId(request), {
+        characterId: input.characterId,
+      });
       return reply.status(201).send(createSuccessResponse(player));
     },
 

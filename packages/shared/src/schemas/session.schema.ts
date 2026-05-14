@@ -15,6 +15,9 @@ export const updateSessionSchema = createSessionSchema.partial();
 
 export const joinSessionSchema = z.object({
   inviteCode: z.string().min(1),
+  /** Personagem que o player vai usar nesta sessão. Backend valida
+   *  que pertence ao usuário e cria Token na mapa ativa. */
+  characterId: z.string().optional(),
 });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;

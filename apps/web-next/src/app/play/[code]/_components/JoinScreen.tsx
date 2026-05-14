@@ -12,6 +12,10 @@ import {
 import { useCharacterStore } from "@/stores/characterStore";
 import type { CampaignCharacter } from "@/types/character";
 import { joinSessionByCode } from "@/lib/session-players-api";
+import {
+  getBackendCharacterId,
+  syncCharacterToBackend,
+} from "@/lib/character-sync";
 
 // Lista vazia por default — player vê empty state com botão "Criar
 // personagem novo". Backend (apps/api/src/modules/sessions/players)
@@ -133,11 +137,30 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     setJoining(true);
     setJoinError(null);
 
+    // Resolve backend characterId — se ainda não foi sincado (caso o
+    // personagem foi criado antes desse PR), sincroniza agora.
+    let backendCharId: string | undefined;
     try {
-      // Backend cria SessionPlayer + emite socket pra GM ver a entrada.
+      const cached = getBackendCharacterId(selectedCharacterId);
+      if (cached) {
+        backendCharId = cached;
+      } else {
+        const local = myCharacters.find((c) => c.id === selectedCharacterId);
+        if (local) {
+          backendCharId = await syncCharacterToBackend(local, sessionCode);
+        }
+      }
+    } catch (err) {
+      // Sync falhou — player ainda entra na sessão, mas sem token no canvas.
+      console.warn("[join] char sync falhou:", err);
+    }
+
+    try {
+      // Backend cria SessionPlayer + Token (se characterId presente)
+      // + emite sockets pra GM ver entrada e token no canvas.
       // 409 ("já é membro") é tratado como sucesso pelo helper —
       // cobre o caso GM testando o player view em outra aba.
-      const result = await joinSessionByCode(sessionCode);
+      const result = await joinSessionByCode(sessionCode, backendCharId);
       setBackendSessionId(result.sessionId);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;

@@ -22,6 +22,8 @@ import { Step6Equipment } from "@/components/cosmic-horror-wizard/step-6-equipme
 import { Step7Backstory } from "@/components/cosmic-horror-wizard/step-7-backstory";
 import { Step8Review } from "@/components/cosmic-horror-wizard/step-8-review";
 import { PlayAuthGate } from "../../_components/PlayAuthGate";
+import { syncCharacterToBackend } from "@/lib/character-sync";
+import { useCharacterStore } from "@/stores/characterStore";
 
 export default function PlayerCosmicHorrorWizardPage() {
   const router = useRouter();
@@ -75,7 +77,19 @@ export default function PlayerCosmicHorrorWizardPage() {
         {step === 8 && (
           <Step8Review
             campaignIdOverride={playCampaignId}
-            onFinish={(newId) => {
+            onFinish={async (newId) => {
+              if (newId) {
+                const local = useCharacterStore
+                  .getState()
+                  .characters.find((c) => c.id === newId);
+                if (local) {
+                  try {
+                    await syncCharacterToBackend(local, code);
+                  } catch (err) {
+                    console.warn("[char-sync]", err);
+                  }
+                }
+              }
               const dest = newId
                 ? `${returnTo}?createdId=${newId}`
                 : returnTo;
