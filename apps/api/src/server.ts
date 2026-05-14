@@ -2,7 +2,6 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
-import { createServer } from "node:http";
 import { env } from "./config/env.js";
 import { errorHandler } from "./plugins/error-handler.js";
 import { registerRateLimit } from "./middleware/rate-limit.js";
@@ -87,16 +86,17 @@ async function buildApp() {
 async function start() {
   const app = await buildApp();
 
-  // Create raw HTTP server for Socket.IO
-  const httpServer = createServer(app.server);
-  const io = createSocketServer(httpServer);
-  registerSocketHandlers(io);
-
-  // Store io reference for route handlers
-  app.decorate("io", io);
-
   try {
+    // Bind Fastify primeiro — isso faz `app.server` (HTTP nativo)
+    // efetivamente escutar a porta. Depois anexamos Socket.IO no
+    // mesmo server pra que upgrade WebSocket compartilhe a porta.
+    // (Fastify proíbe `decorate` após `listen`, então Socket.IO é
+    // consumido via singleton `getIO()` em vez de via `app.io`.)
     await app.listen({ port: env.PORT, host: "0.0.0.0" });
+
+    const io = createSocketServer(app.server);
+    registerSocketHandlers(io);
+
     app.log.info(`Server listening on port ${env.PORT}`);
   } catch (err) {
     app.log.error(err);
