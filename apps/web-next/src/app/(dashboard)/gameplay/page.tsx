@@ -5,8 +5,10 @@
 // CTA pra escolher uma.
 
 import Link from "next/link";
+import { useState } from "react";
 import { Gamepad2, Play, Star } from "lucide-react";
 import { useCampaignStore } from "@/lib/campaign-store";
+import { QuickCreateSessionModal } from "@/components/gameplay/quick-create-session-modal";
 
 // Sessões recentes vêm do backend (apps/api/src/modules/sessions).
 // Hoje a lista chega vazia até wiring real do endpoint.
@@ -25,6 +27,7 @@ export default function GameplayPage() {
   const activeCampaign = useCampaignStore((s) =>
     activeCampaignId ? s.campaigns.find((c) => c.id === activeCampaignId) ?? null : null,
   );
+  const [createOpen, setCreateOpen] = useState(false);
 
   if (!activeCampaignId || !activeCampaign) {
     return <NoActiveCampaign />;
@@ -115,13 +118,21 @@ export default function GameplayPage() {
         </div>
       )}
 
-      <Link
-        href="/lobby/sess_new"
+      <button
+        type="button"
+        onClick={() => setCreateOpen(true)}
         className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-border py-4 text-sm font-medium text-brand-muted transition-colors hover:border-brand-accent/30 hover:text-brand-text"
       >
         <Play className="h-4 w-4" />
         Iniciar Nova Sessão
-      </Link>
+      </button>
+
+      <QuickCreateSessionModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        campaignId={activeCampaignId}
+        campaignName={activeCampaign.name}
+      />
     </div>
   );
 }
