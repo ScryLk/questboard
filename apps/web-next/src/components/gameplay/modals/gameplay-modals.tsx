@@ -43,7 +43,7 @@ export function GameplayModals() {
     case "shareSession":
       return <ShareSessionModal onClose={closeModal} />;
     case "invitePlayers":
-      return <InvitePlayersModal onClose={closeModal} />;
+      return <InvitePlayersModal onClose={closeModal} sessionId={sessionId} />;
     case "hpAdjust":
       return <HpAdjustModal onClose={closeModal} />;
     case "characterSheet":
