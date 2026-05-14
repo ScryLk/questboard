@@ -19,7 +19,10 @@ export function InvitePlayersModal({ onClose }: InvitePlayersModalProps) {
 
   // TODO: read from session store when backend is connected
   const sessionCode = "QB-A3F7";
-  const joinUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${sessionCode}`;
+  // /play/[code] é a rota real do jogador (player view). /join/[code]
+  // é uma landing page promocional (mockada) que aponta de volta pra
+  // /login — não funciona como entrada de sessão.
+  const joinUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/play/${sessionCode}`;
 
   function copyToClipboard(text: string, type: "code" | "link") {
     navigator.clipboard.writeText(text);

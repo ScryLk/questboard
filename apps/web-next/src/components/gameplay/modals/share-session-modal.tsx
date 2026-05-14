@@ -14,7 +14,7 @@ interface ShareSessionModalProps {
 export function ShareSessionModal({ onClose }: ShareSessionModalProps) {
   const [copied, setCopied] = useState(false);
   const sessionCode = "RVLT-2847";
-  const joinUrl = `questboard.app/join/${sessionCode}`;
+  const joinUrl = `questboard.gg/play/${sessionCode}`;
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
