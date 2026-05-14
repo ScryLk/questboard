@@ -6,6 +6,7 @@ import { redis } from "../../lib/redis.js";
 import {
   emitSessionStatusChanged,
   emitSessionSettingsUpdated,
+  emitSessionPlayerJoined,
 } from "../../lib/socket-events.js";
 import { invalidateCampaignDashboardCache } from "../campaign/dashboard.service.js";
 
@@ -128,13 +129,29 @@ export function createSessionsService(prisma: PrismaClient) {
       });
       if (existing) throw new ConflictError("Já está na sessão");
 
-      return prisma.sessionPlayer.create({
+      const created = await prisma.sessionPlayer.create({
         data: {
           userId,
           sessionId: session.id,
           role: "PLAYER",
         },
+        include: {
+          user: { select: { id: true, displayName: true, avatarUrl: true } },
+        },
       });
+
+      // Broadcast pra sala da sessão. GM frontend escuta
+      // `session:player-joined` e atualiza a lista.
+      emitSessionPlayerJoined({
+        sessionId: session.id,
+        player: {
+          userId: created.userId,
+          role: created.role,
+          user: created.user,
+        },
+      });
+
+      return created;
     },
 
     async leave(sessionId: string, userId: string) {

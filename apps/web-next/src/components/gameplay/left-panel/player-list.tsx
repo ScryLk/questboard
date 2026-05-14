@@ -1,23 +1,29 @@
 "use client";
 
+// Lista de jogadores do GM. Consome /sessions/:id/players + listen
+// socket `session:player-joined`. Sem sessionId (modo dev offline), a
+// lista fica vazia e o empty state aparece.
+
+import { useParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
+  Loader2,
   Users,
   UserPlus,
 } from "lucide-react";
-import { MOCK_PLAYERS } from "@/lib/gameplay-mock-data";
 import { useGameplayStore } from "@/lib/gameplay-store";
-import { HPBar } from "../shared/hp-bar";
+import { useSessionPlayers } from "@/hooks/use-session-players";
 import { GameTooltip } from "@/components/ui/game-tooltip";
-import { StatusDot } from "../shared/status-dot";
 
 export function PlayerList() {
   const collapsed = useGameplayStore((s) => s.collapsedSections["players"]);
   const toggleSection = useGameplayStore((s) => s.toggleSection);
   const openModal = useGameplayStore((s) => s.openModal);
 
-  const onlineCount = MOCK_PLAYERS.filter((p) => p.status === "online").length;
+  const params = useParams<{ sessionId?: string }>();
+  const sessionId = params?.sessionId ?? null;
+  const { players, loading, error } = useSessionPlayers(sessionId);
 
   return (
     <div className="border-b border-brand-border">
@@ -25,7 +31,7 @@ export function PlayerList() {
       <div className="flex items-center transition-colors hover:bg-white/[0.02]">
         <button
           onClick={() => toggleSection("players")}
-          className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
+          className="flex flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left"
         >
           {collapsed ? (
             <ChevronRight className="h-3.5 w-3.5 text-brand-muted" />
@@ -37,7 +43,7 @@ export function PlayerList() {
             Jogadores
           </span>
           <span className="text-[11px] text-brand-muted">
-            {onlineCount}/{MOCK_PLAYERS.length} online
+            {players.length} {players.length === 1 ? "membro" : "membros"}
           </span>
         </button>
         <GameTooltip label="Convidar Jogador" side="bottom">
@@ -52,62 +58,70 @@ export function PlayerList() {
 
       {!collapsed && (
         <div className="px-1.5 pb-1.5">
-          {MOCK_PLAYERS.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center gap-2 px-3 py-4 text-[11px] text-brand-muted">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Carregando...
+            </div>
+          ) : error ? (
+            <p className="px-3 py-4 text-center text-[10px] text-rose-300">
+              {error}
+            </p>
+          ) : players.length === 0 ? (
             <div className="px-3 py-4 text-center">
               <p className="text-[10px] text-brand-muted">
                 Nenhum jogador ainda. Convide com o botão acima.
               </p>
             </div>
-          ) : MOCK_PLAYERS.map((player) => (
-            <div
-              key={player.id}
-              className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
-            >
-              {/* Avatar */}
-              <div className="relative">
+          ) : (
+            players.map((player) => {
+              const initials = player.user.displayName
+                .split(" ")
+                .map((p) => p[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+              const isGm = player.role === "GM" || player.role === "CO_GM";
+              return (
                 <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
-                  style={{
-                    backgroundColor: player.color + "20",
-                    color: player.color,
-                  }}
+                  key={player.userId}
+                  className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
                 >
-                  {player.avatarInitials}
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[9px] font-bold text-brand-text">
+                    {player.user.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={player.user.avatarUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium text-brand-text">
+                      {player.user.displayName}
+                    </p>
+                    <p className="text-[10px] text-brand-muted">
+                      {player.role === "GM"
+                        ? "Mestre"
+                        : player.role === "CO_GM"
+                          ? "Co-Mestre"
+                          : player.role === "SPECTATOR"
+                            ? "Espectador"
+                            : "Jogador"}
+                    </p>
+                  </div>
+                  {isGm && (
+                    <span className="rounded bg-brand-accent/15 px-1.5 py-0.5 text-[9px] font-semibold text-brand-accent">
+                      GM
+                    </span>
+                  )}
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5">
-                  <StatusDot status={player.status} size={6} />
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-1">
-                  <span className="truncate text-[11px] font-medium text-brand-text">
-                    {player.name}
-                  </span>
-                  <span className="truncate text-[10px] text-brand-muted">
-                    {player.character}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-brand-muted">
-                    {player.class} Nv.{player.level}
-                  </span>
-                </div>
-                <HPBar
-                  hp={player.hp}
-                  maxHp={player.maxHp}
-                  height={3}
-                  className="mt-0.5"
-                />
-              </div>
-
-              {/* HP */}
-              <span className="text-[10px] tabular-nums text-brand-muted">
-                {player.hp}/{player.maxHp}
-              </span>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
       )}
     </div>

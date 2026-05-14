@@ -10,6 +10,7 @@ import {
 } from "@/lib/player-view-store";
 import { useCharacterStore } from "@/stores/characterStore";
 import type { CampaignCharacter } from "@/types/character";
+import { joinSessionByCode } from "@/lib/session-players-api";
 
 // Lista vazia por default — player vê empty state com botão "Criar
 // personagem novo". Backend (apps/api/src/modules/sessions/players)
@@ -66,7 +67,9 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const setCharacterId = usePlayerViewStore((s) => s.setCharacterId);
   const setJoinStep = usePlayerViewStore((s) => s.setJoinStep);
   const setConnected = usePlayerViewStore((s) => s.setConnected);
+  const setBackendSessionId = usePlayerViewStore((s) => s.setBackendSessionId);
   const setCampaignInfo = usePlayerViewStore((s) => s.setCampaignInfo);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const setAvailableCharacters = usePlayerViewStore(
     (s) => s.setAvailableCharacters,
   );
@@ -113,6 +116,27 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const handleJoin = async () => {
     if (!name.trim() || !selectedCharacterId || !campaignSystem) return;
     setJoining(true);
+    setJoinError(null);
+
+    try {
+      // Backend cria SessionPlayer + emite socket pra GM ver a entrada.
+      // 409 ("já é membro") é tratado como sucesso pelo helper —
+      // cobre o caso GM testando o player view em outra aba.
+      const result = await joinSessionByCode(sessionCode);
+      setBackendSessionId(result.sessionId);
+    } catch (err) {
+      const status = (err as { statusCode?: number }).statusCode;
+      setJoinError(
+        status === 401
+          ? "Faça login pra entrar nessa sessão."
+          : status === 404
+            ? "Sessão não encontrada — verifique o código."
+            : (err as { message?: string }).message ??
+              "Não foi possível entrar na sessão.",
+      );
+      setJoining(false);
+      return;
+    }
 
     setPlayerName(name.trim());
     setCharacterId(selectedCharacterId);
@@ -138,7 +162,6 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
       },
     ]);
 
-    await new Promise((r) => setTimeout(r, 600));
     setConnected(true);
     setJoinStep("waiting-gm");
     setJoining(false);
@@ -297,6 +320,12 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
           "Entrar na Mesa"
         )}
       </button>
+
+      {joinError && (
+        <p className="mt-3 max-w-sm text-center text-xs text-rose-300">
+          {joinError}
+        </p>
+      )}
 
       <p className="mt-6 text-xs text-white/20">Código: {sessionCode}</p>
     </div>

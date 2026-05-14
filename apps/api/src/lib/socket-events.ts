@@ -281,6 +281,25 @@ export function emitMediaHide(p: MediaHidePayload): void {
   emitToSession(p.sessionId, "media:hide", p);
 }
 
+// ─── Sessão / Players ─────────────────────────────────────────
+
+export interface SessionPlayerJoinedPayload {
+  sessionId: string;
+  player: {
+    userId: string;
+    role: "GM" | "CO_GM" | "PLAYER" | "SPECTATOR";
+    user: {
+      id: string;
+      displayName: string;
+      avatarUrl: string | null;
+    };
+  };
+}
+
+export function emitSessionPlayerJoined(p: SessionPlayerJoinedPayload): void {
+  emitToSession(p.sessionId, "session:player-joined", p);
+}
+
 // ─── Chat ─────────────────────────────────────────────────────
 
 export interface ChatMessagePayload {
