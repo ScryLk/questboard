@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
 import { NotFoundError, ForbiddenError } from "../../errors/app-error.js";
 import { uploadFile, deleteFile } from "../../lib/r2.js";
+import { emitTokenRemoved, emitTokenUpdated } from "../../lib/socket-events.js";
 
 export function createMapService(prisma: PrismaClient) {
   // Helper to check GM ownership
@@ -111,12 +112,24 @@ export function createMapService(prisma: PrismaClient) {
       const isOwner = token.ownerId === userId;
       if (!isGM && !isOwner) throw new ForbiddenError("Sem permissão para editar este token");
 
-      return prisma.token.update({ where: { id: tokenId }, data: input as unknown as object });
+      const updated = await prisma.token.update({ where: { id: tokenId }, data: input as unknown as object });
+
+      // Broadcast pra todos os clientes (GM + players) sincronizarem
+      // o token (ownership, HP, label, etc).
+      emitTokenUpdated({
+        sessionId: token.map.sessionId,
+        tokenId,
+        changes: input,
+      });
+
+      return updated;
     },
 
     async deleteToken(sessionId: string, userId: string, tokenId: string) {
       await assertGM(sessionId, userId);
-      return prisma.token.delete({ where: { id: tokenId } });
+      const deleted = await prisma.token.delete({ where: { id: tokenId } });
+      emitTokenRemoved({ sessionId, tokenId });
+      return deleted;
     },
 
     // ─── Fog ─────────────────────────────────────────

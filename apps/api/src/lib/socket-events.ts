@@ -336,6 +336,16 @@ export function emitTokenMoved(p: TokenMovedPayload): void {
   emitToSession(p.sessionId, "token:moved", p);
 }
 
+export interface TokenUpdatedPayload {
+  sessionId: string;
+  tokenId: string;
+  changes: Record<string, unknown>;
+}
+
+export function emitTokenUpdated(p: TokenUpdatedPayload): void {
+  emitToSession(p.sessionId, "token:updated", p);
+}
+
 export interface TokenRemovedPayload {
   sessionId: string;
   tokenId: string;

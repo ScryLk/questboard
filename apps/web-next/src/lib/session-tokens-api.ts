@@ -42,3 +42,26 @@ export async function getActiveMap(sessionId: string): Promise<MapLite | null> {
 export function listMapTokens(sessionId: string, mapId: string) {
   return apiRequest<TokenDto[]>(`/sessions/${sessionId}/maps/${mapId}/tokens`);
 }
+
+/** Patch parcial. Atualiza ownerId, label, x/y, HP, etc. Backend
+ *  emite socket `token:updated` pra todos da sala. */
+export function updateToken(
+  sessionId: string,
+  mapId: string,
+  tokenId: string,
+  changes: Partial<{
+    ownerId: string | null;
+    label: string;
+    x: number;
+    y: number;
+    currentHp: number;
+    maxHp: number;
+    ac: number;
+    isHidden: boolean;
+  }>,
+) {
+  return apiRequest<TokenDto>(
+    `/sessions/${sessionId}/maps/${mapId}/tokens/${tokenId}`,
+    { method: "PATCH", body: changes },
+  );
+}

@@ -32,6 +32,7 @@ import {
 import { useParams } from "next/navigation";
 import { useSessionPlayers } from "@/hooks/use-session-players";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { updateToken as updateTokenApi } from "@/lib/session-tokens-api";
 import { useActionFeedStore } from "@/lib/action-feed-store";
 import { useCombatStore } from "@/lib/combat-store";
 import { useCombatActions } from "@/hooks/use-combat-actions";
@@ -88,10 +89,25 @@ export function TokenContextMenu({
   // não são "donos" de tokens; viram NPCs do mestre).
   const routeParams = useParams<{ sessionId?: string }>();
   const sessionId = routeParams?.sessionId ?? null;
+  const activeMapId = useGameplayStore((s) => s.activeMapId);
   const { players: sessionPlayers } = useSessionPlayers(sessionId);
   const eligiblePlayers = sessionPlayers.filter(
     (p) => p.role === "PLAYER",
   );
+
+  // Persiste ownerId no backend (PATCH) + atualiza store local (otimista).
+  // Backend emite `token:updated` que GM canvas e player view recebem
+  // pra sincronizar.
+  async function assignOwner(tokenId: string, ownerId: string | null) {
+    setTokenPlayerId(tokenId, ownerId);
+    if (!sessionId || !activeMapId) return;
+    try {
+      await updateTokenApi(sessionId, activeMapId, tokenId, { ownerId });
+    } catch (err) {
+      // Reverte se backend recusar.
+      console.warn("[assign-owner] falhou:", err);
+    }
+  }
 
   // Fechar flyout com delay pra permitir deslocamento diagonal do mouse
   // até ele. Sem isso, hover em itens no caminho dispara setSubmenu(null)
@@ -698,7 +714,7 @@ export function TokenContextMenu({
             {/* Opção "Nenhum" — remove vínculo, token volta a ser NPC puro. */}
             <button
               onClick={() => {
-                setTokenPlayerId(token.id, null);
+                void assignOwner(token.id, null);
                 onClose();
               }}
               className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs text-brand-text hover:bg-white/[0.05]"
@@ -732,7 +748,7 @@ export function TokenContextMenu({
                   <button
                     key={p.userId}
                     onClick={() => {
-                      setTokenPlayerId(token.id, p.userId);
+                      void assignOwner(token.id, p.userId);
                       onClose();
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs text-brand-text hover:bg-white/[0.05]"

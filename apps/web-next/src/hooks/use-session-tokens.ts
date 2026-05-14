@@ -114,6 +114,22 @@ export function useSessionTokens(sessionId: string | null): State {
             },
           ),
         );
+
+        cleanups.push(
+          subscribe<{
+            sessionId: string;
+            tokenId: string;
+            changes: Partial<TokenDto>;
+          }>("token:updated", (payload) => {
+            if (payload.sessionId !== sessionId) return;
+            setState((s) => ({
+              ...s,
+              tokens: s.tokens.map((t) =>
+                t.id === payload.tokenId ? { ...t, ...payload.changes } : t,
+              ),
+            }));
+          }),
+        );
       } catch {
         // Sem socket — REST inicial já carregou. Sem live updates.
       }

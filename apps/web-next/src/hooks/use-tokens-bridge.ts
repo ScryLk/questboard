@@ -37,14 +37,17 @@ function toGameToken(dto: TokenDto): GameToken {
 }
 
 export function useTokensBridge(sessionId: string | null): void {
-  const { tokens } = useSessionTokens(sessionId);
+  const { tokens, map } = useSessionTokens(sessionId);
 
   useEffect(() => {
     if (!sessionId) return;
     // Replace total: numa sessão real, a fonte de verdade são os
     // tokens do backend. Tokens mock locais ficam só no modo offline.
+    // Também propaga `activeMapId` pra menus precisarem do mapId
+    // (ex: PATCH /sessions/:s/maps/:m/tokens/:t).
     useGameplayStore.setState(() => ({
       tokens: tokens.map(toGameToken),
+      activeMapId: map?.id ?? null,
     }));
-  }, [sessionId, tokens]);
+  }, [sessionId, tokens, map]);
 }
