@@ -21,6 +21,7 @@ import { Step5SanityLuck } from "@/components/cosmic-horror-wizard/step-5-sanity
 import { Step6Equipment } from "@/components/cosmic-horror-wizard/step-6-equipment";
 import { Step7Backstory } from "@/components/cosmic-horror-wizard/step-7-backstory";
 import { Step8Review } from "@/components/cosmic-horror-wizard/step-8-review";
+import { PlayAuthGate } from "../../_components/PlayAuthGate";
 
 export default function PlayerCosmicHorrorWizardPage() {
   const router = useRouter();
@@ -38,9 +39,10 @@ export default function PlayerCosmicHorrorWizardPage() {
   }, [reset]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 overflow-y-auto p-5 pb-20 h-dvh">
-      <Link
-        href={returnTo}
+    <PlayAuthGate>
+      <div className="mx-auto max-w-3xl space-y-5 overflow-y-auto p-5 pb-20 h-dvh">
+        <Link
+          href={returnTo}
         className="inline-flex items-center gap-1.5 text-xs text-brand-muted transition-colors hover:text-brand-text"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
@@ -83,7 +85,8 @@ export default function PlayerCosmicHorrorWizardPage() {
         )}
       </div>
 
-      <CosmicHorrorWizardFooter />
-    </div>
+        <CosmicHorrorWizardFooter />
+      </div>
+    </PlayAuthGate>
   );
 }

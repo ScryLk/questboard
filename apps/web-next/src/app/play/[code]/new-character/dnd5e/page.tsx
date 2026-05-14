@@ -21,6 +21,7 @@ import { Step7Equipment } from "@/components/character-wizard/step-7-equipment";
 import { Step8Spells } from "@/components/character-wizard/step-8-spells";
 import { Step9Details } from "@/components/character-wizard/step-9-details";
 import { Step10Review } from "@/components/character-wizard/step-10-review";
+import { PlayAuthGate } from "../../_components/PlayAuthGate";
 
 export default function PlayerDnd5eWizardPage() {
   const router = useRouter();
@@ -37,8 +38,9 @@ export default function PlayerDnd5eWizardPage() {
   }, [reset]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 overflow-y-auto p-5 pb-20 h-dvh">
-      <Link
+    <PlayAuthGate>
+      <div className="mx-auto max-w-3xl space-y-5 overflow-y-auto p-5 pb-20 h-dvh">
+        <Link
         href={returnTo}
         className="inline-flex items-center gap-1.5 text-xs text-brand-muted transition-colors hover:text-brand-text"
       >
@@ -84,7 +86,8 @@ export default function PlayerDnd5eWizardPage() {
         )}
       </div>
 
-      <WizardFooter />
-    </div>
+        <WizardFooter />
+      </div>
+    </PlayAuthGate>
   );
 }

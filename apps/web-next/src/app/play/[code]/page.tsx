@@ -14,6 +14,7 @@ import { useMediaBroadcastDevSync } from "@/lib/media-broadcast-dev-sync";
 import { JoinScreen } from "./_components/JoinScreen";
 import { LobbyScreen } from "./_components/LobbyScreen";
 import { EndScreen } from "./_components/EndScreen";
+import { PlayAuthGate } from "./_components/PlayAuthGate";
 
 export default function PlayerSessionPage() {
   // Dev: identidade por ?as= e sync multi-aba via BroadcastChannel.
@@ -39,7 +40,7 @@ export default function PlayerSessionPage() {
   }, [code, nameParam, setSessionCode, setPlayerName]);
 
   return (
-    <>
+    <PlayAuthGate>
       {/* BroadcastChannel sync — mounted only during gameplay */}
       {joinStep === "playing" && <BroadcastSync />}
 
@@ -51,6 +52,6 @@ export default function PlayerSessionPage() {
 
       {/* Badge dev de identidade */}
       <DevIdentityBadge />
-    </>
+    </PlayAuthGate>
   );
 }
