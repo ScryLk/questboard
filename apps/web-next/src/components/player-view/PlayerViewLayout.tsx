@@ -22,6 +22,7 @@ import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 import { usePlayerTokensBridge } from "@/hooks/use-player-tokens-bridge";
+import { useEnsureBackendSessionId } from "@/hooks/use-ensure-backend-session-id";
 import { LevelUpToast } from "@/components/character/level-up-toast";
 
 export function PlayerViewLayout() {
@@ -33,6 +34,11 @@ export function PlayerViewLayout() {
   const screenShake = usePlayerViewStore((s) => s.screenShake);
   const pendingWhisper = usePlayerViewStore((s) => s.pendingWhisper);
   const backendSessionId = usePlayerViewStore((s) => s.backendSessionId);
+  const sessionCode = usePlayerViewStore((s) => s.sessionCode);
+
+  // Garante backendSessionId resolvido (cobre reload pós-join +
+  // bypass via "Iniciar Demo" no LobbyScreen).
+  useEnsureBackendSessionId(sessionCode || null);
 
   // Socket bridge: liga media:show/hide à store quando há backend.
   useMediaSocketBridge(backendSessionId);
