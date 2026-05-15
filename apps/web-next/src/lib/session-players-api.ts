@@ -4,7 +4,6 @@
 // `listPlayers` lê a lista atual da sessão.
 
 import { apiRequest } from "./api-client";
-import { isApiError } from "./api-client";
 
 export interface SessionPlayerDto {
   userId: string;
@@ -18,37 +17,23 @@ export interface SessionPlayerDto {
 
 export interface JoinResult {
   sessionId: string;
-  /** True quando o backend recusou com 409 "já está na sessão" — UX
-   *  trata como sucesso pra cobrir o caso GM testando em duas abas. */
-  alreadyMember: boolean;
 }
 
-/** Junta-se a uma sessão via inviteCode. Backend cria SessionPlayer
- *  + Token na mapa ativa pra o character (se passado). Dispara
- *  sockets `session:player-joined` e `token:added`. Aceita 409 como
- *  sucesso (já é membro). */
+/** Junta-se (ou re-junta-se) a uma sessão via inviteCode. Backend é
+ *  idempotente: se já é membro, atualiza characterId e garante Token
+ *  na mapa ativa. Dispara sockets `session:player-joined` e
+ *  `token:added` quando aplicável. */
 export async function joinSessionByCode(
   inviteCode: string,
   characterId?: string,
 ): Promise<JoinResult> {
-  try {
-    // /sessions/:id/join — controller na verdade usa inviteCode do body
-    // e ignora o param. Passamos "join" como placeholder.
-    const result = await apiRequest<{ sessionId: string }>(
-      `/sessions/join/join`,
-      { method: "POST", body: { inviteCode, characterId } },
-    );
-    return { sessionId: result.sessionId, alreadyMember: false };
-  } catch (err) {
-    if (isApiError(err) && err.statusCode === 409) {
-      // Já é membro — resolver o sessionId via lookup by code.
-      const session = await apiRequest<{ id: string }>(
-        `/sessions/by-code/${encodeURIComponent(inviteCode)}`,
-      );
-      return { sessionId: session.id, alreadyMember: true };
-    }
-    throw err;
-  }
+  // /sessions/:id/join — controller na verdade usa inviteCode do body
+  // e ignora o param. Passamos "join" como placeholder.
+  const result = await apiRequest<{ sessionId: string }>(
+    `/sessions/join/join`,
+    { method: "POST", body: { inviteCode, characterId } },
+  );
+  return { sessionId: result.sessionId };
 }
 
 export function listSessionPlayers(sessionId: string) {

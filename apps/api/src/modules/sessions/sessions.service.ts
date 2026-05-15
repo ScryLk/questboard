@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@questboard/db";
 import { randomInt } from "node:crypto";
 import type { CreateSessionInput, UpdateSessionInput } from "./sessions.schema.js";
-import { NotFoundError, ConflictError, BadRequestError } from "../../errors/app-error.js";
+import { NotFoundError, BadRequestError } from "../../errors/app-error.js";
 import { redis } from "../../lib/redis.js";
 import {
   emitSessionStatusChanged,
@@ -142,15 +142,6 @@ export function createSessionsService(prisma: PrismaClient) {
       });
       if (!session) throw new NotFoundError("Session");
 
-      if (session._count.players >= session.maxPlayers) {
-        throw new BadRequestError("Sessão cheia");
-      }
-
-      const existing = await prisma.sessionPlayer.findUnique({
-        where: { userId_sessionId: { userId, sessionId: session.id } },
-      });
-      if (existing) throw new ConflictError("Já está na sessão");
-
       // Valida que o character (se passado) pertence ao usuário.
       let character: { id: string; name: string; avatarUrl: string | null } | null = null;
       if (opts.characterId) {
@@ -159,7 +150,36 @@ export function createSessionsService(prisma: PrismaClient) {
           select: { id: true, name: true, avatarUrl: true },
         });
         if (c) character = c;
-        // Se não existe ou não é dele, ignora (não trava o join).
+      }
+
+      const existing = await prisma.sessionPlayer.findUnique({
+        where: { userId_sessionId: { userId, sessionId: session.id } },
+      });
+
+      // ── Upsert path: já é membro ─────────────────────────────
+      // Em vez de 409 estéril, reaproveita a entrada e garante que
+      // characterId/Token estão atualizados. Cobre o caso comum:
+      // player entrou antes do feature flag, agora vem com char.
+      if (existing) {
+        if (character && existing.characterId !== character.id) {
+          await prisma.sessionPlayer.update({
+            where: { id: existing.id },
+            data: { characterId: character.id },
+          });
+        }
+        await ensurePlayerToken(prisma, session.id, userId, character);
+        const refreshed = await prisma.sessionPlayer.findUnique({
+          where: { id: existing.id },
+          include: {
+            user: { select: { id: true, displayName: true, avatarUrl: true } },
+          },
+        });
+        return refreshed ?? existing;
+      }
+
+      // ── Primeira entrada ─────────────────────────────────────
+      if (session._count.players >= session.maxPlayers) {
+        throw new BadRequestError("Sessão cheia");
       }
 
       const created = await prisma.sessionPlayer.create({
@@ -174,8 +194,6 @@ export function createSessionsService(prisma: PrismaClient) {
         },
       });
 
-      // Broadcast pra sala da sessão. GM frontend escuta
-      // `session:player-joined` e atualiza a lista.
       emitSessionPlayerJoined({
         sessionId: session.id,
         player: {
@@ -185,52 +203,7 @@ export function createSessionsService(prisma: PrismaClient) {
         },
       });
 
-      // Cria Token no mapa ativo da sessão pra o personagem do player.
-      // GM pode reposicionar/customizar; daqui pra frente o token é
-      // a "presença" do personagem na mesa.
-      if (character) {
-        const activeMap = await prisma.map.findFirst({
-          where: { sessionId: session.id, isActive: true, deletedAt: null },
-          select: { id: true },
-        });
-        if (activeMap) {
-          const initials = character.name
-            .split(" ")
-            .map((p) => p[0])
-            .join("")
-            .slice(0, 3)
-            .toUpperCase();
-          const token = await prisma.token.create({
-            data: {
-              mapId: activeMap.id,
-              characterId: character.id,
-              ownerId: userId,
-              label: character.name,
-              initials,
-              imageUrl: character.avatarUrl,
-              x: 0,
-              y: 0,
-              size: 1,
-            },
-          });
-          emitTokenAdded({
-            sessionId: session.id,
-            token: {
-              id: token.id,
-              mapId: token.mapId,
-              characterId: token.characterId,
-              ownerId: token.ownerId,
-              label: token.label,
-              initials: token.initials,
-              imageUrl: token.imageUrl,
-              color: token.color,
-              x: token.x,
-              y: token.y,
-              size: token.size,
-            },
-          });
-        }
-      }
+      await ensurePlayerToken(prisma, session.id, userId, character);
 
       return created;
     },
@@ -469,3 +442,63 @@ export function createSessionsService(prisma: PrismaClient) {
 }
 
 export type SessionsService = ReturnType<typeof createSessionsService>;
+
+/** Garante que o player tem 1 Token na mapa ativa. Idempotente —
+ *  se já existe (mesmo char ou outro), não faz nada. Se não existe
+ *  E temos character, cria com defaults em (0,0). */
+async function ensurePlayerToken(
+  prisma: PrismaClient,
+  sessionId: string,
+  userId: string,
+  character: { id: string; name: string; avatarUrl: string | null } | null,
+): Promise<void> {
+  if (!character) return;
+  const activeMap = await prisma.map.findFirst({
+    where: { sessionId, isActive: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (!activeMap) return;
+
+  // Já tem um Token desse owner nesse map? Não duplica.
+  const existingToken = await prisma.token.findFirst({
+    where: { mapId: activeMap.id, ownerId: userId },
+    select: { id: true },
+  });
+  if (existingToken) return;
+
+  const initials = character.name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
+  const token = await prisma.token.create({
+    data: {
+      mapId: activeMap.id,
+      characterId: character.id,
+      ownerId: userId,
+      label: character.name,
+      initials,
+      imageUrl: character.avatarUrl,
+      x: 0,
+      y: 0,
+      size: 1,
+    },
+  });
+  emitTokenAdded({
+    sessionId,
+    token: {
+      id: token.id,
+      mapId: token.mapId,
+      characterId: token.characterId,
+      ownerId: token.ownerId,
+      label: token.label,
+      initials: token.initials,
+      imageUrl: token.imageUrl,
+      color: token.color,
+      x: token.x,
+      y: token.y,
+      size: token.size,
+    },
+  });
+}
