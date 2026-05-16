@@ -76,6 +76,31 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const setBackendSessionId = usePlayerViewStore((s) => s.setBackendSessionId);
   const setCampaignInfo = usePlayerViewStore((s) => s.setCampaignInfo);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [sessionNotFound, setSessionNotFound] = useState(false);
+  const [redirectIn, setRedirectIn] = useState<number | null>(null);
+
+  // Auto-redirect pro login quando o código é inválido. Dá 5s pro
+  // usuário ler a mensagem antes de mandar embora. Clerk redireciona
+  // pro dashboard se já estiver autenticado.
+  useEffect(() => {
+    if (!sessionNotFound) {
+      setRedirectIn(null);
+      return;
+    }
+    setRedirectIn(5);
+    const interval = setInterval(() => {
+      setRedirectIn((n) => {
+        if (n === null) return null;
+        if (n <= 1) {
+          clearInterval(interval);
+          router.push("/login");
+          return 0;
+        }
+        return n - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionNotFound, router]);
   const setAvailableCharacters = usePlayerViewStore(
     (s) => s.setAvailableCharacters,
   );
@@ -174,12 +199,15 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
         router.push(`/login?redirect_url=${returnUrl}`);
         return;
       }
-      setJoinError(
-        status === 404
-          ? "Sessão não encontrada — verifique o código."
-          : (err as { message?: string }).message ??
+      if (status === 404) {
+        setSessionNotFound(true);
+        setJoinError("Sessão não encontrada — verifique o código.");
+      } else {
+        setJoinError(
+          (err as { message?: string }).message ??
             "Não foi possível entrar na sessão.",
-      );
+        );
+      }
       setJoining(false);
       return;
     }
@@ -383,6 +411,24 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
         <p className="mt-3 max-w-sm text-center text-xs text-rose-300">
           {joinError}
         </p>
+      )}
+
+      {sessionNotFound && (
+        <div className="mt-4 flex w-full max-w-sm flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-brand-accent/40 bg-brand-accent/10 px-4 py-3 text-sm font-medium text-brand-accent transition-colors hover:bg-brand-accent/20"
+          >
+            <LogIn className="h-4 w-4" />
+            Voltar ao login
+          </button>
+          {redirectIn !== null && redirectIn > 0 && (
+            <p className="text-[11px] text-white/40">
+              Redirecionando em {redirectIn}s...
+            </p>
+          )}
+        </div>
       )}
 
       <p className="mt-6 text-xs text-white/20">Código: {sessionCode}</p>
