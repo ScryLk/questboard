@@ -92,40 +92,29 @@ export default function LoginPage() {
       }
 
       if (attempt.status === "needs_second_factor") {
-        // Conta com 2FA. Detecta o método disponível (totp / backup /
-        // phone). Pra phone_code, dispara prepareSecondFactor primeiro
-        // pra mandar o SMS.
+        // Conta com 2FA. Detecta o método disponível e roteia pro
+        // step de código. Se phone_code é o factor, dispara
+        // prepareSecondFactor primeiro pra mandar o SMS.
         const factors = attempt.supportedSecondFactors ?? [];
-        const totp = factors.find((f) => f.strategy === "totp");
-        const backup = factors.find((f) => f.strategy === "backup_code");
         const phone = factors.find((f) => f.strategy === "phone_code") as
           | { phoneNumberId: string }
           | undefined;
-        if (totp) {
-          setTwoFactorMethod("totp");
-          setStep("verify-2fa");
-          setCode("");
-          return;
-        }
-        if (backup) {
-          setTwoFactorMethod("backup_code");
-          setStep("verify-2fa");
-          setCode("");
-          return;
-        }
         if (phone?.phoneNumberId) {
           await signIn.prepareSecondFactor({
             strategy: "phone_code",
             phoneNumberId: phone.phoneNumberId,
           });
           setTwoFactorMethod("phone_code");
-          setStep("verify-2fa");
-          setCode("");
-          return;
+        } else if (factors.find((f) => f.strategy === "backup_code")) {
+          setTwoFactorMethod("backup_code");
+        } else {
+          // TOTP é o default — não precisa preparar. Se Clerk não
+          // listou nenhum factor, tenta TOTP mesmo assim: o usuário
+          // pode ter app autenticador configurado direto no painel.
+          setTwoFactorMethod("totp");
         }
-        setError(
-          "Nenhum método de 2FA suportado disponível na conta.",
-        );
+        setStep("verify-2fa");
+        setCode("");
         return;
       }
 
