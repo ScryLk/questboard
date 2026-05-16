@@ -39,7 +39,8 @@ function safeRedirectUrl(raw: string | null): string {
   return raw;
 }
 
-type Step = "credentials" | "verify-email";
+type Step = "credentials" | "verify-email" | "verify-2fa";
+type TwoFactorMethod = "totp" | "backup_code" | "phone_code";
 
 export default function LoginPage() {
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -51,6 +52,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethod>("totp");
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<OAuthStrategy | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,8 +92,39 @@ export default function LoginPage() {
       }
 
       if (attempt.status === "needs_second_factor") {
+        // Conta com 2FA. Detecta o método disponível (totp / backup /
+        // phone). Pra phone_code, dispara prepareSecondFactor primeiro
+        // pra mandar o SMS.
+        const factors = attempt.supportedSecondFactors ?? [];
+        const totp = factors.find((f) => f.strategy === "totp");
+        const backup = factors.find((f) => f.strategy === "backup_code");
+        const phone = factors.find((f) => f.strategy === "phone_code") as
+          | { phoneNumberId: string }
+          | undefined;
+        if (totp) {
+          setTwoFactorMethod("totp");
+          setStep("verify-2fa");
+          setCode("");
+          return;
+        }
+        if (backup) {
+          setTwoFactorMethod("backup_code");
+          setStep("verify-2fa");
+          setCode("");
+          return;
+        }
+        if (phone?.phoneNumberId) {
+          await signIn.prepareSecondFactor({
+            strategy: "phone_code",
+            phoneNumberId: phone.phoneNumberId,
+          });
+          setTwoFactorMethod("phone_code");
+          setStep("verify-2fa");
+          setCode("");
+          return;
+        }
         setError(
-          "Autenticação em 2 fatores ainda não está implementada aqui. Use o painel do Clerk pra entrar.",
+          "Nenhum método de 2FA suportado disponível na conta.",
         );
         return;
       }
@@ -127,6 +160,32 @@ export default function LoginPage() {
       const message =
         (err as { errors?: Array<{ message?: string }> }).errors?.[0]?.message ??
         "Código inválido ou expirado.";
+      setError(message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleVerifyTwoFactor(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isLoaded || pending) return;
+    setError(null);
+    setPending(true);
+    try {
+      const attempt = await signIn.attemptSecondFactor({
+        strategy: twoFactorMethod,
+        code,
+      });
+      if (attempt.status === "complete") {
+        await setActive({ session: attempt.createdSessionId });
+        router.push(successRedirect);
+      } else {
+        setError(`Verificação incompleta (${attempt.status}).`);
+      }
+    } catch (err) {
+      const message =
+        (err as { errors?: Array<{ message?: string }> }).errors?.[0]?.message ??
+        "Código 2FA inválido.";
       setError(message);
     } finally {
       setPending(false);
@@ -173,6 +232,100 @@ export default function LoginPage() {
       setError(message);
       setOauthPending(null);
     }
+  }
+
+  if (step === "verify-2fa") {
+    const methodLabel =
+      twoFactorMethod === "totp"
+        ? "do app autenticador"
+        : twoFactorMethod === "backup_code"
+          ? "de backup"
+          : "enviado por SMS";
+    const isBackup = twoFactorMethod === "backup_code";
+    return (
+      <AuthShell>
+        <button
+          type="button"
+          onClick={() => {
+            setStep("credentials");
+            setCode("");
+            setError(null);
+          }}
+          className="mb-2 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-muted hover:text-white"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Voltar
+        </button>
+
+        <h1 className="text-center text-2xl font-bold text-white">
+          Autenticação em 2 fatores
+        </h1>
+        <p className="mt-2 text-center text-sm text-brand-muted">
+          Digite o código {methodLabel}.
+        </p>
+
+        <form onSubmit={handleVerifyTwoFactor} className="mt-6 space-y-3">
+          <Field
+            icon={<KeyRound className="h-4 w-4" />}
+            type="text"
+            value={code}
+            onChange={(v) =>
+              setCode(
+                isBackup
+                  ? v.replace(/[^A-Za-z0-9-]/g, "").slice(0, 16)
+                  : v.replace(/\D/g, "").slice(0, 6),
+              )
+            }
+            placeholder={isBackup ? "código de backup" : "código de 6 dígitos"}
+            autoComplete="one-time-code"
+            inputMode={isBackup ? "text" : "numeric"}
+            maxLength={isBackup ? 16 : 6}
+            autoFocus
+            required
+          />
+
+          {error && (
+            <div className="rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-[11px] text-rose-300">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={
+              !isLoaded ||
+              pending ||
+              code.length < (isBackup ? 6 : 6)
+            }
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-accent px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              "Confirmar e entrar"
+            )}
+          </button>
+        </form>
+
+        {/* Alternar pra backup code se 2FA via TOTP/SMS falhar */}
+        {twoFactorMethod !== "backup_code" && (
+          <button
+            type="button"
+            onClick={() => {
+              setTwoFactorMethod("backup_code");
+              setCode("");
+              setError(null);
+            }}
+            className="mt-4 w-full cursor-pointer text-center text-xs text-brand-muted hover:text-white"
+          >
+            Perdeu o acesso ao autenticador? Usar código de backup
+          </button>
+        )}
+      </AuthShell>
+    );
   }
 
   if (step === "verify-email") {
