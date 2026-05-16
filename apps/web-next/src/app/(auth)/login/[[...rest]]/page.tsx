@@ -230,16 +230,30 @@ export default function LoginPage() {
         : twoFactorMethod === "backup_code"
           ? "de backup"
           : "enviado por SMS";
+    const methodHint =
+      twoFactorMethod === "totp"
+        ? "Abra Google Authenticator, Authy ou outro app autenticador configurado pra essa conta."
+        : twoFactorMethod === "backup_code"
+          ? "Um dos códigos salvos quando você ativou o 2FA."
+          : "Verifique o SMS no celular cadastrado.";
     const isBackup = twoFactorMethod === "backup_code";
+
+    // Reset completo: limpa todo state + recarrega a página pra
+    // abandonar o signIn object intermediário do Clerk. Sem isso,
+    // tentar logar de novo pode reaproveitar o status antigo.
+    function fullReset() {
+      window.location.assign(
+        successRedirect === DEFAULT_REDIRECT
+          ? "/login"
+          : `/login?redirect_url=${encodeURIComponent(successRedirect)}`,
+      );
+    }
+
     return (
       <AuthShell>
         <button
           type="button"
-          onClick={() => {
-            setStep("credentials");
-            setCode("");
-            setError(null);
-          }}
+          onClick={fullReset}
           className="mb-2 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-muted hover:text-white"
         >
           <ArrowLeft className="h-3 w-3" />
@@ -251,6 +265,9 @@ export default function LoginPage() {
         </h1>
         <p className="mt-2 text-center text-sm text-brand-muted">
           Digite o código {methodLabel}.
+        </p>
+        <p className="mt-1 text-center text-[11px] text-brand-muted/70">
+          {methodHint}
         </p>
 
         <form onSubmit={handleVerifyTwoFactor} className="mt-6 space-y-3">
@@ -318,15 +335,18 @@ export default function LoginPage() {
   }
 
   if (step === "verify-email") {
+    function fullResetEmail() {
+      window.location.assign(
+        successRedirect === DEFAULT_REDIRECT
+          ? "/login"
+          : `/login?redirect_url=${encodeURIComponent(successRedirect)}`,
+      );
+    }
     return (
       <AuthShell>
         <button
           type="button"
-          onClick={() => {
-            setStep("credentials");
-            setCode("");
-            setError(null);
-          }}
+          onClick={fullResetEmail}
           className="mb-2 inline-flex cursor-pointer items-center gap-1 text-xs text-brand-muted hover:text-white"
         >
           <ArrowLeft className="h-3 w-3" />
