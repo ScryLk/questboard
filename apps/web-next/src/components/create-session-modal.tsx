@@ -22,6 +22,9 @@ interface CreateSessionModalProps {
   onClose: () => void;
   /** Slug do sistema pré-preenchido (vindo do compêndio, por ex.). */
   prefilledSystem?: string | null;
+  /** ID da campanha à qual a sessão será vinculada. Quando presente,
+   *  é enviado no POST e o backend popula `Session.campaignId`. */
+  prefilledCampaignId?: string | null;
 }
 
 type ModalStep = "form" | "confirmation";
@@ -48,6 +51,7 @@ export function CreateSessionModal({
   open,
   onClose,
   prefilledSystem,
+  prefilledCampaignId,
 }: CreateSessionModalProps) {
   const [step, setStep] = useState<ModalStep>("form");
   const [title, setTitle] = useState("A Torre de Ravenloft");
@@ -92,6 +96,7 @@ export function CreateSessionModal({
           system,
           maxPlayers: players.filter((p) => p.checked).length + 1,
           isPublic: false,
+          ...(prefilledCampaignId ? { campaignId: prefilledCampaignId } : {}),
         }),
       });
       const data = await res.json();
@@ -110,7 +115,7 @@ export function CreateSessionModal({
     } finally {
       setCreating(false);
     }
-  }, [creating, title, players]);
+  }, [creating, title, system, players, prefilledCampaignId]);
 
   const handleClose = useCallback(() => {
     setStep("form");

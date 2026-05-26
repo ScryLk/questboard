@@ -9,6 +9,7 @@ export const createSessionSchema = z.object({
   isPublic: z.boolean().default(false),
   tags: z.array(z.string().max(30)).max(10).default([]),
   scheduledAt: z.coerce.date().nullable().optional(),
+  campaignId: z.string().optional(),
 });
 
 export const updateSessionSchema = createSessionSchema.partial();

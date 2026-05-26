@@ -48,7 +48,7 @@ export function createCampaignService(prisma: PrismaClient) {
       return campaign;
     },
 
-    async create(userId: string, plan: string, input: { name: string; description?: string; system: string; isPublic?: boolean; maxPlayers?: number }) {
+    async create(userId: string, plan: string, input: { name: string; description?: string; system: string; isPublic?: boolean; maxPlayers?: number; coverUrl?: string | null; bannerUrl?: string | null; tags?: string[]; settings?: Record<string, unknown> }) {
       const limits = PLAN_LIMITS[plan as PlanKey] ?? PLAN_LIMITS.FREE;
       if (limits.maxActiveCampaigns !== -1) {
         const count = await prisma.campaign.count({ where: { ownerId: userId, deletedAt: null } });
@@ -65,6 +65,10 @@ export function createCampaignService(prisma: PrismaClient) {
           system: input.system,
           isPublic: input.isPublic ?? false,
           maxPlayers: input.maxPlayers ?? 5,
+          tags: input.tags ?? [],
+          coverUrl: input.coverUrl ?? null,
+          bannerUrl: input.bannerUrl ?? null,
+          settings: (input.settings ?? {}) as object,
           code: generateCode(),
           members: {
             create: { userId, role: "GM" },
@@ -73,12 +77,21 @@ export function createCampaignService(prisma: PrismaClient) {
       });
     },
 
-    async update(campaignId: string, userId: string, input: { name?: string; description?: string; isPublic?: boolean; maxPlayers?: number; tags?: string[] }) {
+    async update(campaignId: string, userId: string, input: { name?: string; description?: string; isPublic?: boolean; maxPlayers?: number; tags?: string[]; coverUrl?: string | null; bannerUrl?: string | null; settings?: Record<string, unknown> }) {
       const campaign = await prisma.campaign.findFirst({ where: { id: campaignId, deletedAt: null }, select: { ownerId: true } });
       if (!campaign) throw new NotFoundError("Campaign");
       if (campaign.ownerId !== userId) throw new ForbiddenError("Apenas o GM pode editar a campanha");
 
-      return prisma.campaign.update({ where: { id: campaignId }, data: input });
+      // `settings` é Json; substitui por completo. Caller é responsável
+      // por mesclar com o atual quando quiser apenas alterar uma chave.
+      const { settings, ...rest } = input;
+      return prisma.campaign.update({
+        where: { id: campaignId },
+        data: {
+          ...rest,
+          ...(settings !== undefined ? { settings: settings as object } : {}),
+        },
+      });
     },
 
     async delete(campaignId: string, userId: string) {

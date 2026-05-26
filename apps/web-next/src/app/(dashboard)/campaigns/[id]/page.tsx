@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCampaignStore } from "@/lib/campaign-store";
 import { useCampaignModalsStore } from "@/lib/campaign-modals-store";
+import { useCreateSessionModalStore } from "@/lib/create-session-modal-store";
 import { CampaignSubNav } from "@/components/campaigns/campaign-subnav";
 import {
   CAMPAIGN_SYSTEMS,
@@ -62,6 +63,7 @@ export default function CampaignOverviewPage(props: {
   const remove = useCampaignStore((s) => s.deleteCampaign);
   const setActive = useCampaignStore((s) => s.setActiveCampaignId);
   const openSettings = useCampaignModalsStore((s) => s.openSettings);
+  const openCreateSession = useCreateSessionModalStore((s) => s.open);
 
   const [copied, setCopied] = useState(false);
 
@@ -223,9 +225,10 @@ export default function CampaignOverviewPage(props: {
           <button
             onClick={() => {
               setActive(campaign.id);
-              // TODO(create-session): integrar com o modal existente
-              // (CreateSessionModal) e passar campaignId.
-              alert("Criação de sessão integrada virá na próxima fatia.");
+              openCreateSession({
+                campaignId: campaign.id,
+                system: campaign.system,
+              });
             }}
             className="mt-3 rounded-md bg-brand-accent px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-brand-accent-hover"
           >

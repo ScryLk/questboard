@@ -1,251 +1,270 @@
+"use client";
+
+// Map library store — respaldado pelo backend (apps/api/src/modules/
+// map-library). Cache local em memória pra UI síncrona; verdade vive
+// no Postgres (MapTemplate por campanha).
+//
+// Padrão idêntico a campaigns/notes/world: hydrate por campanha
+// ativa + mutations otimistas com revert em falha.
+
+import { useEffect, useRef } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { QuestBoardMap } from "./map-types";
-import { migrateSavedMap } from "./map-types";
 import { parseMapJSON } from "./map-export";
 import { generateMapThumbnail } from "./map-thumbnail";
-import type { SavedMap } from "./map-storage";
-
-// ── Types ──
+import * as mapLibraryApi from "./map-library-api";
 
 interface MapLibraryState {
   maps: Record<string, QuestBoardMap>;
-  _migrated: boolean;
+  /** Campanhas já hidratadas → timestamp ms. Evita refetch curto. */
+  hydratedAt: Record<string, number>;
 
-  addMap: (data: Omit<QuestBoardMap, "id" | "createdAt" | "updatedAt">) => string;
+  hydrateMaps: (campaignId: string, maps: QuestBoardMap[]) => void;
+
+  /** Cria mapa via backend. `campaignId` é obrigatório porque o
+   *  servidor precisa pra vincular. Retorna o id real (não temp). */
+  addMap: (
+    campaignId: string,
+    data: Omit<QuestBoardMap, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<string>;
   updateMap: (id: string, updates: Partial<QuestBoardMap>) => void;
   deleteMap: (id: string) => void;
-  duplicateMap: (id: string) => string | null;
-  /** Importa o mapa do JSON. `campaignId` define o dono — geralmente
-   *  a campanha ativa do dashboard. Mapas sem campanha (null) ficam
-   *  invisíveis em /maps até serem re-associados. */
-  importMap: (json: string, campaignId: string | null) => string | null;
-  migrateFromLegacy: () => void;
+  duplicateMap: (id: string) => Promise<string | null>;
+  importMap: (
+    json: string,
+    campaignId: string | null,
+  ) => Promise<string | null>;
   setMapCollection: (mapId: string, collectionId: string | null) => void;
   reorderMapsInCollection: (collectionId: string, mapIds: string[]) => void;
   clearCollectionFromMaps: (collectionId: string) => void;
 }
 
-function generateId(): string {
-  return `map_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function pendingId(): string {
+  return `map_pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ── Store ──
+export const useMapLibraryStore = create<MapLibraryState>()((set, get) => ({
+  maps: {},
+  hydratedAt: {},
 
-export const useMapLibraryStore = create<MapLibraryState>()(
-  persist(
-    (set, get) => ({
-      maps: {},
-      _migrated: false,
-
-      addMap: (data) => {
-        const id = generateId();
-        const now = Date.now();
-        const map: QuestBoardMap = {
-          ...data,
-          id,
-          createdAt: now,
-          updatedAt: now,
-        };
-        set((s) => ({ maps: { ...s.maps, [id]: map } }));
-        return id;
-      },
-
-      updateMap: (id, updates) => {
-        set((s) => {
-          const existing = s.maps[id];
-          if (!existing) return s;
-          return {
-            maps: {
-              ...s.maps,
-              [id]: { ...existing, ...updates, updatedAt: Date.now() },
-            },
-          };
-        });
-      },
-
-      deleteMap: (id) => {
-        set((s) => {
-          const { [id]: _, ...rest } = s.maps;
-          return { maps: rest };
-        });
-      },
-
-      duplicateMap: (id) => {
-        const original = get().maps[id];
-        if (!original) return null;
-        const newId = generateId();
-        const now = Date.now();
-        const duplicate: QuestBoardMap = {
-          ...structuredClone(original),
-          id: newId,
-          name: `${original.name} (cópia)`,
-          createdAt: now,
-          updatedAt: now,
-        };
-        set((s) => ({ maps: { ...s.maps, [newId]: duplicate } }));
-        return newId;
-      },
-
-      importMap: (json, campaignId) => {
-        const result = parseMapJSON(json);
-        if ("error" in result) return null;
-
-        // Generate thumbnail for imported map
-        try {
-          result.thumbnail = generateMapThumbnail({
-            width: result.width,
-            height: result.height,
-            terrain: result.terrain,
-            walls: result.walls,
-            objects: result.objects,
-          });
-        } catch {
-          // Thumbnail generation might fail in non-browser contexts
+  hydrateMaps: (campaignId, fresh) => {
+    set((s) => {
+      // Substitui apenas os mapas da campanha em questão; preserva
+      // outras campanhas + qualquer otimista pending da mesma campanha
+      // (pode estar em vôo de POST).
+      const next: Record<string, QuestBoardMap> = {};
+      for (const [id, m] of Object.entries(s.maps)) {
+        if (m.campaignId === campaignId && !id.startsWith("map_pending_")) {
+          continue;
         }
+        next[id] = m;
+      }
+      for (const m of fresh) next[m.id] = m;
+      return {
+        maps: next,
+        hydratedAt: { ...s.hydratedAt, [campaignId]: Date.now() },
+      };
+    });
+  },
 
-        // JSON importado pode não trazer campaignId — usa a campanha ativa
-        // como dona. Se o JSON já trouxer o campo, respeita.
-        const id = get().addMap({
-          ...result,
-          campaignId: result.campaignId ?? campaignId,
-        });
-        return id;
-      },
+  addMap: async (campaignId, data) => {
+    const tempId = pendingId();
+    const now = Date.now();
+    const optimistic: QuestBoardMap = {
+      ...data,
+      id: tempId,
+      campaignId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ maps: { ...s.maps, [tempId]: optimistic } }));
 
-      setMapCollection: (mapId, collectionId) => {
-        set((s) => {
-          const existing = s.maps[mapId];
-          if (!existing) return s;
-          let nextOrder = 0;
-          if (collectionId !== null) {
-            const maxOrder = Object.values(s.maps)
-              .filter((m) => m.collectionId === collectionId)
-              .reduce((max, m) => Math.max(max, m.order ?? 0), 0);
-            nextOrder = maxOrder + 1;
-          }
-          return {
-            maps: {
-              ...s.maps,
-              [mapId]: {
-                ...existing,
-                collectionId,
-                order: nextOrder,
-                updatedAt: Date.now(),
-              },
-            },
-          };
-        });
-      },
+    try {
+      const created = await mapLibraryApi.createMap(campaignId, optimistic);
+      set((s) => {
+        const { [tempId]: _drop, ...rest } = s.maps;
+        return { maps: { ...rest, [created.id]: created } };
+      });
+      return created.id;
+    } catch (err) {
+      console.error("[map-library-store] addMap failed", err);
+      set((s) => {
+        const { [tempId]: _drop, ...rest } = s.maps;
+        return { maps: rest };
+      });
+      throw err;
+    }
+  },
 
-      reorderMapsInCollection: (collectionId, mapIds) => {
-        set((s) => {
-          const next: Record<string, QuestBoardMap> = { ...s.maps };
-          const now = Date.now();
-          for (let i = 0; i < mapIds.length; i++) {
-            const id = mapIds[i];
-            const map = s.maps[id];
-            if (!map || map.collectionId !== collectionId) continue;
-            next[id] = { ...map, order: i + 1, updatedAt: now };
-          }
-          return { maps: next };
-        });
-      },
+  updateMap: (id, updates) => {
+    const before = get().maps[id];
+    if (!before) return;
+    const optimistic: QuestBoardMap = {
+      ...before,
+      ...updates,
+      updatedAt: Date.now(),
+    };
+    set((s) => ({ maps: { ...s.maps, [id]: optimistic } }));
+    if (id.startsWith("map_pending_")) return;
+    void mapLibraryApi
+      .updateMap(id, updates)
+      .then((canonical) => {
+        set((s) => ({ maps: { ...s.maps, [id]: canonical } }));
+      })
+      .catch((err) => {
+        console.error("[map-library-store] updateMap failed", err);
+        set((s) => ({ maps: { ...s.maps, [id]: before } }));
+      });
+  },
 
-      clearCollectionFromMaps: (collectionId) => {
-        set((s) => {
-          const next: Record<string, QuestBoardMap> = { ...s.maps };
-          const now = Date.now();
-          for (const [id, map] of Object.entries(s.maps)) {
-            if (map.collectionId === collectionId) {
-              next[id] = { ...map, collectionId: null, order: 0, updatedAt: now };
-            }
-          }
-          return { maps: next };
-        });
-      },
+  deleteMap: (id) => {
+    const before = get().maps[id];
+    if (!before) return;
+    set((s) => {
+      const { [id]: _drop, ...rest } = s.maps;
+      return { maps: rest };
+    });
+    if (id.startsWith("map_pending_")) return;
+    void mapLibraryApi.deleteMap(id).catch((err) => {
+      console.error("[map-library-store] deleteMap failed", err);
+      set((s) => ({ maps: { ...s.maps, [id]: before } }));
+    });
+  },
 
-      migrateFromLegacy: () => {
-        if (get()._migrated) return;
+  duplicateMap: async (id) => {
+    const original = get().maps[id];
+    if (!original || !original.campaignId) return null;
+    const { id: _drop, createdAt: _c, updatedAt: _u, ...rest } = original;
+    void _drop;
+    void _c;
+    void _u;
+    const copy = {
+      ...structuredClone(rest),
+      name: `${original.name} (cópia)`,
+    };
+    return get().addMap(original.campaignId, copy);
+  },
 
-        try {
-          const raw = localStorage.getItem("questboard_saved_maps");
-          if (!raw) {
-            set({ _migrated: true });
-            return;
-          }
+  importMap: async (json, campaignId) => {
+    const result = parseMapJSON(json);
+    if ("error" in result) return null;
 
-          const oldMaps = JSON.parse(raw) as SavedMap[];
-          if (!Array.isArray(oldMaps) || oldMaps.length === 0) {
-            set({ _migrated: true });
-            return;
-          }
+    try {
+      result.thumbnail = generateMapThumbnail({
+        width: result.width,
+        height: result.height,
+        terrain: result.terrain,
+        walls: result.walls,
+        objects: result.objects,
+      });
+    } catch {
+      // Thumbnail pode falhar fora do browser; segue sem.
+    }
 
-          const newMaps: Record<string, QuestBoardMap> = { ...get().maps };
-          for (const old of oldMaps) {
-            const migrated = migrateSavedMap(old);
+    // Mapa importado pode trazer campaignId; senão usa a ativa.
+    const ownerCampaign = result.campaignId ?? campaignId;
+    if (!ownerCampaign) return null;
 
-            // Generate thumbnail
-            try {
-              migrated.thumbnail = generateMapThumbnail({
-                width: migrated.width,
-                height: migrated.height,
-                terrain: migrated.terrain,
-                walls: migrated.walls,
-                objects: migrated.objects,
-              });
-            } catch {
-              // Ignore thumbnail errors during migration
-            }
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = result;
+    void _id;
+    void _c;
+    void _u;
+    return get().addMap(ownerCampaign, rest);
+  },
 
-            newMaps[migrated.id] = migrated;
-          }
+  setMapCollection: (mapId, collectionId) => {
+    const before = get().maps[mapId];
+    if (!before) return;
+    // Recalcula `order` localmente pra novos mapas no fim da coleção.
+    let nextOrder = 0;
+    if (collectionId !== null) {
+      const maxOrder = Object.values(get().maps)
+        .filter((m) => m.collectionId === collectionId)
+        .reduce((max, m) => Math.max(max, m.order ?? 0), 0);
+      nextOrder = maxOrder + 1;
+    }
+    get().updateMap(mapId, { collectionId, order: nextOrder });
+  },
 
-          set({ maps: newMaps, _migrated: true });
-        } catch {
-          // Migration failed, mark as done anyway to avoid retry loops
-          set({ _migrated: true });
-        }
-      },
-    }),
-    {
-      name: "questboard-maps",
-      version: 3,
-      partialize: (state) => ({
-        maps: state.maps,
-        _migrated: state._migrated,
-      }),
-      migrate: (persisted, fromVersion) => {
-        const state = persisted as
-          | { maps?: Record<string, Partial<QuestBoardMap>>; _migrated?: boolean }
-          | undefined;
-        if (!state || !state.maps) return persisted;
-        let maps = state.maps;
-        if (fromVersion < 2) {
-          const upgraded: Record<string, Partial<QuestBoardMap>> = {};
-          for (const [id, map] of Object.entries(maps)) {
-            upgraded[id] = {
-              ...map,
-              collectionId: map.collectionId ?? null,
-              order: map.order ?? 0,
-            };
-          }
-          maps = upgraded;
-        }
-        if (fromVersion < 3) {
-          // Mapas pré-fatia ficam órfãos (campaignId=null). Não tentamos
-          // adivinhar a campanha — usuário re-associa pela UI quando precisar.
-          const withCampaign: Record<string, QuestBoardMap> = {};
-          for (const [id, map] of Object.entries(maps)) {
-            withCampaign[id] = {
-              ...(map as QuestBoardMap),
-              campaignId: (map as QuestBoardMap).campaignId ?? null,
-            };
-          }
-          return { ...state, maps: withCampaign };
-        }
-        return { ...state, maps };
-      },
-    },
-  ),
-);
+  reorderMapsInCollection: (collectionId, mapIds) => {
+    // Otimismo local primeiro; depois envia PATCHs em paralelo. Backend
+    // não tem endpoint dedicado de reorder — usa updates individuais.
+    set((s) => {
+      const next: Record<string, QuestBoardMap> = { ...s.maps };
+      const now = Date.now();
+      for (let i = 0; i < mapIds.length; i++) {
+        const id = mapIds[i];
+        const map = s.maps[id];
+        if (!map || map.collectionId !== collectionId) continue;
+        next[id] = { ...map, order: i + 1, updatedAt: now };
+      }
+      return { maps: next };
+    });
+    for (let i = 0; i < mapIds.length; i++) {
+      const id = mapIds[i];
+      if (id.startsWith("map_pending_")) continue;
+      const map = get().maps[id];
+      if (!map || map.collectionId !== collectionId) continue;
+      void mapLibraryApi
+        .updateMap(id, { order: i + 1 })
+        .catch((err) =>
+          console.error("[map-library-store] reorder failed for", id, err),
+        );
+    }
+  },
+
+  clearCollectionFromMaps: (collectionId) => {
+    const affected = Object.values(get().maps).filter(
+      (m) => m.collectionId === collectionId,
+    );
+    set((s) => {
+      const next: Record<string, QuestBoardMap> = { ...s.maps };
+      const now = Date.now();
+      for (const m of affected) {
+        next[m.id] = { ...m, collectionId: null, order: 0, updatedAt: now };
+      }
+      return { maps: next };
+    });
+    for (const m of affected) {
+      if (m.id.startsWith("map_pending_")) continue;
+      void mapLibraryApi
+        .updateMap(m.id, { collectionId: null, order: 0 })
+        .catch((err) =>
+          console.error(
+            "[map-library-store] clearCollection failed for",
+            m.id,
+            err,
+          ),
+        );
+    }
+  },
+}));
+
+/** Hidrata mapas da campanha quando o componente monta. Throttle 5s. */
+export function useHydrateMapLibrary(campaignId: string | null): void {
+  const hydrate = useMapLibraryStore((s) => s.hydrateMaps);
+  const lastRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!campaignId) return;
+    let cancelled = false;
+    const last = lastRef.current[campaignId] ?? 0;
+    if (Date.now() - last < 5_000) return;
+    lastRef.current[campaignId] = Date.now();
+
+    void mapLibraryApi
+      .listMapsForCampaign(campaignId)
+      .then((maps) => {
+        if (cancelled) return;
+        hydrate(campaignId, maps);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[map-library-store] hydrate failed", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, hydrate]);
+}

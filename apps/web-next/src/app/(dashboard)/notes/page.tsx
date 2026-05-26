@@ -18,6 +18,7 @@ import {
   NOTE_CATEGORIES,
   NOTE_CATEGORY_COLORS,
   NOTE_CATEGORY_LABELS,
+  useHydrateNotes,
   useNotesStore,
 } from "@/lib/notes-store";
 
@@ -38,6 +39,7 @@ function formatRelative(iso: string): string {
 
 export default function NotesPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  useHydrateNotes(activeCampaignId);
   const notes = useNotesStore((s) => s.notes);
   const createNote = useNotesStore((s) => s.createNote);
   const updateNote = useNotesStore((s) => s.updateNote);

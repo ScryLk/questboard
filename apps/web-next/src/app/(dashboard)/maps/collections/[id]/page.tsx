@@ -25,8 +25,15 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useMapCollectionsStore } from "@/lib/map-collections-store";
-import { useMapLibraryStore } from "@/lib/map-library-store";
+import {
+  useHydrateMapCollections,
+  useMapCollectionsStore,
+} from "@/lib/map-collections-store";
+import {
+  useHydrateMapLibrary,
+  useMapLibraryStore,
+} from "@/lib/map-library-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 import { SortableMapCard } from "@/components/maps/sortable-map-card";
 import { AddMapsToCollectionDialog } from "@/components/maps/add-maps-to-collection-dialog";
 
@@ -35,6 +42,9 @@ export default function CollectionDetailPage() {
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
 
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  useHydrateMapLibrary(activeCampaignId);
+  useHydrateMapCollections(activeCampaignId);
   const collection = useMapCollectionsStore((s) => s.collections[id]);
   const updateCollection = useMapCollectionsStore((s) => s.updateCollection);
   const deleteCollection = useMapCollectionsStore((s) => s.deleteCollection);
@@ -107,10 +117,10 @@ export default function CollectionDetailPage() {
     );
   }
 
-  const handleRename = () => {
+  const handleRename = async () => {
     const newName = window.prompt("Novo nome da coleção:", collection.name)?.trim();
     if (!newName || newName === collection.name) return;
-    const result = updateCollection(id, { name: newName });
+    const result = await updateCollection(id, { name: newName });
     if ("error" in result) window.alert(result.error);
   };
 
@@ -120,7 +130,7 @@ export default function CollectionDetailPage() {
       collection.description ?? "",
     );
     if (next === null) return;
-    updateCollection(id, { description: next });
+    void updateCollection(id, { description: next });
   };
 
   const handleDeleteCollection = () => {

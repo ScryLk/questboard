@@ -98,39 +98,56 @@ export function NewMapModal({
   const dimensionError = validateMapDimensions(cols, rows);
   const warnLarge = !dimensionError && isSoftLarge(cols, rows);
 
-  const handleCreate = () => {
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const handleCreate = async () => {
     if (dimensionError) return;
     if (aiDescriptionInvalid) return;
-    const mapName = name.trim() || (aiMode ? "Mapa IA" : "Novo Mapa");
-    const id = addMap({
-      version: 1,
-      name: mapName,
-      description: "",
-      tags: [],
-      category,
-      thumbnail: null,
-      width: cols,
-      height: rows,
-      cellSizeFt: 5,
-      terrain: {},
-      walls: {},
-      objects: [],
-      backgroundImage: null,
-      backgroundOpacity: 0.5,
-      stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
-      collectionId: null,
-      order: 0,
-      campaignId: activeCampaignId,
-    });
-    if (aiMode) {
-      onCreated(id, {
-        description: aiDescription.trim(),
-        regionMode: aiRegionMode,
-      });
-    } else {
-      onCreated(id);
+    if (!activeCampaignId) {
+      setCreateError("Nenhuma campanha ativa.");
+      return;
     }
-    onClose();
+    if (creating) return;
+    setCreating(true);
+    setCreateError(null);
+    const mapName = name.trim() || (aiMode ? "Mapa IA" : "Novo Mapa");
+    try {
+      const id = await addMap(activeCampaignId, {
+        version: 1,
+        name: mapName,
+        description: "",
+        tags: [],
+        category,
+        thumbnail: null,
+        width: cols,
+        height: rows,
+        cellSizeFt: 5,
+        terrain: {},
+        walls: {},
+        objects: [],
+        backgroundImage: null,
+        backgroundOpacity: 0.5,
+        stats: { terrainCount: 0, wallCount: 0, objectCount: 0 },
+        collectionId: null,
+        order: 0,
+        campaignId: activeCampaignId,
+      });
+      if (aiMode) {
+        onCreated(id, {
+          description: aiDescription.trim(),
+          regionMode: aiRegionMode,
+        });
+      } else {
+        onCreated(id);
+      }
+      onClose();
+    } catch (err) {
+      setCreateError(
+        (err as { message?: string }).message ?? "Falha ao criar o mapa.",
+      );
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (

@@ -6,6 +6,7 @@ import { CreateSessionModal } from "@/components/create-session-modal";
 import { CampaignSettingsModal } from "@/components/campaigns/campaign-settings-modal";
 import { CampaignQuickModalHost } from "@/components/campaigns/campaign-quick-modal";
 import { useCreateSessionModalStore } from "@/lib/create-session-modal-store";
+import { useReconcileCampaigns } from "@/hooks/use-reconcile-campaigns";
 
 export default function DashboardLayout({
   children,
@@ -14,8 +15,16 @@ export default function DashboardLayout({
 }) {
   const isOpen = useCreateSessionModalStore((s) => s.isOpen);
   const prefilledSystem = useCreateSessionModalStore((s) => s.prefilledSystem);
+  const prefilledCampaignId = useCreateSessionModalStore(
+    (s) => s.prefilledCampaignId,
+  );
   const openModal = useCreateSessionModalStore((s) => s.open);
   const closeModal = useCreateSessionModalStore((s) => s.close);
+
+  // Limpa campanhas fantasma do cache local quando o backend diz que
+  // não existem mais (deleção/reset de DB). Sem isso a sidebar mostra
+  // campanhas que o servidor já não conhece.
+  useReconcileCampaigns();
 
   return (
     <div className="flex h-screen overflow-hidden bg-brand-primary">
@@ -29,6 +38,7 @@ export default function DashboardLayout({
         open={isOpen}
         onClose={closeModal}
         prefilledSystem={prefilledSystem}
+        prefilledCampaignId={prefilledCampaignId}
       />
       <CampaignSettingsModal />
       <CampaignQuickModalHost />

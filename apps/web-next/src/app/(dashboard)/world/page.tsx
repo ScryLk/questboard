@@ -21,6 +21,7 @@ import {
   DISPOSITION_LABELS,
   WORLD_KIND_LABELS,
   WORLD_KIND_SINGULAR,
+  useHydrateWorld,
   useWorldStore,
 } from "@/lib/world-store";
 
@@ -43,6 +44,7 @@ const SUBTITLE_PLACEHOLDER: Record<WorldEntityKind, string> = {
 
 export default function WorldPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  useHydrateWorld(activeCampaignId);
   const entities = useWorldStore((s) => s.entities);
   const createEntity = useWorldStore((s) => s.createEntity);
   const updateEntity = useWorldStore((s) => s.updateEntity);

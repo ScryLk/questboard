@@ -353,6 +353,8 @@ model Campaign {
   narrativeNodes NarrativeNode[]
   notes          Note[]
   worldEntities  WorldEntity[]
+  mapTemplates   MapTemplate[]
+  mapCollections MapCollection[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1303,4 +1305,76 @@ model UserFollow {
 
   @@unique([followerId, followedId])
   @@index([followedId])
+}
+
+// ── Map Library ──
+//
+// Templates de mapa reutilizáveis por campanha. Cada template guarda
+// terrain/walls/objects como JSONB (record indexed by "x,y" pra
+// terrain e wallEdgeKey pra walls). Thumbnail/background são strings
+// (data URI base64 hoje; futura fatia move pra R2 quando bater limite
+// de tamanho).
+//
+// Distinção de `Map` (model session-runtime): `Map` é a instância em
+// jogo, com tokens/fog/lights vivos; `MapTemplate` é a versão template
+// que o GM mantém entre sessões.
+
+model MapTemplate {
+  id          String  @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  name        String @db.VarChar(120)
+  description String @default("") @db.VarChar(2000)
+  tags        String[] @default([])
+  category    String @default("custom") @db.VarChar(40)
+
+  /** PNG base64. Gerado pelo frontend ao salvar (canvas.toDataURL). */
+  thumbnail   String? @db.Text
+
+  width      Int
+  height     Int
+  cellSizeFt Int @default(5)
+
+  /** Mapa `"x,y" → terrainType`. */
+  terrain Json @default("{}")
+  /** Mapa `edgeKey → { type, style, lockDC? }`. */
+  walls   Json @default("{}")
+  /** Lista de `{ id, x, y, type, rotation }`. */
+  objects Json @default("[]")
+
+  /** Imagem de fundo. base64 data URI hoje; R2 quando bater limite. */
+  background String? @db.Text
+  bgOpacity  Int     @default(60)
+
+  /** Cache dos contadores pra a UI mostrar sem desserializar terrain/walls. */
+  stats Json @default("{}")
+
+  collectionId String?
+  collection   MapCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  orderIndex   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([collectionId])
+}
+
+model MapCollection {
+  id          String  @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  name        String  @db.VarChar(60)
+  description String? @db.VarChar(500)
+  coverMapId  String?
+
+  maps        MapTemplate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId])
+  @@unique([campaignId, name])
 }

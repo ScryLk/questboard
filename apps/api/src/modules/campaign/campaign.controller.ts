@@ -18,7 +18,17 @@ export function createCampaignController(campaignService: CampaignService) {
     },
 
     async create(request: FastifyRequest, reply: FastifyReply) {
-      const body = request.body as { name: string; description?: string; system: string; isPublic?: boolean; maxPlayers?: number };
+      const body = request.body as {
+        name: string;
+        description?: string;
+        system: string;
+        isPublic?: boolean;
+        maxPlayers?: number;
+        coverUrl?: string | null;
+        bannerUrl?: string | null;
+        tags?: string[];
+        settings?: Record<string, unknown>;
+      };
       const campaign = await campaignService.create(request.user.id, request.user.plan, body);
       return reply.status(201).send(createSuccessResponse(campaign));
     },
@@ -27,7 +37,16 @@ export function createCampaignController(campaignService: CampaignService) {
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply,
     ) {
-      const body = request.body as { name?: string; description?: string; isPublic?: boolean; maxPlayers?: number; tags?: string[] };
+      const body = request.body as {
+        name?: string;
+        description?: string;
+        isPublic?: boolean;
+        maxPlayers?: number;
+        tags?: string[];
+        coverUrl?: string | null;
+        bannerUrl?: string | null;
+        settings?: Record<string, unknown>;
+      };
       const campaign = await campaignService.update(request.params.id, request.user.id, body);
       return reply.send(createSuccessResponse(campaign));
     },

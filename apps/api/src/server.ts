@@ -8,6 +8,7 @@ import { registerRateLimit } from "./middleware/rate-limit.js";
 import { verifyAuth } from "./middleware/auth.js";
 import { createSocketServer } from "./lib/socket.js";
 import { sessionsRoutes } from "./modules/sessions/sessions.routes.js";
+import { mapLibraryRoutes } from "./modules/map-library/map-library.routes.js";
 import { userRoutes } from "./modules/user/user.routes.js";
 import { billingRoutes, billingWebhookRoutes } from "./modules/billing/billing.routes.js";
 import { webhookRoutes } from "./modules/webhook/webhook.routes.js";
@@ -38,6 +39,9 @@ async function buildApp() {
   await app.register(cors, {
     origin: env.CORS_ORIGIN.split(","),
     credentials: true,
+    // @fastify/cors default permite só GET/HEAD/POST. Sem explicitar,
+    // PATCH/PUT/DELETE batem no preflight com erro de CORS.
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   });
   await app.register(errorHandler);
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
@@ -76,6 +80,7 @@ async function buildApp() {
       await v1.register(worldRoutes);
       await v1.register(behaviorRoutes);
       await v1.register(mediaRoutes);
+      await v1.register(mapLibraryRoutes);
     },
     { prefix: "/api/v1" },
   );

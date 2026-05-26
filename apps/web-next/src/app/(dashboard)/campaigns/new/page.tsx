@@ -97,6 +97,7 @@ export default function NewCampaignPage() {
   const [step, setStep] = useState<Step>(1);
   const [draft, setDraft] = useState<DraftState>(INITIAL);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Aviso amigável se Cthulhu (engine freeform) — não bloqueia, só informa.
@@ -174,7 +175,8 @@ export default function NewCampaignPage() {
     };
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (submitting) return;
     setSubmitError(null);
     setFieldErrors({});
     const input = buildInput();
@@ -193,8 +195,17 @@ export default function NewCampaignPage() {
       else setStep(3);
       return;
     }
-    const created = createCampaign(parsed.data);
-    router.push(`/campaigns/${created.id}`);
+    setSubmitting(true);
+    try {
+      const created = await createCampaign(parsed.data);
+      router.push(`/campaigns/${created.id}`);
+    } catch (err) {
+      setSubmitError(
+        (err as { message?: string }).message ??
+          "Falha ao criar campanha. Tente novamente.",
+      );
+      setSubmitting(false);
+    }
   }
 
   const stepProgress = useMemo(() => (step / 3) * 100, [step]);
@@ -590,11 +601,11 @@ export default function NewCampaignPage() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={soloPublicConflict}
+            disabled={soloPublicConflict || submitting}
             className="flex items-center gap-1.5 rounded-md bg-brand-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Check className="h-4 w-4" />
-            Criar campanha
+            {submitting ? "Criando..." : "Criar campanha"}
           </button>
         )}
       </div>

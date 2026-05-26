@@ -961,13 +961,25 @@ function MapEditorInner() {
 
     if (state.savedMapId) {
       updateMap(state.savedMapId, { ...mapData, thumbnail });
+      setSaveIndicator("saved");
+      setTimeout(() => setSaveIndicator(null), 2000);
     } else {
-      const newId = addMap({ ...mapData, thumbnail });
-      setState((s) => ({ ...s, savedMapId: newId }));
-      window.history.replaceState(null, "", `/maps/editor?id=${newId}`);
+      if (!activeCampaignId) {
+        // Sem campanha ativa não dá pra persistir o mapa novo.
+        // Não bloqueia o editor; só não salva.
+        return;
+      }
+      void addMap(activeCampaignId, { ...mapData, thumbnail })
+        .then((newId) => {
+          setState((s) => ({ ...s, savedMapId: newId }));
+          window.history.replaceState(null, "", `/maps/editor?id=${newId}`);
+          setSaveIndicator("saved");
+          setTimeout(() => setSaveIndicator(null), 2000);
+        })
+        .catch((err) => {
+          console.error("[editor] addMap failed", err);
+        });
     }
-    setSaveIndicator("saved");
-    setTimeout(() => setSaveIndicator(null), 2000);
   }, [state.mapName, state.gridCols, state.gridRows, state.terrainCells, state.wallEdges, state.mapObjects, state.backgroundImage, state.backgroundOpacity, state.savedMapId, addMap, updateMap, activeCampaignId]);
 
   // Load map from URL param on mount

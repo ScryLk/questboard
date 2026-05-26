@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { Logo } from "@/components/brand/logo";
 
 interface AuthShellProps {
   children: ReactNode;
@@ -26,7 +27,7 @@ export function AuthShell({
 
       <main className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#111116]/95 p-8 shadow-2xl backdrop-blur">
         <div className="mb-6 flex justify-center">
-          <LogoMark />
+          <Logo variant="mark" size="lg" priority />
         </div>
         {children}
       </main>
@@ -119,37 +120,7 @@ export function OAuthButton({
   );
 }
 
-// ── Logo + decorações ────────────────────────────────────────────
-
-function LogoMark() {
-  return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1A1A24] to-[#0D0D12] shadow-inner">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-6 w-6"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="9"
-          stroke="url(#logo-gradient)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeDasharray="40 60"
-          strokeDashoffset="10"
-        />
-        <defs>
-          <linearGradient id="logo-gradient" x1="0" y1="0" x2="24" y2="24">
-            <stop offset="0%" stopColor="#9BA8FF" />
-            <stop offset="100%" stopColor="#5C7BFF" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  );
-}
+// ── Decorações ───────────────────────────────────────────────────
 
 function CornerCircuits() {
   return (

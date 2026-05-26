@@ -1,9 +1,13 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+"use client";
 
-// Entidades do "Mundo" — NPCs, locais, facções e lore. Modelados com
-// um discriminator único (`kind`) pra simplificar o store e a UI:
-// CRUD compartilhado, campos extras por tipo.
+// World store — respaldado pelo backend (apps/api/src/modules/world).
+// Mesma arquitetura do notes-store: cache local pra UI síncrona,
+// mutations chamam REST em background com revert em caso de falha.
+
+import { useEffect, useRef } from "react";
+import { create } from "zustand";
+import * as worldApi from "./world-api";
+import type { WorldEntityDto } from "./world-api";
 
 export type WorldEntityKind = "npc" | "location" | "faction" | "lore";
 
@@ -14,13 +18,9 @@ export interface WorldEntity {
   campaignId: string;
   kind: WorldEntityKind;
   name: string;
-  /** Texto livre — descrição, lore, motivações. */
   description: string;
-  /** Campo livre exibido no card (raça pra NPC, tipo pra local, etc.). */
   subtitle?: string;
-  /** Campo de localização — usado por NPCs e ocasionalmente facções. */
   location?: string;
-  /** Disposição (default neutral). Só faz sentido pra NPC e facção. */
   disposition?: Disposition;
   notes?: string;
   createdAt: string;
@@ -29,59 +29,174 @@ export interface WorldEntity {
 
 interface WorldState {
   entities: WorldEntity[];
+
+  hydrateEntities: (campaignId: string, dtos: WorldEntityDto[]) => void;
   createEntity: (
     e: Omit<WorldEntity, "id" | "createdAt" | "updatedAt">,
   ) => WorldEntity;
   updateEntity: (
     id: string,
-    updates: Partial<Omit<WorldEntity, "id" | "createdAt" | "campaignId" | "kind">>,
+    updates: Partial<
+      Omit<WorldEntity, "id" | "createdAt" | "campaignId" | "kind">
+    >,
   ) => void;
   deleteEntity: (id: string) => void;
 }
 
-function generateId(): string {
-  return `world_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+function dtoToEntity(dto: WorldEntityDto): WorldEntity {
+  return {
+    id: dto.id,
+    campaignId: dto.campaignId,
+    kind: worldApi.kindFromDto(dto.kind) as WorldEntityKind,
+    name: dto.name,
+    description: dto.description,
+    subtitle: dto.subtitle ?? undefined,
+    location: dto.location ?? undefined,
+    disposition:
+      (worldApi.dispoFromDto(dto.disposition) as Disposition | undefined) ??
+      undefined,
+    notes: dto.notes ?? undefined,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
 }
 
-// Store inicia vazio — dados vêm do backend via `useBackendWorld`
-// (apps/api/src/modules/world) ou da UI quando GM cria.
-const SEED: WorldEntity[] = [];
+function pendingId(): string {
+  return `world_pending_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
 
-export const useWorldStore = create<WorldState>()(
-  persist(
-    (set) => ({
-      entities: SEED,
+export const useWorldStore = create<WorldState>()((set, get) => ({
+  entities: [],
 
-      createEntity: (entity) => {
-        const now = new Date().toISOString();
-        const newEntity: WorldEntity = {
-          ...entity,
-          id: generateId(),
-          createdAt: now,
-          updatedAt: now,
-        };
-        set((s) => ({ entities: [newEntity, ...s.entities] }));
-        return newEntity;
-      },
+  hydrateEntities: (campaignId, dtos) => {
+    const fresh = dtos.map(dtoToEntity);
+    set((s) => {
+      const other = s.entities.filter(
+        (e) =>
+          e.campaignId !== campaignId || e.id.startsWith("world_pending_"),
+      );
+      return { entities: [...fresh, ...other] };
+    });
+  },
 
-      updateEntity: (id, updates) =>
+  createEntity: (entity) => {
+    const now = new Date().toISOString();
+    const optimistic: WorldEntity = {
+      ...entity,
+      id: pendingId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ entities: [optimistic, ...s.entities] }));
+
+    void worldApi
+      .createWorldEntity(entity.campaignId, {
+        kind: worldApi.kindToDto(entity.kind),
+        name: entity.name,
+        description: entity.description,
+        subtitle: entity.subtitle,
+        location: entity.location,
+        disposition: worldApi.dispoToDto(entity.disposition),
+        notes: entity.notes,
+      })
+      .then((dto) => {
+        const real = dtoToEntity(dto);
         set((s) => ({
-          entities: s.entities.map((e) =>
-            e.id === id
-              ? { ...e, ...updates, updatedAt: new Date().toISOString() }
-              : e,
-          ),
-        })),
+          entities: s.entities.map((e) => (e.id === optimistic.id ? real : e)),
+        }));
+      })
+      .catch((err) => {
+        console.error("[world-store] createEntity failed", err);
+        set((s) => ({
+          entities: s.entities.filter((e) => e.id !== optimistic.id),
+        }));
+      });
 
-      deleteEntity: (id) =>
-        set((s) => ({ entities: s.entities.filter((e) => e.id !== id) })),
-    }),
-    {
-      name: "questboard-world",
-      version: 1,
-    },
-  ),
-);
+    return optimistic;
+  },
+
+  updateEntity: (id, updates) => {
+    const before = get().entities.find((e) => e.id === id);
+    if (!before) return;
+    set((s) => ({
+      entities: s.entities.map((e) =>
+        e.id === id
+          ? { ...e, ...updates, updatedAt: new Date().toISOString() }
+          : e,
+      ),
+    }));
+    if (id.startsWith("world_pending_")) return;
+    void worldApi
+      .updateWorldEntity(id, {
+        ...(updates.name !== undefined ? { name: updates.name } : {}),
+        ...(updates.description !== undefined
+          ? { description: updates.description }
+          : {}),
+        ...(updates.subtitle !== undefined
+          ? { subtitle: updates.subtitle }
+          : {}),
+        ...(updates.location !== undefined
+          ? { location: updates.location }
+          : {}),
+        ...(updates.disposition !== undefined
+          ? { disposition: worldApi.dispoToDto(updates.disposition) }
+          : {}),
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+      })
+      .then((dto) => {
+        const real = dtoToEntity(dto);
+        set((s) => ({
+          entities: s.entities.map((e) => (e.id === id ? real : e)),
+        }));
+      })
+      .catch((err) => {
+        console.error("[world-store] updateEntity failed", err);
+        set((s) => ({
+          entities: s.entities.map((e) => (e.id === id ? before : e)),
+        }));
+      });
+  },
+
+  deleteEntity: (id) => {
+    const before = get().entities.find((e) => e.id === id);
+    if (!before) return;
+    set((s) => ({ entities: s.entities.filter((e) => e.id !== id) }));
+    if (id.startsWith("world_pending_")) return;
+    void worldApi.deleteWorldEntity(id).catch((err) => {
+      console.error("[world-store] deleteEntity failed", err);
+      set((s) => ({ entities: [before, ...s.entities] }));
+    });
+  },
+}));
+
+/** Hidrata entidades da campanha ativa. Mesmo padrão de useHydrateNotes. */
+export function useHydrateWorld(campaignId: string | null): void {
+  const hydrate = useWorldStore((s) => s.hydrateEntities);
+  const lastRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!campaignId) return;
+    let cancelled = false;
+    const last = lastRef.current[campaignId] ?? 0;
+    if (Date.now() - last < 5_000) return;
+    lastRef.current[campaignId] = Date.now();
+
+    void worldApi
+      .listWorldEntities(campaignId)
+      .then((dtos) => {
+        if (cancelled) return;
+        hydrate(campaignId, dtos);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[world-store] hydrate failed", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, hydrate]);
+}
 
 // ── Labels & helpers ──
 

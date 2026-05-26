@@ -23,6 +23,23 @@ export interface ApiError {
   raw?: unknown;
 }
 
+/** Erro de API como classe real (extends Error). Sem isso, console.error
+ *  imprime `{}` no Next porque o objeto não é instância de Error. A
+ *  interface `ApiError` segue exposta pra type-guards externos. */
+export class ApiRequestError extends Error implements ApiError {
+  code: string;
+  statusCode: number;
+  raw?: unknown;
+
+  constructor(input: ApiError) {
+    super(input.message);
+    this.name = "ApiRequestError";
+    this.code = input.code;
+    this.statusCode = input.statusCode;
+    this.raw = input.raw;
+  }
+}
+
 /** Retorna o token Bearer atual. Em browser: leitura do Clerk session
  *  (window.Clerk?.session?.getToken). Espera até 3s pelo Clerk
  *  inicializar — evita o race em que hooks disparam fetch antes do
@@ -111,13 +128,12 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const err: ApiError = {
+    throw new ApiRequestError({
       code: extractCode(parsed),
       message: extractMessage(parsed) ?? `Request falhou (${response.status})`,
       statusCode: response.status,
       raw: parsed,
-    };
-    throw err;
+    });
   }
 
   // Backend usa `createSuccessResponse({ data })` — extraímos `.data`.
@@ -147,21 +163,26 @@ function extractCode(payload: unknown): string {
 }
 
 function extractMessage(payload: unknown): string | null {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "error" in payload &&
-    payload.error &&
-    typeof payload.error === "object" &&
-    "message" in payload.error
-  ) {
-    return String((payload.error as { message?: unknown }).message ?? "");
+  if (typeof payload === "string" && payload.trim().length > 0) {
+    return payload;
+  }
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>;
+    // Formato canônico do backend: { error: { code, message } }
+    if (p.error && typeof p.error === "object") {
+      const errMsg = (p.error as { message?: unknown }).message;
+      if (typeof errMsg === "string" && errMsg.length > 0) return errMsg;
+    }
+    // Fallbacks comuns: { message }, { error: "string" }
+    if (typeof p.message === "string" && p.message.length > 0) return p.message;
+    if (typeof p.error === "string" && p.error.length > 0) return p.error;
   }
   return null;
 }
 
 /** Helper pra detectar `ApiError` vs erro genérico. */
 export function isApiError(err: unknown): err is ApiError {
+  if (err instanceof ApiRequestError) return true;
   return (
     typeof err === "object" &&
     err !== null &&

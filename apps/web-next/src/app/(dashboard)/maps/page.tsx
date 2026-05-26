@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FolderPlus, Map, Plus, Search, Sparkles, Upload } from "lucide-react";
-import { useMapLibraryStore } from "@/lib/map-library-store";
-import { useMapCollectionsStore } from "@/lib/map-collections-store";
+import {
+  useHydrateMapLibrary,
+  useMapLibraryStore,
+} from "@/lib/map-library-store";
+import {
+  useHydrateMapCollections,
+  useMapCollectionsStore,
+} from "@/lib/map-collections-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { MapCategory } from "@/lib/map-types";
 import { MapCard } from "@/components/maps/map-card";
@@ -38,9 +44,9 @@ export default function MapsPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
 
   const router = useRouter();
+  useHydrateMapLibrary(activeCampaignId);
+  useHydrateMapCollections(activeCampaignId);
   const maps = useMapLibraryStore((s) => s.maps);
-  const _migrated = useMapLibraryStore((s) => s._migrated);
-  const migrateFromLegacy = useMapLibraryStore((s) => s.migrateFromLegacy);
   const deleteMap = useMapLibraryStore((s) => s.deleteMap);
   const duplicateMap = useMapLibraryStore((s) => s.duplicateMap);
   const clearCollectionFromMaps = useMapLibraryStore((s) => s.clearCollectionFromMaps);
@@ -62,10 +68,6 @@ export default function MapsPage() {
   const [exportMapId, setExportMapId] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    if (mounted && !_migrated) migrateFromLegacy();
-  }, [mounted, _migrated, migrateFromLegacy]);
 
   const allMaps = useMemo(
     () =>
@@ -144,7 +146,11 @@ export default function MapsPage() {
   };
 
   const handleDuplicate = (id: string) => {
-    duplicateMap(id);
+    void duplicateMap(id).catch((err) => {
+      window.alert(
+        (err as { message?: string }).message ?? "Falha ao duplicar mapa.",
+      );
+    });
   };
 
   const handleCreated = (id: string) => {
@@ -177,12 +183,12 @@ export default function MapsPage() {
     router.push(`/gameplay/local`);
   };
 
-  const handleRenameCollection = (id: string) => {
+  const handleRenameCollection = async (id: string) => {
     const current = collections[id];
     if (!current) return;
     const newName = window.prompt("Novo nome da coleção:", current.name)?.trim();
     if (!newName || newName === current.name) return;
-    const result = updateCollection(id, { name: newName });
+    const result = await updateCollection(id, { name: newName });
     if ("error" in result) {
       window.alert(result.error);
     }

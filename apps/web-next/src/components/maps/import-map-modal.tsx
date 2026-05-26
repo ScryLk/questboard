@@ -59,14 +59,24 @@ export function ImportMapModal({ onClose, onImported }: ImportMapModalProps) {
     [processFile],
   );
 
-  const handleImport = () => {
-    if (!rawJson) return;
-    const id = importMap(rawJson, activeCampaignId);
-    if (id) {
-      onImported?.(id);
-      onClose();
-    } else {
-      setError("Erro ao importar o mapa.");
+  const [importing, setImporting] = useState(false);
+  const handleImport = async () => {
+    if (!rawJson || importing) return;
+    setImporting(true);
+    try {
+      const id = await importMap(rawJson, activeCampaignId);
+      if (id) {
+        onImported?.(id);
+        onClose();
+      } else {
+        setError("Erro ao importar o mapa.");
+      }
+    } catch (err) {
+      setError(
+        (err as { message?: string }).message ?? "Erro ao importar o mapa.",
+      );
+    } finally {
+      setImporting(false);
     }
   };
 

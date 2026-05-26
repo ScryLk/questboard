@@ -4,8 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Map as MapIcon, X } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
-import { useMapLibraryStore } from "@/lib/map-library-store";
-import { useMapCollectionsStore } from "@/lib/map-collections-store";
+import {
+  useHydrateMapLibrary,
+  useMapLibraryStore,
+} from "@/lib/map-library-store";
+import {
+  useHydrateMapCollections,
+  useMapCollectionsStore,
+} from "@/lib/map-collections-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 // Tools que abrem pickers flutuantes em cima do canvas — quando algum
 // desses está ativo, escondemos o botão de troca de mapa pra não
@@ -22,6 +29,9 @@ const TOOLS_WITH_FLOATING_PICKER = new Set([
 
 export function GameplayMapPicker() {
   const [open, setOpen] = useState(false);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
+  useHydrateMapLibrary(activeCampaignId);
+  useHydrateMapCollections(activeCampaignId);
   const activeMapId = useGameplayStore((s) => s.activeMapId);
   const mapConfig = useGameplayStore((s) => s.mapConfig);
   const activeTool = useGameplayStore((s) => s.activeTool);

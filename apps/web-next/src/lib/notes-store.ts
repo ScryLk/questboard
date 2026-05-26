@@ -1,5 +1,17 @@
+"use client";
+
+// Notes store — respaldado pelo backend (apps/api/src/modules/notes).
+// Cache local serve só pra UI síncrona; verdade vive no Postgres.
+//
+// Hidratação: por campanha. Quando `activeCampaignId` muda, a página
+// dispara `useHydrateNotes(campaignId)` (definido aqui) pra preencher o
+// cache. Mutações chamam REST em background; otimismo + revert em
+// caso de falha.
+
+import { useEffect, useRef } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import * as notesApi from "./notes-api";
+import type { NoteDto } from "./notes-api";
 
 export type NoteCategory = "plot" | "item" | "npc" | "general" | "location";
 
@@ -16,6 +28,11 @@ export interface CampaignNote {
 
 interface NotesState {
   notes: CampaignNote[];
+  /** Map campaignId → ISO timestamp da última hidratação. Evita refetch
+   *  em loops curtos. */
+  lastHydrated: Record<string, number>;
+
+  hydrateNotes: (campaignId: string, dtos: NoteDto[]) => void;
   createNote: (
     note: Omit<CampaignNote, "id" | "createdAt" | "updatedAt">,
   ) => CampaignNote;
@@ -26,49 +43,150 @@ interface NotesState {
   deleteNote: (id: string) => void;
 }
 
-function generateId(): string {
-  return `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+function dtoToNote(dto: NoteDto): CampaignNote {
+  return {
+    id: dto.id,
+    campaignId: dto.campaignId,
+    title: dto.title,
+    category: notesApi.categoryFromDto(dto.category) as NoteCategory,
+    content: dto.content,
+    isGmOnly: notesApi.visibilityToIsGmOnly(dto.visibility),
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
 }
 
-// Store inicia vazio — dados vêm do backend via `useBackendNotes`
-// (apps/api/src/modules/notes) ou da UI quando GM cria.
-const SEED: CampaignNote[] = [];
+function generateLocalId(): string {
+  return `note_pending_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
 
-export const useNotesStore = create<NotesState>()(
-  persist(
-    (set) => ({
-      notes: SEED,
+export const useNotesStore = create<NotesState>()((set, get) => ({
+  notes: [],
+  lastHydrated: {},
 
-      createNote: (note) => {
-        const now = new Date().toISOString();
-        const newNote: CampaignNote = {
-          ...note,
-          id: generateId(),
-          createdAt: now,
-          updatedAt: now,
-        };
-        set((s) => ({ notes: [newNote, ...s.notes] }));
-        return newNote;
-      },
+  hydrateNotes: (campaignId, dtos) => {
+    const fresh = dtos.map(dtoToNote);
+    set((s) => {
+      // Mantém notas de outras campanhas + notas otimistas (pending)
+      // que ainda não voltaram do backend.
+      const other = s.notes.filter(
+        (n) => n.campaignId !== campaignId || n.id.startsWith("note_pending_"),
+      );
+      return {
+        notes: [...fresh, ...other],
+        lastHydrated: { ...s.lastHydrated, [campaignId]: Date.now() },
+      };
+    });
+  },
 
-      updateNote: (id, updates) =>
+  createNote: (note) => {
+    const now = new Date().toISOString();
+    const optimistic: CampaignNote = {
+      ...note,
+      id: generateLocalId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ notes: [optimistic, ...s.notes] }));
+
+    void notesApi
+      .createNote(note.campaignId, {
+        title: note.title,
+        content: note.content,
+        category: notesApi.categoryToDto(note.category),
+        visibility: notesApi.isGmOnlyToVisibility(note.isGmOnly),
+      })
+      .then((dto) => {
+        const real = dtoToNote(dto);
         set((s) => ({
-          notes: s.notes.map((n) =>
-            n.id === id
-              ? { ...n, ...updates, updatedAt: new Date().toISOString() }
-              : n,
-          ),
-        })),
+          notes: s.notes.map((n) => (n.id === optimistic.id ? real : n)),
+        }));
+      })
+      .catch((err) => {
+        console.error("[notes-store] createNote failed", err);
+        set((s) => ({ notes: s.notes.filter((n) => n.id !== optimistic.id) }));
+      });
 
-      deleteNote: (id) =>
-        set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
-    }),
-    {
-      name: "questboard-notes",
-      version: 1,
-    },
-  ),
-);
+    return optimistic;
+  },
+
+  updateNote: (id, updates) => {
+    const before = get().notes.find((n) => n.id === id);
+    if (!before) return;
+    set((s) => ({
+      notes: s.notes.map((n) =>
+        n.id === id
+          ? { ...n, ...updates, updatedAt: new Date().toISOString() }
+          : n,
+      ),
+    }));
+    // Pending: a nota ainda não chegou ao backend; quando o POST original
+    // resolver, ela será substituída pela canônica e o patch local é
+    // descartado. Aceitamos esse trade-off (raro: usuário edita logo após
+    // criar) em favor de não enfileirar mutações.
+    if (id.startsWith("note_pending_")) return;
+    void notesApi
+      .updateNote(id, {
+        ...(updates.title !== undefined ? { title: updates.title } : {}),
+        ...(updates.content !== undefined ? { content: updates.content } : {}),
+        ...(updates.category !== undefined
+          ? { category: notesApi.categoryToDto(updates.category) }
+          : {}),
+        ...(updates.isGmOnly !== undefined
+          ? { visibility: notesApi.isGmOnlyToVisibility(updates.isGmOnly) }
+          : {}),
+      })
+      .then((dto) => {
+        const real = dtoToNote(dto);
+        set((s) => ({ notes: s.notes.map((n) => (n.id === id ? real : n)) }));
+      })
+      .catch((err) => {
+        console.error("[notes-store] updateNote failed", err);
+        set((s) => ({ notes: s.notes.map((n) => (n.id === id ? before : n)) }));
+      });
+  },
+
+  deleteNote: (id) => {
+    const before = get().notes.find((n) => n.id === id);
+    if (!before) return;
+    set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }));
+    if (id.startsWith("note_pending_")) return;
+    void notesApi.deleteNote(id).catch((err) => {
+      console.error("[notes-store] deleteNote failed", err);
+      set((s) => ({ notes: [before, ...s.notes] }));
+    });
+  },
+}));
+
+/** Hidrata notas da campanha ativa quando o componente monta ou o id
+ *  muda. Throttle 5s pra evitar refetch em renders rápidos. */
+export function useHydrateNotes(campaignId: string | null): void {
+  const hydrate = useNotesStore((s) => s.hydrateNotes);
+  const lastRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!campaignId) return;
+    let cancelled = false;
+    const last = lastRef.current[campaignId] ?? 0;
+    if (Date.now() - last < 5_000) return;
+    lastRef.current[campaignId] = Date.now();
+
+    void notesApi
+      .listNotes(campaignId)
+      .then((dtos) => {
+        if (cancelled) return;
+        hydrate(campaignId, dtos);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[notes-store] hydrate failed", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, hydrate]);
+}
 
 export const NOTE_CATEGORY_LABELS: Record<NoteCategory, string> = {
   plot: "Enredo",

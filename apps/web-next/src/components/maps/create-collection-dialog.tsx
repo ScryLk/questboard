@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FolderPlus, X } from "lucide-react";
 import { useMapCollectionsStore } from "@/lib/map-collections-store";
+import { useCampaignStore } from "@/lib/campaign-store";
 
 interface Props {
   onClose: () => void;
@@ -11,20 +12,28 @@ interface Props {
 
 export function CreateCollectionDialog({ onClose, onCreated }: Props) {
   const createCollection = useMapCollectionsStore((s) => s.createCollection);
+  const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = name.trim().length > 0;
+  const canSubmit = name.trim().length > 0 && !!activeCampaignId;
 
-  function handleSubmit() {
-    if (!canSubmit) return;
-    const result = createCollection({
+  async function handleSubmit() {
+    if (!canSubmit || submitting) return;
+    if (!activeCampaignId) {
+      setError("Nenhuma campanha ativa.");
+      return;
+    }
+    setSubmitting(true);
+    const result = await createCollection(activeCampaignId, {
       name,
       description: description || undefined,
     });
     if ("error" in result) {
       setError(result.error);
+      setSubmitting(false);
       return;
     }
     onCreated?.(result.id);
