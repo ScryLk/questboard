@@ -3,6 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ModalShell } from "./modal-shell";
+import { broadcastSend } from "@/lib/broadcast-sync";
 
 interface EndSessionModalProps {
   onClose: () => void;
@@ -56,6 +57,7 @@ export function EndSessionModal({ onClose }: EndSessionModalProps) {
         </button>
         <button
           onClick={() => {
+            broadcastSend("gm:session-end", {}, "gm");
             onClose();
             router.push("/dashboard");
           }}

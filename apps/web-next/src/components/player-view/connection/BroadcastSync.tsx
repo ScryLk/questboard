@@ -1,50 +1,55 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { buildPlayerView } from "@/lib/visibility-filter";
 import { onBroadcastMessage, broadcastSend } from "@/lib/broadcast-sync";
-import type { BroadcastMessage } from "@/lib/broadcast-sync";
+import type { BroadcastMessage, GmStateSyncPayload } from "@/lib/broadcast-sync";
+import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
+import type { BehaviorTickPayload } from "@/lib/npc-behavior-types";
 
 /**
- * BroadcastSync — syncs player view with GM state.
+ * BroadcastSync — player-side sync with the GM tab.
  *
- * For local development (same machine, different tabs):
- * - Listens to GM store changes and updates player view
- * - Listens to BroadcastChannel messages from GM tab
- * - Sends player actions via BroadcastChannel
+ * Cross-tab flow:
+ * 1. GM tab broadcasts gm:state-sync (throttled, ~instant) on every change.
+ * 2. We mirror that payload into THIS tab's gameplay store, so every
+ *    component that reads useGameplayStore (fog, terrain, AOE overlays)
+ *    keeps working unchanged.
+ * 3. syncFromGMStore() then derives the filtered player view.
  *
- * In production, this would be replaced by Socket.IO.
+ * Player actions are sent via player:* messages and applied by the GM's
+ * GmBroadcastSync, whose state re-broadcast confirms (or corrects) our
+ * optimistic local updates.
  */
 export function BroadcastSync() {
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Initial sync + periodic sync from GM store
   useEffect(() => {
-    // Sync immediately
+    // Initial sync from local store (mock state until first GM broadcast)
     syncFromGMStore();
 
-    // Subscribe to GM store changes
+    // Re-derive player view whenever the mirrored store changes
     const unsub = useGameplayStore.subscribe(() => {
       syncFromGMStore();
     });
 
-    // Also listen for BroadcastChannel messages (from GM in another tab)
     const unsubBroadcast = onBroadcastMessage("player-sync", handleBroadcastMessage);
 
-    // Announce player joined
+    // Announce player joined — GM responds with a full gm:state-sync
+    // and claims/creates our character token
     const state = usePlayerViewStore.getState();
+    const chosenCharacter = state.availableCharacters.find(
+      (c) => c.id === state.characterId,
+    );
     broadcastSend("player:join", {
       playerId: state.playerId,
       playerName: state.playerName,
-      characterName: state.myToken?.name,
+      characterName: chosenCharacter?.name ?? state.myToken?.name,
     }, "player");
 
     return () => {
       unsub();
       unsubBroadcast();
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -52,8 +57,28 @@ export function BroadcastSync() {
 }
 
 /**
- * Read the GM's Zustand store directly (same tab / same window context)
- * and build the player view from it.
+ * Mirror the GM's broadcast state into this tab's gameplay store.
+ * The store subscription then rebuilds the player view.
+ */
+function applyGMState(payload: GmStateSyncPayload) {
+  useGameplayStore.setState({
+    tokens: payload.tokens,
+    fogCells: payload.fogCells,
+    terrainCells: payload.terrainCells,
+    wallEdges: payload.wallEdges,
+    markers: payload.markers,
+    notes: payload.notes,
+    aoeInstances: payload.aoeInstances,
+    damageFloats: payload.damageFloats,
+    gridVisible: payload.gridVisible,
+    fogSettings: payload.fogSettings,
+    combat: payload.combat,
+    messages: payload.messages,
+  });
+}
+
+/**
+ * Build the filtered player view from the (mirrored) gameplay store.
  */
 function syncFromGMStore() {
   const gmState = useGameplayStore.getState();
@@ -102,7 +127,7 @@ function handleBroadcastMessage(msg: BroadcastMessage) {
 
   switch (msg.type) {
     case "gm:state-sync":
-      syncFromGMStore();
+      applyGMState(msg.payload as GmStateSyncPayload);
       break;
 
     case "gm:scene-show":
@@ -149,9 +174,19 @@ function handleBroadcastMessage(msg: BroadcastMessage) {
       break;
     }
 
+    case "npc:behavior-tick":
+      // Live NPC positions during PANIC/FLEE/RIOT etc.
+      useNpcBehaviorStore.getState().applyTick(msg.payload as BehaviorTickPayload);
+      break;
+
+    case "npc:behavior-ended":
+      // Clear stale overrides; authoritative positions come via gm:state-sync
+      useNpcBehaviorStore.setState({ renderStates: {} });
+      break;
+
     default:
-      // Re-sync for any GM action
-      syncFromGMStore();
+      // Other gm:* events (scene/audio/npc) are handled by their own
+      // sync components; state changes arrive via gm:state-sync.
       break;
   }
 }

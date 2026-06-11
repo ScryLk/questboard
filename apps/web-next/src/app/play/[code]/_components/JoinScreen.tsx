@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Swords, Loader2 } from "lucide-react";
 import { usePlayerViewStore, type LobbyCharacter } from "@/lib/player-view-store";
+import { broadcastSend } from "@/lib/broadcast-sync";
 
 // Mock characters for demo
 const MOCK_CHARACTERS: LobbyCharacter[] = [
@@ -72,6 +73,13 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     setConnected(true);
     setJoinStep("waiting-gm");
     setJoining(false);
+
+    // Tell the GM tab we're waiting — if the session is already live,
+    // the GM replies with lobby:session-start and we enter right away.
+    broadcastSend("lobby:join-request", {
+      playerName: name.trim(),
+      characterName: selectedChar?.name,
+    }, "player");
   };
 
   return (

@@ -471,7 +471,11 @@ interface GameplayState {
     size?: number;
     speed?: number;
     icon?: string;
+    playerId?: string;
   }) => void;
+
+  // Assign a player to control a token
+  assignTokenToPlayer: (tokenId: string, playerId: string) => void;
 
   // Clear cell contents
   clearCell: (x: number, y: number) => void;
@@ -1005,7 +1009,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
   removePing: (id) => set((s) => ({ pings: s.pings.filter((p) => p.id !== id) })),
 
   damageFloats: [],
-  addDamageFloat: (tokenId, amount, isHeal, isCrit) =>
+  addDamageFloat: (tokenId, amount, isHeal, isCrit) => {
     set((s) => ({
       damageFloats: [
         ...s.damageFloats,
@@ -1018,7 +1022,9 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
           timestamp: Date.now(),
         },
       ],
-    })),
+    }));
+    broadcastSend(isHeal ? "gm:heal-applied" : "gm:damage-applied", { tokenId });
+  },
   removeDamageFloat: (id) =>
     set((s) => ({ damageFloats: s.damageFloats.filter((d) => d.id !== id) })),
 
@@ -1284,8 +1290,16 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
           visibility: "visible",
           speed: t.speed ?? 30,
           icon: t.icon,
+          playerId: t.playerId,
         },
       ],
+    })),
+
+  assignTokenToPlayer: (tokenId, playerId) =>
+    set((s) => ({
+      tokens: s.tokens.map((t) =>
+        t.id === tokenId ? { ...t, playerId, alignment: "player" as TokenAlignment } : t,
+      ),
     })),
 
   // Clear cell

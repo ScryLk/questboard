@@ -88,6 +88,36 @@ export interface BroadcastMessage {
   senderId: string;
 }
 
+// ── GM state-sync payload (mirrored into the player tab's stores) ──
+
+import type {
+  GameToken,
+  TerrainCell,
+  WallData,
+  MapPin,
+  MapNote,
+  AOEInstance,
+  DamageFloat,
+  FogSettings,
+  CombatState,
+  ChatMessage,
+} from "./gameplay-mock-data";
+
+export interface GmStateSyncPayload {
+  tokens: GameToken[];
+  fogCells: Set<string>;
+  terrainCells: TerrainCell[];
+  wallEdges: Record<string, WallData>;
+  markers: MapPin[];
+  notes: MapNote[];
+  aoeInstances: AOEInstance[];
+  damageFloats: DamageFloat[];
+  gridVisible: boolean;
+  fogSettings: FogSettings;
+  combat: CombatState;
+  messages: ChatMessage[];
+}
+
 // ── Channel singleton ─────────────────────────────────────────
 
 const CHANNEL_NAME = "questboard-session";

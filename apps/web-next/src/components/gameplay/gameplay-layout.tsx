@@ -31,6 +31,7 @@ import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
 import { NpcConversationSync } from "@/components/npc-conversation/NpcConversationSync";
 import { NpcBehaviorSync } from "./npc-behavior-sync";
+import { GmBroadcastSync } from "./gm-broadcast-sync";
 
 
 export function GameplayLayout() {
@@ -173,6 +174,9 @@ export function GameplayLayout() {
 
       {/* NPC Behavior sync (tick broadcast + combat/scene integration) */}
       <NpcBehaviorSync />
+
+      {/* GM ↔ Player state sync (state broadcast + player action handling) */}
+      <GmBroadcastSync />
     </div>
     </SFXProvider>
   );

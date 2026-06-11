@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLobbyStore } from "@/lib/lobby-store";
+import { broadcastSend } from "@/lib/broadcast-sync";
 import { LobbyHeader } from "./lobby-header";
 import { LobbyPlayerList } from "./lobby-player-list";
 import { LobbyChat } from "./lobby-chat";
@@ -31,9 +32,11 @@ export function LobbyLayout({ sessionId }: { sessionId: string }) {
 
   const handleStart = useCallback(() => {
     startCountdown(3);
+    broadcastSend("lobby:countdown-start", { seconds: 3 }, "gm");
   }, [startCountdown]);
 
   const handleCountdownFinish = useCallback(() => {
+    broadcastSend("lobby:session-start", {}, "gm");
     router.push(`/gameplay/${sessionId}`);
   }, [router, sessionId]);
 

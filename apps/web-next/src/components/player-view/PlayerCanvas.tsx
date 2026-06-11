@@ -10,9 +10,12 @@ import {
 } from "@/lib/gameplay-mock-data";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useNpcBehaviorStore } from "@/lib/npc-behavior-store";
 import { useNpcConversationStore } from "@/lib/npc-conversation-store";
 import { useNPCStore } from "@/lib/npc-store";
 import { getHPDescriptionColor } from "@/lib/visibility-filter";
+import { canTokenTravel } from "@/lib/collision";
+import { broadcastSend } from "@/lib/broadcast-sync";
 import { FogOverlay } from "../gameplay/map-canvas/overlays/fog-overlay";
 import { TerrainOverlay } from "../gameplay/map-canvas/overlays/terrain-overlay";
 import { AOEOverlay } from "../gameplay/map-canvas/overlays/aoe-overlay";
@@ -30,12 +33,15 @@ export function PlayerCanvas() {
   const moveMyToken = usePlayerViewStore((s) => s.moveMyToken);
   const addMovementFt = usePlayerViewStore((s) => s.addMovementFt);
 
-  // Read fog/terrain/aoe from GM store (shared state)
+  // Read fog/terrain/aoe from the mirrored gameplay store
   const fogCells = useGameplayStore((s) => s.fogCells);
   const terrainCells = useGameplayStore((s) => s.terrainCells);
   const aoeInstances = useGameplayStore((s) => s.aoeInstances);
   const damageFloats = useGameplayStore((s) => s.damageFloats);
   const gridVisible = useGameplayStore((s) => s.gridVisible);
+
+  // Live NPC behavior positions (PANIC/FLEE/RIOT ticks from GM)
+  const behaviorRenderStates = useNpcBehaviorStore((s) => s.renderStates);
 
   const { gridCols, gridRows, cellSize, cellSizeFt } = MOCK_MAP;
   const scaledCell = cellSize;
@@ -170,15 +176,39 @@ export function PlayerCanvas() {
 
       function onUp() {
         if (dragRef.current && dragPos) {
-          const dist = gridDistance(
-            dragRef.current.originX,
-            dragRef.current.originY,
-            dragPos.x,
-            dragPos.y,
-            cellSizeFt,
-          );
-          moveMyToken(dragPos.x, dragPos.y);
-          addMovementFt(dist);
+          const { originX, originY, tokenId: dragTokenId } = dragRef.current;
+          const moved = dragPos.x !== originX || dragPos.y !== originY;
+
+          if (moved) {
+            const dist = gridDistance(originX, originY, dragPos.x, dragPos.y, cellSizeFt);
+
+            // Wall/door collision along the straight line
+            const wallEdges = useGameplayStore.getState().wallEdges;
+            const check = canTokenTravel(
+              originX, originY, dragPos.x, dragPos.y,
+              gridCols, gridRows, wallEdges,
+            );
+
+            // Movement budget (combat only, unless GM allows free movement)
+            const overBudget =
+              combat?.active === true &&
+              !settings.canMoveFreely &&
+              dist > movementMaxFt - movementUsedFt;
+
+            if (check.allowed && !overBudget) {
+              // Optimistic: update player view + local mirror instantly
+              moveMyToken(dragPos.x, dragPos.y);
+              useGameplayStore.getState().moveToken(dragTokenId, dragPos.x, dragPos.y);
+              addMovementFt(dist);
+              // GM validates and confirms via gm:state-sync
+              broadcastSend("player:move", {
+                tokenId: dragTokenId,
+                x: dragPos.x,
+                y: dragPos.y,
+              }, "player");
+            }
+            // Blocked: drop the drag — token snaps back to origin
+          }
         }
         dragRef.current = null;
         setDragPos(null);
@@ -189,7 +219,7 @@ export function PlayerCanvas() {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [visibleTokens, combat, isMyTurn, settings, scaledCell, gridCols, gridRows, cellSizeFt, moveMyToken, addMovementFt, dragPos],
+    [visibleTokens, combat, isMyTurn, settings, scaledCell, gridCols, gridRows, cellSizeFt, moveMyToken, addMovementFt, dragPos, movementMaxFt, movementUsedFt],
   );
 
   // NPC conversation
@@ -311,8 +341,9 @@ export function PlayerCanvas() {
         {/* Tokens */}
         {visibleTokens.map((token) => {
           const isBeingDragged = dragPos?.id === token.id;
-          const displayX = isBeingDragged ? dragPos.x : token.x;
-          const displayY = isBeingDragged ? dragPos.y : token.y;
+          const behaviorPos = !token.isMe ? behaviorRenderStates[token.id] : undefined;
+          const displayX = isBeingDragged ? dragPos.x : behaviorPos?.x ?? token.x;
+          const displayY = isBeingDragged ? dragPos.y : behaviorPos?.y ?? token.y;
           const borderColor = getAlignmentColor(token.type);
           const isDead = token.hpDescription === "Morto";
           const tokenSizePx = token.size * scaledCell;
