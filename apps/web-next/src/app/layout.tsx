@@ -11,6 +11,13 @@ const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel", weight: [
 export const metadata: Metadata = {
   title: "QuestBoard — Sua mesa de RPG, online",
   description: "Crie sessões, gerencie personagens e role dados — tudo em um só lugar.",
+  icons: {
+    // PNG funciona como favicon em browsers modernos. Mesmo asset
+    // serve de Apple touch icon — suficiente até gerarmos sprite
+    // multi-resolução .ico/.webp.
+    icon: [{ url: "/brand/logo.png", type: "image/png" }],
+    apple: [{ url: "/brand/logo.png" }],
+  },
 };
 
 export default function RootLayout({

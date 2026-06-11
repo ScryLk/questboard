@@ -97,7 +97,7 @@ function verticalStrip(count: number, frameSize: number): SpriteRegion[] {
  */
 export const OBJECT_SPRITE_MAP: Record<string, SpriteMeta> = {
   // ── PNGs individuais (pack 0x72) ──
-  chest: { kind: "file", file: "chest_closed.png" },
+  chest: { kind: "file", file: "chest_locked.png" },
   crate: { kind: "file", file: "box.png" },
   pillar: { kind: "file", file: "column.png" },
   statue: { kind: "file", file: "gargoyle_top_1.png" },
@@ -117,6 +117,22 @@ export const OBJECT_SPRITE_MAP: Record<string, SpriteMeta> = {
     frameDurationMs: 100,
     motion: "fire",
   },
+
+  // ── PNGs individuais (pack Gemini pixel-art, lote 2026-05) ──
+  // Adicionados em 14 imagens 3/4 isometric, fundo preto/transparente
+  // misto. Mantêm o estilo das splashes existentes em spritesnew/.
+  chair: { kind: "file", file: "chair_wood.png" },
+  table: { kind: "file", file: "table_long.png" },
+  table_round: { kind: "file", file: "table_round.png" },
+  bed: { kind: "file", file: "bed_red.png" },
+  bookshelf: { kind: "file", file: "bookshelf_books.png" },
+  barrel: { kind: "file", file: "barrel_iron.png" },
+  rock_large: { kind: "file", file: "rock_large.png" },
+  rug: { kind: "file", file: "rug_round.png" },
+  candleholder: { kind: "file", file: "candleholder.png" },
+  fireplace: { kind: "file", file: "fireplace_stone.png" },
+  chalice: { kind: "file", file: "chalice.png" },
+  beer_mug: { kind: "file", file: "beer_mug.png" },
 
   // ── Sheets novos — estáticos (pegam o primeiro tile) ──
   skull_pile: {

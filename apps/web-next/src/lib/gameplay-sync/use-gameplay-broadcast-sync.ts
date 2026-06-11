@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import type { ChatMessage } from "@/lib/gameplay-mock-data";
 import {
   broadcastSend,
@@ -65,6 +66,43 @@ export function useGameplayBroadcastSync() {
       ? useGameplayStore.subscribe(scheduleBroadcast)
       : () => {};
 
+    // GM: assina map-sidebar-store pra broadcastar gm:map-switch quando
+    // a cena ativa mudar. Cobre o caso da troca via sidebar (setActiveScene
+    // já emite, mas isso garante consistência se outro caminho mudar o
+    // activeSceneId) e o caso de mount após refresh (emite o estado atual).
+    let lastSceneId: string | null = null;
+    const unsubMapSidebar = isGM
+      ? useMapSidebarStore.subscribe((state) => {
+          if (state.activeSceneId === lastSceneId) return;
+          lastSceneId = state.activeSceneId;
+          if (!state.activeSceneId) return;
+          const scene = state.scenes.find((sc) => sc.id === state.activeSceneId);
+          if (scene) {
+            broadcastSend(
+              "gm:map-switch",
+              { mapId: scene.id, mapName: scene.name },
+              senderId,
+            );
+          }
+        })
+      : () => {};
+
+    // Broadcast inicial da cena ativa (pós-rehydrate de localStorage).
+    if (isGM) {
+      const mapSidebar = useMapSidebarStore.getState();
+      const activeScene = mapSidebar.scenes.find(
+        (sc) => sc.id === mapSidebar.activeSceneId,
+      );
+      if (activeScene) {
+        lastSceneId = activeScene.id;
+        broadcastSend(
+          "gm:map-switch",
+          { mapId: activeScene.id, mapName: activeScene.name },
+          senderId,
+        );
+      }
+    }
+
     // ── Player: aplica snapshots recebidos no próprio store ───────
     // GM: escuta `player:join` e responde com snapshot imediato.
     function handleMessage(msg: BroadcastMessage) {
@@ -87,6 +125,20 @@ export function useGameplayBroadcastSync() {
         // Novo player chegou → envia snapshot imediato (sem debounce).
         const snapshot = pickWorldState(useGameplayStore.getState());
         broadcastSend("gm:state-sync", snapshot, senderId);
+
+        // Cena ativa não está no gameplay-store — vive no map-sidebar-store.
+        // Re-emite gm:map-switch pra late-joiner não cair em "Sem mapa ativo".
+        const mapSidebar = useMapSidebarStore.getState();
+        const activeScene = mapSidebar.scenes.find(
+          (sc) => sc.id === mapSidebar.activeSceneId,
+        );
+        if (activeScene) {
+          broadcastSend(
+            "gm:map-switch",
+            { mapId: activeScene.id, mapName: activeScene.name },
+            senderId,
+          );
+        }
         return;
       }
 
@@ -147,6 +199,7 @@ export function useGameplayBroadcastSync() {
     return () => {
       if (broadcastTimer) clearTimeout(broadcastTimer);
       unsubStore();
+      unsubMapSidebar();
       unsubMessages();
     };
     // Só liga uma vez no mount — identidade vem da URL e não muda em runtime.

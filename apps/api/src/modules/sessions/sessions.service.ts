@@ -8,6 +8,9 @@ import {
   emitSessionSettingsUpdated,
   emitSessionPlayerJoined,
   emitTokenAdded,
+  emitTokenUpdated,
+  emitPlayerForceResync,
+  emitMissionContextUpdated,
 } from "../../lib/socket-events.js";
 import { invalidateCampaignDashboardCache } from "../campaign/dashboard.service.js";
 
@@ -129,6 +132,54 @@ export function createSessionsService(prisma: PrismaClient) {
 
     async delete(sessionId: string, _userId: string) {
       return prisma.session.delete({ where: { id: sessionId } });
+    },
+
+    /** Briefing/contexto da missão. Escrita restrita a GM/CO_GM (router
+     *  valida via `requireGmOwner`). Texto é mesclado em
+     *  `Session.settings.missionContext` pra não pisar nas outras
+     *  chaves de settings (`activeMedia` já vive lá, futuras chaves
+     *  idem). Broadcast via socket pra players verem em tempo real. */
+    async setMissionContext(
+      sessionId: string,
+      userId: string,
+      content: string,
+    ) {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        select: { settings: true },
+      });
+      if (!session) throw new NotFoundError("Session");
+
+      const current =
+        (session.settings as Record<string, unknown> | null) ?? {};
+      const nextSettings = { ...current, missionContext: content };
+
+      const updated = await prisma.session.update({
+        where: { id: sessionId },
+        data: { settings: nextSettings },
+        select: { updatedAt: true },
+      });
+
+      emitMissionContextUpdated({
+        sessionId,
+        content,
+        by: userId,
+        at: updated.updatedAt.toISOString(),
+      });
+
+      return { content, updatedAt: updated.updatedAt.toISOString() };
+    },
+
+    async getMissionContext(sessionId: string) {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        select: { settings: true },
+      });
+      if (!session) throw new NotFoundError("Session");
+      const settings =
+        (session.settings as Record<string, unknown> | null) ?? {};
+      const raw = settings.missionContext;
+      return { content: typeof raw === "string" ? raw : "" };
     },
 
     async join(
@@ -343,6 +394,76 @@ export function createSessionsService(prisma: PrismaClient) {
       await this.logAudit(sessionId, userId, "player:kicked", { targetUserId });
     },
 
+    // Lista personagens do jogador-alvo pro GM atribuir um sem precisar
+    // pedir pro player refazer o join. Permissão GM/CO_GM no router.
+    async listPlayerAvailableCharacters(
+      sessionId: string,
+      targetUserId: string,
+    ) {
+      const player = await prisma.sessionPlayer.findUnique({
+        where: { userId_sessionId: { userId: targetUserId, sessionId } },
+        select: { characterId: true },
+      });
+      if (!player) throw new NotFoundError("SessionPlayer");
+
+      const characters = await prisma.character.findMany({
+        where: { userId: targetUserId, deletedAt: null },
+        select: { id: true, name: true, avatarUrl: true, system: true, level: true },
+        orderBy: { updatedAt: "desc" },
+      });
+      return { currentCharacterId: player.characterId, characters };
+    },
+
+    // Atribui personagem do próprio jogador-alvo ao SessionPlayer dele.
+    // Cria/garante o Token na mapa ativa e dispara force-resync pro
+    // player recarregar. Resolve o caso "Sem personagem atribuído".
+    async assignPlayerCharacter(
+      sessionId: string,
+      requesterId: string,
+      targetUserId: string,
+      characterId: string,
+    ) {
+      const player = await prisma.sessionPlayer.findUnique({
+        where: { userId_sessionId: { userId: targetUserId, sessionId } },
+      });
+      if (!player) throw new NotFoundError("SessionPlayer");
+
+      const character = await prisma.character.findFirst({
+        where: { id: characterId, userId: targetUserId, deletedAt: null },
+        select: { id: true, name: true, avatarUrl: true },
+      });
+      if (!character) {
+        throw new BadRequestError(
+          "Personagem não pertence ao jogador-alvo ou foi removido",
+        );
+      }
+
+      const updated = await prisma.sessionPlayer.update({
+        where: { id: player.id },
+        data: { characterId: character.id },
+        include: {
+          user: { select: { id: true, displayName: true, avatarUrl: true } },
+          character: { select: { id: true, name: true, avatarUrl: true } },
+        },
+      });
+
+      await ensurePlayerToken(prisma, sessionId, targetUserId, character);
+
+      await this.logAudit(sessionId, requesterId, "player:character-assigned", {
+        targetUserId,
+        characterId: character.id,
+      });
+
+      emitPlayerForceResync({
+        sessionId,
+        targetUserId,
+        by: requesterId,
+        at: new Date().toISOString(),
+      });
+
+      return updated;
+    },
+
     async updatePlayerRole(sessionId: string, _userId: string, targetUserId: string, role: string) {
       // Permissão GM titular validada no router (`requireGmOwner`).
       const player = await prisma.sessionPlayer.findUnique({
@@ -443,10 +564,64 @@ export function createSessionsService(prisma: PrismaClient) {
 
 export type SessionsService = ReturnType<typeof createSessionsService>;
 
+/** HP mínimo de fallback quando o Character não tem `resources.hp`/
+ *  `resources.maxHp` setado. Evita que o player joine com token 0/0
+ *  e fique impossível de jogar (regra: jogadores nunca são bloqueados,
+ *  CLAUDE.md §1). */
+const FALLBACK_TOKEN_HP = 10;
+
+/** Wrapper que busca o Character via SessionPlayer e chama
+ *  ensurePlayerToken. Pra ser usado em pontos que não têm o character
+ *  carregado em memória — ex: socket `session:join` no reconnect. */
+export async function syncPlayerTokenOnConnect(
+  prisma: PrismaClient,
+  sessionId: string,
+  userId: string,
+): Promise<void> {
+  const sp = await prisma.sessionPlayer.findUnique({
+    where: { userId_sessionId: { userId, sessionId } },
+    select: {
+      character: {
+        select: { id: true, name: true, avatarUrl: true },
+      },
+    },
+  });
+  if (!sp?.character) return;
+  await ensurePlayerToken(prisma, sessionId, userId, sp.character);
+}
+
+function extractHpFromResources(resources: unknown): {
+  currentHp: number;
+  maxHp: number;
+} {
+  if (resources && typeof resources === "object") {
+    const r = resources as Record<string, unknown>;
+    // Aceita vários layouts comuns (D&D 5e: hp/maxHp; cosmic horror:
+    // hitPoints/hitPointsMax). Pegamos o primeiro positivo encontrado.
+    const maxCandidates = [r.maxHp, r.hpMax, r.hitPointsMax, r.maxHitPoints];
+    const curCandidates = [r.hp, r.currentHp, r.hpCurrent, r.hitPoints];
+    const maxHp =
+      maxCandidates.find((v) => typeof v === "number" && v > 0) ?? null;
+    const currentHp =
+      curCandidates.find((v) => typeof v === "number" && v > 0) ?? maxHp;
+    if (typeof maxHp === "number") {
+      return {
+        maxHp,
+        currentHp: typeof currentHp === "number" ? currentHp : maxHp,
+      };
+    }
+  }
+  return { currentHp: FALLBACK_TOKEN_HP, maxHp: FALLBACK_TOKEN_HP };
+}
+
 /** Garante que o player tem 1 Token na mapa ativa. Idempotente —
- *  se já existe (mesmo char ou outro), não faz nada. Se não existe
- *  E temos character, cria com defaults em (0,0). */
-async function ensurePlayerToken(
+ *  se já existe (mesmo char ou outro), só backfila HP se estiver
+ *  null/0 (cobre tokens criados antes do fix de HP).
+ *
+ *  Exportado pra ser chamado também no socket `session:join` —
+ *  reconnects não passam pelo endpoint REST de join, então sem isso
+ *  tokens antigos com HP nulo nunca seriam corrigidos. */
+export async function ensurePlayerToken(
   prisma: PrismaClient,
   sessionId: string,
   userId: string,
@@ -459,12 +634,36 @@ async function ensurePlayerToken(
   });
   if (!activeMap) return;
 
-  // Já tem um Token desse owner nesse map? Não duplica.
+  // HP vem das resources do Character (sistemas guardam em layouts
+  // diferentes — D&D em `hp`/`maxHp`, cosmic horror em `hitPoints*`).
+  const fullCharacter = await prisma.character.findUnique({
+    where: { id: character.id },
+    select: { resources: true },
+  });
+  const hp = extractHpFromResources(fullCharacter?.resources);
+
+  // Já tem um Token desse owner nesse map? Backfila HP se 0/null,
+  // mantém o resto. Cobre tokens criados antes desse fix.
   const existingToken = await prisma.token.findFirst({
     where: { mapId: activeMap.id, ownerId: userId },
-    select: { id: true },
+    select: { id: true, currentHp: true, maxHp: true },
   });
-  if (existingToken) return;
+  if (existingToken) {
+    const needsBackfill =
+      (existingToken.maxHp ?? 0) <= 0 || (existingToken.currentHp ?? 0) <= 0;
+    if (needsBackfill) {
+      await prisma.token.update({
+        where: { id: existingToken.id },
+        data: { currentHp: hp.currentHp, maxHp: hp.maxHp },
+      });
+      emitTokenUpdated({
+        sessionId,
+        tokenId: existingToken.id,
+        changes: { currentHp: hp.currentHp, maxHp: hp.maxHp },
+      });
+    }
+    return;
+  }
 
   const initials = character.name
     .split(" ")
@@ -483,6 +682,8 @@ async function ensurePlayerToken(
       x: 0,
       y: 0,
       size: 1,
+      currentHp: hp.currentHp,
+      maxHp: hp.maxHp,
     },
   });
   emitTokenAdded({

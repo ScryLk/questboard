@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { useGameplayStore } from "@/lib/gameplay-store";
+import { useMapSidebarStore } from "@/lib/map-sidebar-store";
 import { buildPlayerView } from "@/lib/visibility-filter";
 import { onBroadcastMessage, broadcastSend } from "@/lib/broadcast-sync";
 import type { BroadcastMessage } from "@/lib/broadcast-sync";
@@ -24,10 +25,19 @@ export function BroadcastSync() {
   useEffect(() => {
     // Sync immediately
     syncFromGMStore();
+    syncActiveMapFromSidebar();
 
     // Subscribe to GM store changes
     const unsub = useGameplayStore.subscribe(() => {
       syncFromGMStore();
+    });
+
+    // Subscribe to map-sidebar-store changes — em dev cross-tab no mesmo
+    // browser, o localStorage é compartilhado e a cena ativa fica nesse
+    // store. Sem isso o player view depende só do broadcast gm:map-switch,
+    // que sofre race condition no mount inicial.
+    const unsubSidebar = useMapSidebarStore.subscribe(() => {
+      syncActiveMapFromSidebar();
     });
 
     // Also listen for BroadcastChannel messages (from GM in another tab)
@@ -43,6 +53,7 @@ export function BroadcastSync() {
 
     return () => {
       unsub();
+      unsubSidebar();
       unsubBroadcast();
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
@@ -54,6 +65,23 @@ export function BroadcastSync() {
 // Último sussurro entregue ao overlay — evita reabrir no mesmo msg
 // a cada re-sync. Vive em module-scope porque syncFromGMStore não é hook.
 let lastWhisperShown: string | null = null;
+
+/**
+ * Lê a cena ativa do map-sidebar-store (cujo localStorage é compartilhado
+ * entre tabs do mesmo browser) e propaga pro playerViewStore. Cobre o caso
+ * em que o broadcast gm:map-switch chegou antes do listener montar.
+ */
+function syncActiveMapFromSidebar() {
+  const sidebar = useMapSidebarStore.getState();
+  const activeScene = sidebar.scenes.find((sc) => sc.id === sidebar.activeSceneId);
+  const playerStore = usePlayerViewStore.getState();
+  const nextId = activeScene?.id ?? null;
+  const nextName = activeScene?.name ?? null;
+  if (playerStore.activeMapId === nextId && playerStore.activeMapName === nextName) {
+    return;
+  }
+  usePlayerViewStore.setState({ activeMapId: nextId, activeMapName: nextName });
+}
 
 /**
  * Read the GM's Zustand store directly (same tab / same window context)

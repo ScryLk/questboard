@@ -30,7 +30,7 @@ import type { DashboardDto } from "@questboard/validators";
 
 export default function DashboardPage() {
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId);
-  const clearActive = useCampaignStore((s) => s.setActiveCampaignId);
+  const deleteCampaign = useCampaignStore((s) => s.deleteCampaign);
   const { data, isLoading, error, notFound, refetch } =
     useCampaignDashboard(activeCampaignId);
 
@@ -39,9 +39,16 @@ export default function DashboardPage() {
   }
 
   // Campanha local aponta pra ID que não existe mais no backend
-  // (ex: DB resetado, ou deletada). Limpa local e mostra empty state.
+  // (ex: DB resetado, ou deletada). Limpa local + remove do cache pra
+  // a sidebar também atualizar — sem isso, a sidebar continua mostrando
+  // a campanha como ATIVA porque lê do mesmo cache local.
   if (notFound) {
-    return <StaleCampaign onClear={() => clearActive(null)} />;
+    return (
+      <StaleCampaign
+        onClear={() => deleteCampaign(activeCampaignId)}
+        onRetry={refetch}
+      />
+    );
   }
 
   if (isLoading && !data) {
@@ -279,24 +286,37 @@ function SessionsTable({
   );
 }
 
-function StaleCampaign({ onClear }: { onClear: () => void }) {
+function StaleCampaign({
+  onClear,
+  onRetry,
+}: {
+  onClear: () => void;
+  onRetry: () => void;
+}) {
   return (
     <div className="space-y-8">
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
         <p className="text-base font-medium text-amber-300">
-          A campanha selecionada não existe mais.
+          A campanha selecionada não foi encontrada no servidor.
         </p>
         <p className="mt-2 text-sm text-brand-muted">
-          Pode ter sido excluída ou o banco foi resetado. Limpe a seleção
-          local e escolha outra campanha.
+          Ela aparece na barra lateral porque está em cache local. Pode ter
+          sido excluída, o banco foi resetado, ou foi uma falha temporária.
         </p>
-        <div className="mt-4 flex justify-center gap-2">
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="cursor-pointer rounded-lg border border-brand-border bg-white/5 px-4 py-2 text-sm font-medium text-brand-text hover:bg-white/10"
+          >
+            Tentar de novo
+          </button>
           <button
             type="button"
             onClick={onClear}
             className="cursor-pointer rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/25"
           >
-            Limpar seleção
+            Remover do cache
           </button>
           <Link
             href="/campaigns"

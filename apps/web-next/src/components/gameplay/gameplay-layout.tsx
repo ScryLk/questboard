@@ -35,6 +35,7 @@ import { AIGenerationPanel } from "./ai-generation-panel";
 import { SFXProvider } from "./audio/sfx-provider";
 import { DevIdentityBadge } from "./dev-identity-badge";
 import { ActionFeedPanel } from "./action-feed/action-feed-panel";
+import { MissionContextModal } from "./modals/mission-context-modal";
 import { DiceCentralReveal } from "@/components/dice/DiceCentralReveal";
 import { MoveApprovalDialog } from "./move-approval-dialog";
 import { RadialMenu } from "@/components/shared/radial-menu";
@@ -53,6 +54,10 @@ import { LevelUpToast } from "@/components/character/level-up-toast";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 import { useParams } from "next/navigation";
 import { useTokensBridge } from "@/hooks/use-tokens-bridge";
+import {
+  useMissionContextSync,
+  useMissionContextAutoSave,
+} from "@/lib/mission-context-sync";
 
 
 export function GameplayLayout() {
@@ -74,6 +79,13 @@ export function GameplayLayout() {
   // Em sessão real: lista da mapa ativa + socket live updates.
   // Sem sessionId: noop, store fica com mock local.
   useTokensBridge(sessionId);
+
+  // Briefing da missão — hidrata + escuta socket. Auto-save é
+  // pro GM/CO_GM apenas; player veria o modal em readOnly e nunca
+  // chama setMissionContext.
+  useMissionContextSync(sessionId);
+  const currentUserIsGMForMission = useGameplayStore((s) => s.currentUserIsGM);
+  useMissionContextAutoSave(currentUserIsGMForMission);
 
   const leftPanelOpen = useGameplayStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useGameplayStore((s) => s.rightPanelOpen);
@@ -207,8 +219,10 @@ export function GameplayLayout() {
           </aside>
         )}
 
-        {/* Feed de ações — só GM/CO_GM vê (prompt seção 2 + matriz §6). */}
-        {currentUserIsGM && <ActionFeedPanel />}
+        {/* Rail direito — Feed de ações (GM/CO_GM only) + Contexto da
+            Missão (todos). O componente decide o que mostrar baseado
+            em role. */}
+        <ActionFeedPanel />
       </div>
 
       {/* Action Bar — combat turn controls */}
@@ -216,6 +230,7 @@ export function GameplayLayout() {
 
       {/* Modals */}
       <GameplayModals />
+      <MissionContextModal readOnly={!currentUserIsGM} />
 
       {/* Phase side panel */}
       <PhaseModal />

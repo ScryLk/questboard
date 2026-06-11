@@ -5,6 +5,7 @@ import { AlertTriangle, Award, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ModalShell } from "./modal-shell";
 import { awardSessionXp } from "@/lib/xp-api";
+import { endSession } from "@/lib/session-lifecycle-api";
 
 interface EndSessionModalProps {
   onClose: () => void;
@@ -23,9 +24,11 @@ export function EndSessionModal({ onClose, sessionId }: EndSessionModalProps) {
     if (pending) return;
     const amount = Number.parseInt(xpAmount, 10) || 0;
     setError(null);
+    setPending(true);
 
+    // 1) XP primeiro (se houver) — falha aqui aborta sem encerrar a
+    //    sessão, pra o GM corrigir e tentar de novo.
     if (amount > 0 && sessionId) {
-      setPending(true);
       try {
         await awardSessionXp(sessionId, {
           amount,
@@ -41,12 +44,36 @@ export function EndSessionModal({ onClose, sessionId }: EndSessionModalProps) {
       }
     }
 
+    // 2) Encerra a sessão de verdade no backend (transição LIVE/PAUSED
+    //    → ENDED, limpa Redis, emite socket pros players). Em modo
+    //    local (sem sessionId) pula direto pro redirect.
+    if (sessionId) {
+      try {
+        await endSession(sessionId);
+      } catch (err) {
+        setError(
+          (err as { message?: string }).message ??
+            "Não foi possível encerrar a sessão. Tente novamente.",
+        );
+        setPending(false);
+        return;
+      }
+    }
+
     onClose();
     router.push("/dashboard");
   }
 
+  // Bloqueia Esc/backdrop/X durante a finalização — fechar no meio
+  // deixaria a sessão num estado intermediário (XP aplicado, mas end
+  // não chamado, por exemplo).
+  const handleClose = () => {
+    if (pending) return;
+    onClose();
+  };
+
   return (
-    <ModalShell title="Encerrar Sessão" maxWidth={460} onClose={onClose}>
+    <ModalShell title="Encerrar Sessão" maxWidth={460} onClose={handleClose}>
       <div className="mb-5 flex flex-col items-center text-center">
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-danger/15">
           <AlertTriangle className="h-6 w-6 text-brand-danger" />
@@ -83,7 +110,8 @@ export function EndSessionModal({ onClose, sessionId }: EndSessionModalProps) {
                 max={100000}
                 value={xpAmount}
                 onChange={(e) => setXpAmount(e.target.value)}
-                className="w-full rounded-md border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
+                disabled={pending}
+                className="w-full rounded-md border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none focus:border-brand-accent disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
             <label className="block">
@@ -96,7 +124,8 @@ export function EndSessionModal({ onClose, sessionId }: EndSessionModalProps) {
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={500}
                 placeholder="Ex: Derrotaram o dragão vermelho"
-                className="w-full rounded-md border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none placeholder:text-brand-muted focus:border-brand-accent"
+                disabled={pending}
+                className="w-full rounded-md border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none placeholder:text-brand-muted focus:border-brand-accent disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
           </div>
@@ -141,10 +170,16 @@ export function EndSessionModal({ onClose, sessionId }: EndSessionModalProps) {
           type="button"
           onClick={handleConfirm}
           disabled={pending}
-          className="flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-brand-danger px-4 text-xs font-medium text-white transition-colors hover:bg-brand-danger/90 disabled:opacity-50"
+          className="flex h-9 min-w-[150px] cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-danger px-4 text-xs font-medium text-white transition-colors hover:bg-brand-danger/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {pending && <Loader2 className="h-3 w-3 animate-spin" />}
-          Encerrar Sessão
+          {pending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Encerrando...
+            </>
+          ) : (
+            "Encerrar Sessão"
+          )}
         </button>
       </div>
     </ModalShell>

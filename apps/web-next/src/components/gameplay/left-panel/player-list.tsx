@@ -5,6 +5,7 @@
 // lista fica vazia e o empty state aparece.
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -15,6 +16,24 @@ import {
 import { useGameplayStore } from "@/lib/gameplay-store";
 import { useSessionPlayers } from "@/hooks/use-session-players";
 import { GameTooltip } from "@/components/ui/game-tooltip";
+import { requestPlayerResync } from "@/lib/session-socket";
+import {
+  PlayerListContextMenu,
+  type PlayerContextMenuAction,
+} from "./player-list-context-menu";
+import { AssignCharacterModal } from "./assign-character-modal";
+
+interface ContextMenuState {
+  userId: string;
+  playerName: string;
+  x: number;
+  y: number;
+}
+
+interface AssignTarget {
+  userId: string;
+  playerName: string;
+}
 
 export function PlayerList() {
   const collapsed = useGameplayStore((s) => s.collapsedSections["players"]);
@@ -24,6 +43,26 @@ export function PlayerList() {
   const params = useParams<{ sessionId?: string }>();
   const sessionId = params?.sessionId ?? null;
   const { players, loading, error } = useSessionPlayers(sessionId);
+  const addToast = useGameplayStore((s) => s.addToast);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
+
+  const handleAction = (action: PlayerContextMenuAction) => {
+    if (!contextMenu || !sessionId) {
+      setContextMenu(null);
+      return;
+    }
+    if (action.kind === "resync") {
+      requestPlayerResync(sessionId, contextMenu.userId);
+      addToast(`Ressincronizando ${contextMenu.playerName}...`);
+    } else if (action.kind === "assignCharacter") {
+      setAssignTarget({
+        userId: contextMenu.userId,
+        playerName: contextMenu.playerName,
+      });
+    }
+    setContextMenu(null);
+  };
 
   return (
     <div className="border-b border-brand-border">
@@ -82,9 +121,24 @@ export function PlayerList() {
                 .join("")
                 .toUpperCase();
               const isGm = player.role === "GM" || player.role === "CO_GM";
+              const canResync = !isGm && sessionId !== null;
+              const missingCharacter = !isGm && !player.characterId;
               return (
                 <div
                   key={player.userId}
+                  onContextMenu={
+                    canResync
+                      ? (e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            userId: player.userId,
+                            playerName: player.user.displayName,
+                            x: e.clientX,
+                            y: e.clientY,
+                          });
+                        }
+                      : undefined
+                  }
                   className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
                 >
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[9px] font-bold text-brand-text">
@@ -103,26 +157,51 @@ export function PlayerList() {
                     <p className="truncate text-[11px] font-medium text-brand-text">
                       {player.user.displayName}
                     </p>
-                    <p className="text-[10px] text-brand-muted">
+                    <p className="truncate text-[10px] text-brand-muted">
                       {player.role === "GM"
                         ? "Mestre"
                         : player.role === "CO_GM"
                           ? "Co-Mestre"
                           : player.role === "SPECTATOR"
                             ? "Espectador"
-                            : "Jogador"}
+                            : player.character?.name
+                              ? player.character.name
+                              : "Jogador"}
                     </p>
                   </div>
-                  {isGm && (
+                  {isGm ? (
                     <span className="rounded bg-brand-accent/15 px-1.5 py-0.5 text-[9px] font-semibold text-brand-accent">
                       GM
                     </span>
-                  )}
+                  ) : missingCharacter ? (
+                    <GameTooltip label="Sem personagem — clique direito para atribuir" side="bottom">
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">
+                        Sem PJ
+                      </span>
+                    </GameTooltip>
+                  ) : null}
                 </div>
               );
             })
           )}
         </div>
+      )}
+      {contextMenu && (
+        <PlayerListContextMenu
+          playerName={contextMenu.playerName}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onAction={handleAction}
+        />
+      )}
+      {assignTarget && sessionId && (
+        <AssignCharacterModal
+          sessionId={sessionId}
+          targetUserId={assignTarget.userId}
+          targetPlayerName={assignTarget.playerName}
+          onClose={() => setAssignTarget(null)}
+        />
       )}
     </div>
   );

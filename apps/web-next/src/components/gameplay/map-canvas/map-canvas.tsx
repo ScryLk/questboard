@@ -72,10 +72,15 @@ import type { LayerId } from "@/lib/map-sidebar-types";
 import { CELL_SIZE, CELL_SIZE_FT } from "@/lib/gameplay/constants";
 import { useCameraStore, isZoomAnimating } from "@/lib/camera-store";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
+import { persistTokenMove } from "@/lib/session-tokens-api";
 
 export function MapCanvas() {
   const gridVisible = useGameplayStore((s) => s.gridVisible);
   const tokens = useGameplayStore((s) => s.tokens);
+  const activeMapId = useGameplayStore((s) => s.activeMapId);
+  const viewportWidth = useCameraStore((s) => s.viewportWidth);
+  const viewportHeight = useCameraStore((s) => s.viewportHeight);
+
   const tokenCreatureMap = useGameplayStore((s) => s.tokenCreatureMap);
   const selectedTokenIds = useGameplayStore((s) => s.selectedTokenIds);
   const hoveredTokenId = useGameplayStore((s) => s.hoveredTokenId);
@@ -156,6 +161,20 @@ export function MapCanvas() {
 
   const mapConfig = useGameplayStore((s) => s.mapConfig);
   const { gridCols, gridRows, name } = mapConfig;
+
+  // Auto fit-to-screen ao trocar de cena (ou quando o viewport mede
+  // pela primeira vez após o mount). Sem isso o mapa fica deslocado e
+  // cortado por padrão. Reage também a mudanças de viewport pra
+  // re-encaixar quando painéis colapsam/expandem.
+  // Trade-off: re-fit em toda troca de mapa, sem guard de "user já
+  // panou". Simples e previsível; user pode re-pan/zoom depois.
+  useEffect(() => {
+    if (!activeMapId) return;
+    if (viewportWidth <= 0 || viewportHeight <= 0) return;
+    if (gridCols <= 0 || gridRows <= 0) return;
+    useCameraStore.getState().fitToMap(gridCols, gridRows);
+  }, [activeMapId, gridCols, gridRows, viewportWidth, viewportHeight]);
+
   // CELL_SIZE é FIXO (64px) e NUNCA muda — importado de gameplay/constants
   const scaledCell = CELL_SIZE;
   const cellSizeFt = mapConfig.cellSizeFt || CELL_SIZE_FT;
@@ -544,6 +563,7 @@ export function MapCanvas() {
           pushMovementHistory(orig.tokenId, orig.originX, orig.originY);
           if (isCurrentTurnToken) addMovementFt(totalDist);
           moveToken(orig.tokenId, gx, gy);
+          persistTokenMove(orig.tokenId, gx, gy);
 
           // Check for Opportunity Attacks
           const state = useGameplayStore.getState();

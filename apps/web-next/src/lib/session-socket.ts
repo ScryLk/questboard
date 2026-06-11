@@ -100,6 +100,17 @@ export function disconnectSessionSocket(): void {
   }
 }
 
+/** GM pede ao backend pra ressincronizar um jogador travado. Backend
+ *  valida permissão e re-emite `player:force-resync` na sala — o client
+ *  do alvo reage recarregando o estado da sessão. */
+export function requestPlayerResync(
+  sessionId: string,
+  targetUserId: string,
+): void {
+  const s = getSessionSocket();
+  s.emit("session:request-resync", { sessionId, targetUserId });
+}
+
 /** Helper tipado pra subscrever evento + retornar cleanup function. */
 export function subscribe<T>(
   event: string,

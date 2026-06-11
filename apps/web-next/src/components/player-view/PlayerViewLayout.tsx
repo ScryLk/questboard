@@ -22,8 +22,11 @@ import { useRadialMenuStore } from "@/lib/radial-menu-store";
 import { MediaBroadcastOverlay } from "@/components/gameplay/media-broadcast-overlay";
 import { useMediaSocketBridge } from "@/lib/media-socket-bridge";
 import { usePlayerTokensBridge } from "@/hooks/use-player-tokens-bridge";
+import { usePlayerResyncListener } from "@/hooks/use-player-resync-listener";
 import { useEnsureBackendSessionId } from "@/hooks/use-ensure-backend-session-id";
 import { LevelUpToast } from "@/components/character/level-up-toast";
+import { MissionContextModal } from "@/components/gameplay/modals/mission-context-modal";
+import { useMissionContextSync } from "@/lib/mission-context-sync";
 
 export function PlayerViewLayout() {
   const panelVisible = usePlayerViewStore((s) => s.panelVisible);
@@ -47,6 +50,14 @@ export function PlayerViewLayout() {
   // o overlay "Sem personagem atribuído" fica eterno mesmo após o
   // backend ter criado o Token do char no join.
   usePlayerTokensBridge(backendSessionId);
+
+  // GM pode forçar resync via right-click na sidebar de jogadores —
+  // listener recarrega a página quando o alvo é esse usuário.
+  usePlayerResyncListener(backendSessionId);
+
+  // Briefing da missão — leitura via GET + socket subscribe. Player
+  // nunca escreve (modal montado em readOnly mais abaixo).
+  useMissionContextSync(backendSessionId);
 
   // Transition to end screen when session ends
   useEffect(() => {
@@ -110,6 +121,9 @@ export function PlayerViewLayout() {
       <div className="md:hidden" style={{ flexShrink: 0 }}>
         <MobileBottomTabs />
       </div>
+
+      {/* Briefing da missão — read-only pro player. */}
+      <MissionContextModal readOnly />
 
       {/* Dice central reveal — overlay de nat20/nat1 */}
       <DiceCentralReveal />

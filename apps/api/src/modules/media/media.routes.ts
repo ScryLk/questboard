@@ -25,6 +25,11 @@ export async function mediaRoutes(app: FastifyInstance) {
     { preHandler: requireGm },
     controller.show,
   );
+  app.post<SessionParams>(
+    "/sessions/:id/media/upload",
+    { preHandler: requireGm },
+    controller.upload,
+  );
   app.delete<SessionParams>(
     "/sessions/:id/media",
     { preHandler: requireGm },

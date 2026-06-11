@@ -18,6 +18,12 @@ interface CameraStore extends CameraState {
   zoomIn: (factor?: number, screenX?: number, screenY?: number) => void;
   zoomOut: (factor?: number, screenX?: number, screenY?: number) => void;
   centerOnCell: (cellX: number, cellY: number) => void;
+  /** Ajusta zoom e pan pra o mapa inteiro (gridCols × gridRows
+   *  células de `CELL_SIZE`) caber centralizado no viewport atual,
+   *  com `padding` em pixels nas bordas. Aplica clamp em
+   *  `[MIN_ZOOM, MAX_ZOOM]`. No-op se o viewport ainda não tem
+   *  dimensão (caso comum no primeiro render). */
+  fitToMap: (gridCols: number, gridRows: number, padding?: number) => void;
   reset: () => void;
   setViewportSize: (w: number, h: number) => void;
 
@@ -147,6 +153,42 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
       }
     };
     animFrameId = requestAnimationFrame(animate);
+  },
+
+  fitToMap: (gridCols, gridRows, padding = 48) => {
+    const s = get();
+    // Em SSR / antes do ResizeObserver disparar o viewport pode chegar
+    // zerado. Não fazemos fit — quem chama deve re-tentar após o
+    // viewport medir.
+    if (s.viewportWidth <= 0 || s.viewportHeight <= 0) return;
+    if (gridCols <= 0 || gridRows <= 0) return;
+
+    const mapW = gridCols * CELL_SIZE;
+    const mapH = gridRows * CELL_SIZE;
+    // Disponibilidade efetiva descontando padding em ambos os lados.
+    // Mínimo de 50px pra evitar zoom absurdo em viewports minúsculos
+    // (painéis muito largos abertos em telas pequenas).
+    const availW = Math.max(50, s.viewportWidth - padding * 2);
+    const availH = Math.max(50, s.viewportHeight - padding * 2);
+
+    // Pega o menor scale (limita pela dimensão mais apertada) e
+    // respeita o clamp global de zoom.
+    const rawFit = Math.min(availW / mapW, availH / mapH);
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, rawFit));
+
+    // Centraliza o mapa no viewport com o zoom escolhido.
+    const panX = (s.viewportWidth - mapW * zoom) / 2;
+    const panY = (s.viewportHeight - mapH * zoom) / 2;
+
+    // Cancela qualquer animação em curso de centerOnCell/zoomAt; o fit
+    // tem prioridade e não anima (snap pra evitar conflito visual ao
+    // trocar de cena).
+    if (animFrameId !== null) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+    cancelZoomAnim();
+    set({ zoom, panX, panY });
   },
 
   reset: () => {

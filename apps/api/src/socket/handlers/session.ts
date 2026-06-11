@@ -4,7 +4,9 @@ import { prisma } from "@questboard/db";
 import {
   emitPlayerConnected,
   emitPlayerDisconnected,
+  emitPlayerForceResync,
 } from "../../lib/socket-events.js";
+import { syncPlayerTokenOnConnect } from "../../modules/sessions/sessions.service.js";
 
 export function registerSessionHandler(nsp: Namespace, socket: Socket): void {
   const user = socket.data.user;
@@ -47,6 +49,16 @@ export function registerSessionHandler(nsp: Namespace, socket: Socket): void {
       userId: user.id,
       at: new Date().toISOString(),
     });
+
+    // Backfill defensivo: tokens criados antes do fix de HP têm
+    // currentHp/maxHp nulos. Reconnects não passam pelo REST join,
+    // então sem isso esses tokens nunca se autocorrigem. Fire-and-
+    // forget pra não atrasar a confirmação do join.
+    void syncPlayerTokenOnConnect(prisma, sessionId, user.id).catch(
+      (err) => {
+        console.warn("[session:join] syncPlayerTokenOnConnect falhou:", err);
+      },
+    );
   });
 
   socket.on("session:leave", async () => {
@@ -72,6 +84,45 @@ export function registerSessionHandler(nsp: Namespace, socket: Socket): void {
       ...data,
     });
   });
+
+  // GM dispara resync de um jogador travado. Backend regaranta o token
+  // (idempotente — backfila HP/recria se sumiu) e avisa a sala; o
+  // client cujo userId === targetUserId reage recarregando a página.
+  socket.on(
+    "session:request-resync",
+    async (data: { sessionId?: string; targetUserId?: string }) => {
+      const sessionId = data?.sessionId ?? socket.data.sessionId;
+      const targetUserId = data?.targetUserId;
+      if (!sessionId || !targetUserId) {
+        socket.emit("error", { message: "Payload inválido" });
+        return;
+      }
+
+      const requester = await prisma.sessionPlayer.findUnique({
+        where: { userId_sessionId: { userId: user.id, sessionId } },
+        select: { role: true },
+      });
+      if (!requester || (requester.role !== "GM" && requester.role !== "CO_GM")) {
+        socket.emit("error", {
+          message: "Apenas GM/CO-GM pode ressincronizar jogadores",
+        });
+        return;
+      }
+
+      try {
+        await syncPlayerTokenOnConnect(prisma, sessionId, targetUserId);
+      } catch (err) {
+        console.warn("[session:request-resync] sync falhou:", err);
+      }
+
+      emitPlayerForceResync({
+        sessionId,
+        targetUserId,
+        by: user.id,
+        at: new Date().toISOString(),
+      });
+    },
+  );
 }
 
 async function handleDisconnect(nsp: Namespace, socket: Socket, sessionId: string): Promise<void> {

@@ -54,6 +54,31 @@ export function createSessionsController(sessionsService: SessionsService) {
       return reply.status(204).send();
     },
 
+    async getMissionContext(
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply,
+    ) {
+      const out = await sessionsService.getMissionContext(request.params.id);
+      return reply.send(createSuccessResponse(out));
+    },
+
+    async setMissionContext(
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply,
+    ) {
+      const body = request.body as { content?: unknown };
+      const raw = typeof body?.content === "string" ? body.content : "";
+      // Limite defensivo: 8000 chars cobre briefings ricos sem deixar a
+      // settings JSON virar um monstro. Acima disso, recortamos.
+      const content = raw.slice(0, 8000);
+      const out = await sessionsService.setMissionContext(
+        request.params.id,
+        getUserId(request),
+        content,
+      );
+      return reply.send(createSuccessResponse(out));
+    },
+
     async join(
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply,
@@ -134,6 +159,37 @@ export function createSessionsController(sessionsService: SessionsService) {
     ) {
       await sessionsService.kick(request.params.id, getUserId(request), request.params.userId);
       return reply.status(204).send();
+    },
+
+    async listPlayerAvailableCharacters(
+      request: FastifyRequest<{ Params: { id: string; userId: string } }>,
+      reply: FastifyReply,
+    ) {
+      const result = await sessionsService.listPlayerAvailableCharacters(
+        request.params.id,
+        request.params.userId,
+      );
+      return reply.send(createSuccessResponse(result));
+    },
+
+    async assignPlayerCharacter(
+      request: FastifyRequest<{ Params: { id: string; userId: string } }>,
+      reply: FastifyReply,
+    ) {
+      const body = request.body as { characterId?: unknown };
+      if (typeof body?.characterId !== "string" || !body.characterId) {
+        return reply.status(400).send({
+          success: false,
+          error: { message: "characterId é obrigatório" },
+        });
+      }
+      const updated = await sessionsService.assignPlayerCharacter(
+        request.params.id,
+        getUserId(request),
+        request.params.userId,
+        body.characterId,
+      );
+      return reply.send(createSuccessResponse(updated));
     },
 
     async updatePlayerRole(

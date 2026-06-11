@@ -23,6 +23,7 @@ import { VisionOverlay } from "./VisionOverlay";
 import { PlayerZoomControls } from "./PlayerZoomControls";
 import { PlayerToolToggle } from "./PlayerToolToggle";
 import { useRadialMenuStore } from "@/lib/radial-menu-store";
+import { clearJoinResume } from "@/lib/join-resume";
 
 export function PlayerCanvas() {
   const visibleTokens = usePlayerViewStore((s) => s.visibleTokens);
@@ -42,6 +43,10 @@ export function PlayerCanvas() {
   const aoeInstances = useGameplayStore((s) => s.aoeInstances);
   const damageFloats = useGameplayStore((s) => s.damageFloats);
   const gridVisible = useGameplayStore((s) => s.gridVisible);
+  const mapBackgroundImage = useGameplayStore((s) => s.mapBackgroundImage);
+  const mapBackgroundOpacity = useGameplayStore((s) => s.mapBackgroundOpacity);
+  const mapGridOffsetX = useGameplayStore((s) => s.mapGridOffsetX);
+  const mapGridOffsetY = useGameplayStore((s) => s.mapGridOffsetY);
 
   const { gridCols, gridRows, cellSize, cellSizeFt } = MOCK_MAP;
   const playerZoom = usePlayerViewStore((s) => s.playerZoom);
@@ -419,6 +424,24 @@ export function PlayerCanvas() {
           stageMove(cell.x, cell.y);
         }}
       >
+        {/* Background image — vem do backend (Map.imageUrl/backgroundImage).
+            Renderizado antes do grid pra ficar embaixo das demais camadas. */}
+        {mapBackgroundImage && (
+          <img
+            src={mapBackgroundImage}
+            alt=""
+            className="pointer-events-none absolute inset-0"
+            style={{
+              width: canvasW,
+              height: canvasH,
+              objectFit: "cover",
+              opacity: mapBackgroundOpacity,
+              transform: `translate(${mapGridOffsetX}px, ${mapGridOffsetY}px)`,
+            }}
+            draggable={false}
+          />
+        )}
+
         {/* Grid */}
         {gridVisible && (
           <svg
@@ -773,6 +796,25 @@ export function PlayerCanvas() {
                 </>
               }
             />
+            {/* Escape hatch — joinStep persiste em localStorage, então um
+                player que tem um token no backend mas com ownerId de OUTRO
+                user (ex: troca de conta Clerk) fica preso aqui. Reset
+                manda de volta pro JoinScreen pra refazer o join. */}
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => {
+                  const s = usePlayerViewStore.getState();
+                  // Limpa o resume — sem isso o JoinScreen tentaria
+                  // auto-rejoin imediatamente e cairia no mesmo estado.
+                  if (s.sessionCode) clearJoinResume(s.sessionCode);
+                  s.setJoinStep("enter-code");
+                  s.setBackendSessionId(null);
+                }}
+                className="cursor-pointer rounded-md border border-brand-border bg-white/[0.04] px-4 py-2 text-xs text-brand-muted transition-colors hover:bg-white/[0.08] hover:text-brand-text"
+              >
+                Refazer entrada na sessão
+              </button>
+            </div>
           </div>
         </div>
       )}

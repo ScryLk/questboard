@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { ClipboardList, Trash2, X } from "lucide-react";
+import { ClipboardList, ScrollText, Trash2, X } from "lucide-react";
 import {
   useActionFeedStore,
   type FeedFilter,
 } from "@/lib/action-feed-store";
+import { useMissionContextStore } from "@/lib/mission-context-store";
+import { useGameplayStore } from "@/lib/gameplay-store";
 import { ActionFeedEntry } from "./action-feed-entry";
 import { useFeedTick } from "./use-feed-tick";
 
@@ -40,6 +42,9 @@ export function ActionFeedPanel() {
   const clear = useActionFeedStore((s) => s.clear);
   const now = useActionFeedStore((s) => s.tick);
 
+  const openMissionContext = useMissionContextStore((s) => s.open);
+  const currentUserIsGM = useGameplayStore((s) => s.currentUserIsGM);
+
   // Hidrata estado de abertura do localStorage no mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -63,20 +68,30 @@ export function ActionFeedPanel() {
   ).length;
 
   if (!isOpen) {
-    // Bordinha colapsada — botão único do feed de ações.
+    // Bordinha colapsada — rail vertical com botões. Action feed só
+    // pra GM/CO_GM; Contexto da missão sempre disponível.
     return (
-      <aside className="flex w-10 shrink-0 flex-col items-center border-l border-brand-border bg-[#0D0D12] py-2">
+      <aside className="flex w-10 shrink-0 flex-col items-center gap-1 border-l border-brand-border bg-[#0D0D12] py-2">
+        {currentUserIsGM && (
+          <button
+            onClick={toggleOpen}
+            title="Abrir feed de ações"
+            className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/[0.04] hover:text-brand-accent"
+          >
+            <ClipboardList className="h-4 w-4" />
+            {activeCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-accent px-1 text-[9px] font-bold tabular-nums text-white">
+                {activeCount}
+              </span>
+            )}
+          </button>
+        )}
         <button
-          onClick={toggleOpen}
-          title="Abrir feed de ações"
-          className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/[0.04] hover:text-brand-accent"
+          onClick={openMissionContext}
+          title="Contexto da missão"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-white/[0.04] hover:text-brand-accent"
         >
-          <ClipboardList className="h-4 w-4" />
-          {activeCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-accent px-1 text-[9px] font-bold tabular-nums text-white">
-              {activeCount}
-            </span>
-          )}
+          <ScrollText className="h-4 w-4" />
         </button>
       </aside>
     );

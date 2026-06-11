@@ -5,6 +5,7 @@
 // e listar tokens.
 
 import { apiRequest } from "./api-client";
+import { useGameplayStore } from "./gameplay-store";
 
 export interface MapLite {
   id: string;
@@ -15,6 +16,13 @@ export interface MapLite {
   gridSize: number;
   gridCols: number;
   gridRows: number;
+  // Assets visuais — vêm preenchidos pelo `prisma.map.findMany` sem
+  // `select`, então a list endpoint já entrega isso sem alteração no
+  // backend. Player/GM bridges propagam pro gameplay-store.
+  imageUrl: string | null;
+  backgroundImage: string | null;
+  gridOffsetX?: number;
+  gridOffsetY?: number;
 }
 
 export interface TokenDto {
@@ -64,4 +72,23 @@ export function updateToken(
     `/sessions/${sessionId}/maps/${mapId}/tokens/${tokenId}`,
     { method: "PATCH", body: changes },
   );
+}
+
+/**
+ * Fire-and-forget: persiste posição de token no backend lendo sessionId
+ * e mapId direto do gameplay-store. No-op se algum dos dois faltar
+ * (modo offline/dev sem backend). Use em qualquer caminho onde o GM
+ * mexe em token.x/token.y localmente — o backend emite token:updated
+ * pra player view sincronizar.
+ */
+export function persistTokenMove(
+  tokenId: string,
+  x: number,
+  y: number,
+): void {
+  const { sessionId, activeMapId } = useGameplayStore.getState();
+  if (!sessionId || !activeMapId) return;
+  void updateToken(sessionId, activeMapId, tokenId, { x, y }).catch((err) => {
+    console.warn("[persistTokenMove] PATCH falhou:", err);
+  });
 }

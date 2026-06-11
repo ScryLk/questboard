@@ -8,11 +8,30 @@ import { apiRequest } from "./api-client";
 export interface SessionPlayerDto {
   userId: string;
   role: "GM" | "CO_GM" | "PLAYER" | "SPECTATOR";
+  characterId: string | null;
+  character: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  } | null;
   user: {
     id: string;
     displayName: string;
     avatarUrl: string | null;
   };
+}
+
+export interface AvailableCharacterDto {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  system: string;
+  level: number;
+}
+
+export interface AvailableCharactersResult {
+  currentCharacterId: string | null;
+  characters: AvailableCharacterDto[];
 }
 
 export interface JoinResult {
@@ -38,4 +57,28 @@ export async function joinSessionByCode(
 
 export function listSessionPlayers(sessionId: string) {
   return apiRequest<SessionPlayerDto[]>(`/sessions/${sessionId}/players`);
+}
+
+/** GM lista personagens do jogador-alvo pra atribuir um. */
+export function listPlayerAvailableCharacters(
+  sessionId: string,
+  userId: string,
+) {
+  return apiRequest<AvailableCharactersResult>(
+    `/sessions/${sessionId}/players/${userId}/available-characters`,
+  );
+}
+
+/** GM atribui um personagem do próprio jogador-alvo ao SessionPlayer.
+ *  Backend cria/garante o token e dispara `player:force-resync` —
+ *  o player recarrega automaticamente. */
+export function assignPlayerCharacter(
+  sessionId: string,
+  userId: string,
+  characterId: string,
+) {
+  return apiRequest<SessionPlayerDto>(
+    `/sessions/${sessionId}/players/${userId}/character`,
+    { method: "PATCH", body: { characterId } },
+  );
 }

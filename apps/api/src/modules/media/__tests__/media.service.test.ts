@@ -20,6 +20,14 @@ vi.mock("../../../lib/socket-events.js", () => ({
   emitMediaHide: (...args: unknown[]) => emitMediaHide(...args),
 }));
 
+// r2.ts importa `env` no top-level e quebra em testes sem credenciais.
+// Mock vazio é suficiente — só o `show` com URL é exercido aqui.
+vi.mock("../../../lib/r2.js", () => ({
+  uploadFile: vi.fn(async () => "https://r2-mock/file.mp4"),
+  deleteFile: vi.fn(),
+  getSignedUrl: vi.fn(async () => "https://r2-mock/signed"),
+}));
+
 interface FakeSession {
   id: string;
   status: "IDLE" | "LOBBY" | "LIVE" | "PAUSED" | "ENDED" | "ARCHIVED";

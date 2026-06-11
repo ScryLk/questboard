@@ -48,6 +48,10 @@ export function useTokensBridge(sessionId: string | null): void {
     useGameplayStore.setState(() => ({
       tokens: tokens.map(toGameToken),
       activeMapId: map?.id ?? null,
+      sessionId,
+      mapBackgroundImage: map?.imageUrl ?? map?.backgroundImage ?? null,
+      mapGridOffsetX: map?.gridOffsetX ?? 0,
+      mapGridOffsetY: map?.gridOffsetY ?? 0,
     }));
   }, [sessionId, tokens, map]);
 }

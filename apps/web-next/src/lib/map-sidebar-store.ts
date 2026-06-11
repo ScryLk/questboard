@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_LAYERS, DEFAULT_VISIBLE_SECTIONS } from "./map-sidebar-types";
 import { useGameplayStore } from "./gameplay-store";
 import { MOCK_MAP } from "./gameplay-mock-data";
+import { broadcastSend } from "./broadcast-sync";
 
 // ── Helpers ──
 
@@ -166,6 +167,17 @@ export const useMapSidebarStore = create<MapSidebarState>()(
 
         // Load new scene state
         state.loadSceneState(sceneId);
+
+        // Notifica o player view que o mapa ativo mudou. Sem isso o
+        // PlayerCanvas fica mostrando "Sem mapa ativo" — o evento
+        // gm:map-switch é o único que popula activeMapName lá.
+        const scene = get().scenes.find((sc) => sc.id === sceneId);
+        if (scene) {
+          broadcastSend("gm:map-switch", {
+            mapId: scene.id,
+            mapName: scene.name,
+          }, "gm");
+        }
       },
 
       reorderScenes: (fromIndex, toIndex) => {
@@ -210,10 +222,25 @@ export const useMapSidebarStore = create<MapSidebarState>()(
 
       loadSceneState: (sceneId) => {
         const scene = get().scenes.find((sc) => sc.id === sceneId);
-        if (!scene?.savedState) return;
+        if (!scene) return;
 
+        // mapConfig não vive no SceneSavedState — vem dos metadados da
+        // cena (name + dimensions). Sem essa sincronia o botão do canvas
+        // mostra "Sem mapa ativo 25×25" (MOCK_MAP default) mesmo com a
+        // cena ativa, e o grid renderiza em tamanho errado.
+        const dimsMatch = scene.dimensions.match(/^(\d+)\s*[×x]\s*(\d+)$/);
+        if (dimsMatch) {
+          useGameplayStore.getState().setMapConfig({
+            gridCols: parseInt(dimsMatch[1], 10),
+            gridRows: parseInt(dimsMatch[2], 10),
+            name: scene.name,
+          });
+        } else {
+          useGameplayStore.getState().setMapConfig({ name: scene.name });
+        }
+
+        if (!scene.savedState) return;
         const saved = scene.savedState;
-        const gs = useGameplayStore.getState();
 
         // Restore gameplay-store state
         // We set fields directly via the store's set function
@@ -403,6 +430,20 @@ export const useMapSidebarStore = create<MapSidebarState>()(
         visibleSections: state.visibleSections,
         sidebarLayout: state.sidebarLayout,
       }),
+      onRehydrateStorage: () => (state) => {
+        // gameplayStore não é persistido → mapConfig volta ao default no
+        // refresh, mesmo com cena ativa persistida aqui. Re-aplica a cena
+        // pra sincronizar mapConfig + saved state com o localStorage.
+        // Em microtask pra garantir que useGameplayStore já exista.
+        // O broadcast pra player tabs é tratado em outro lugar (resposta
+        // de `player:join`); não emite daqui pra evitar player tab
+        // mandando mensagens com senderId "gm".
+        if (!state?.activeSceneId) return;
+        const sceneId = state.activeSceneId;
+        queueMicrotask(() => {
+          useMapSidebarStore.getState().loadSceneState(sceneId);
+        });
+      },
     },
   ),
 );

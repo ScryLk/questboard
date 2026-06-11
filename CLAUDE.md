@@ -258,6 +258,7 @@ behavior:{id}:state              Hash: status, phase, tickCount
 session:status-changed    session:settings-updated
 player:joined             player:left
 player:connected          player:disconnected
+player:force-resync       { sessionId, targetUserId, by, at }  # GM destrava player travado (right-click na sidebar)
 
 # Mapa / Tokens
 token:moved               token:added

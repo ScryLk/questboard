@@ -461,6 +461,9 @@ export interface GameplayState {
   // Map config (grid dims, cell size in ft, active map id)
   mapConfig: { gridCols: number; gridRows: number; cellSizeFt: number; name: string };
   activeMapId: string | null;
+  // sessionId do backend — usado pelos persistors (PATCH /sessions/:s/...).
+  // Populado pelo useTokensBridge a partir da rota.
+  sessionId: string | null;
   setMapConfig: (cfg: Partial<{ gridCols: number; gridRows: number; cellSizeFt: number; name: string }>) => void;
   loadMapFromLibrary: (mapId: string) => { ok: true } | { error: string };
 
@@ -800,6 +803,10 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     if (!req) return;
     // Move o token no mapa — player vê via sync automático.
     get().moveToken(req.tokenId, req.toX, req.toY);
+    // Persiste no backend pra players via socket token:updated.
+    import("./session-tokens-api").then(({ persistTokenMove }) => {
+      persistTokenMove(req.tokenId, req.toX, req.toY);
+    });
     // Notifica o player (broadcast cross-tab) — mesma aba recebe via
     // próprio sync + limpa stagedMove quando chega.
     import("./broadcast-sync").then(({ broadcastSend }) => {
@@ -1447,6 +1454,7 @@ export const useGameplayStore = create<GameplayState>((set, get) => ({
     name: MOCK_MAP.name,
   },
   activeMapId: null,
+  sessionId: null,
   setMapConfig: (cfg) => set((s) => ({ mapConfig: { ...s.mapConfig, ...cfg } })),
   loadMapFromLibrary: (mapId) => {
     const map = useMapLibraryStore.getState().maps[mapId];

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Swords } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
 export default function PublicLayout({
   children,
@@ -13,9 +14,8 @@ export default function PublicLayout({
       {/* Nav */}
       <nav className="sticky top-0 z-30 border-b border-brand-border bg-brand-primary/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <Link href="/dashboard" className="flex items-center gap-2 text-brand-text">
-            <Swords className="h-5 w-5 text-brand-accent" />
-            <span className="font-heading text-sm font-bold">QuestBoard</span>
+          <Link href="/dashboard" className="flex items-center text-brand-text">
+            <Logo variant="full" size="sm" priority />
           </Link>
           <Link
             href="/dashboard"

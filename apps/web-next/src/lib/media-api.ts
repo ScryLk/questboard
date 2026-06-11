@@ -33,3 +33,21 @@ export function showMedia(
 export function hideMedia(sessionId: string) {
   return apiRequest<void>(`/sessions/${sessionId}/media`, { method: "DELETE" });
 }
+
+/** Upload de vídeo local — sobe pro R2 e já ativa o broadcast. Mesmo
+ *  payload do `showMedia` retornado pra o frontend não precisar de
+ *  segundo GET. */
+export function uploadMedia(
+  sessionId: string,
+  file: File,
+  title?: string,
+) {
+  const form = new FormData();
+  // Backend lê o file via `request.file()` — campo "file" é o blob.
+  form.append("file", file);
+  if (title) form.append("title", title);
+  return apiRequest<ActiveMediaDto>(
+    `/sessions/${sessionId}/media/upload`,
+    { method: "POST", body: form },
+  );
+}

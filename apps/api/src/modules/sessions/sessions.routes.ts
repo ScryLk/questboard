@@ -86,6 +86,29 @@ export async function sessionsRoutes(app: FastifyInstance) {
     { preHandler: requireGmOwner },
     controller.updatePlayerRole,
   );
+  app.get<SessionUserParams>(
+    "/sessions/:id/players/:userId/available-characters",
+    { preHandler: requireGm },
+    controller.listPlayerAvailableCharacters,
+  );
+  app.patch<SessionUserParams>(
+    "/sessions/:id/players/:userId/character",
+    { preHandler: requireGm },
+    controller.assignPlayerCharacter,
+  );
+
+  // ─── Mission context (briefing visível pra todos) ─
+  // Leitura: qualquer participante. Escrita: GM/CO_GM (requireGm).
+  app.get<SessionParams>(
+    "/sessions/:id/mission-context",
+    { preHandler: requireAnyParticipant },
+    controller.getMissionContext,
+  );
+  app.patch<SessionParams>(
+    "/sessions/:id/mission-context",
+    { preHandler: requireGm },
+    controller.setMissionContext,
+  );
 
   // ─── Audit log & phases ──────────────────────────
   app.get<SessionParams>(

@@ -425,6 +425,7 @@ export interface WallSegment {
 
 export type MapObjectType =
   | "table"
+  | "table_round"
   | "chair"
   | "bed"
   | "chest"
@@ -435,11 +436,13 @@ export type MapObjectType =
   | "statue"
   | "pillar"
   | "campfire"
+  | "fireplace"
   | "tree"
   | "bush"
   | "rock_large"
   | "rock_small"
   | "torch_stand"
+  | "candleholder"
   | "banner"
   | "rug"
   | "cage"
@@ -450,6 +453,8 @@ export type MapObjectType =
   | "weapon_rack"
   | "anvil"
   | "cauldron"
+  | "chalice"
+  | "beer_mug"
   | "skull_pile"
   | "spider_web"
   | "flask_monster"
@@ -508,6 +513,7 @@ export interface MapObjectInfo {
 export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
   // Furniture
   { type: "table", label: "Mesa", icon: Table2, category: "furniture" },
+  { type: "table_round", label: "Mesa Redonda", icon: Table2, category: "furniture" },
   { type: "chair", label: "Cadeira", icon: Armchair, category: "furniture" },
   { type: "bed", label: "Cama", icon: Bed, category: "furniture" },
   { type: "throne", label: "Trono", icon: Crown, category: "furniture" },
@@ -529,6 +535,8 @@ export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
   { type: "well", label: "Poco", icon: CircleDot, category: "decoration" },
   { type: "anvil", label: "Bigorna", icon: Hammer, category: "decoration" },
   { type: "cauldron", label: "Caldeirao", icon: FlaskConical, category: "decoration" },
+  { type: "chalice", label: "Cálice", icon: Wine, category: "decoration" },
+  { type: "beer_mug", label: "Caneca", icon: Wine, category: "decoration" },
   // Nature
   { type: "tree", label: "Arvore", icon: TreePine, category: "nature" },
   { type: "bush", label: "Arbusto", icon: Leaf, category: "nature" },
@@ -536,7 +544,9 @@ export const MAP_OBJECT_CATALOG: MapObjectInfo[] = [
   { type: "rock_small", label: "Pedra Peq.", icon: Mountain, category: "nature" },
   // Light
   { type: "torch_stand", label: "Tocha", icon: Flame, category: "light" },
+  { type: "candleholder", label: "Castiçal", icon: Flame, category: "light" },
   { type: "campfire", label: "Fogueira", icon: Flame, category: "light" },
+  { type: "fireplace", label: "Lareira", icon: Flame, category: "light" },
   // New sprite-backed types (no Lucide equivalent; icons are approximations)
   { type: "skull_pile", label: "Crânios", icon: Skull, category: "decoration" },
   { type: "spider_web", label: "Teia", icon: Hexagon, category: "decoration" },

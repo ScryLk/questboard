@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, X } from "lucide-react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { broadcastSend } from "@/lib/broadcast-sync";
+import { clearJoinResume } from "@/lib/join-resume";
 
 interface Props {
   onClose: () => void;
@@ -28,6 +29,7 @@ export function LeaveSessionDialog({ onClose }: Props) {
   }, [onClose]);
 
   const handleLeave = () => {
+    if (sessionCode) clearJoinResume(sessionCode);
     broadcastSend("player:leave", { sessionCode }, "player");
     router.push("/campanhas");
   };

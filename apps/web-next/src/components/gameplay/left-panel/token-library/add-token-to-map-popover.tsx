@@ -5,6 +5,7 @@ import { Minus, Plus } from "lucide-react";
 import { useGameplayStore } from "@/lib/gameplay-store";
 import type { SavedToken } from "@/lib/token-library-types";
 import type { TokenAlignment } from "@/lib/gameplay-mock-data";
+import { pickFreeSpawnCells } from "@/lib/gameplay/token-spawn";
 
 interface AddTokenToMapPopoverProps {
   token: SavedToken;
@@ -33,7 +34,19 @@ export function AddTokenToMapPopover({
   function handleAdd() {
     const alignment = TYPE_TO_ALIGNMENT[token.type] ?? "neutral";
 
+    // Spawn no centro do viewport (espaço de grid, considerando pan/
+    // zoom da câmera) e dispersa em espiral pra não empilhar com
+    // tokens já no mapa. Antes era chumbado em (5+i, 5).
+    const { mapConfig, tokens: existingTokens } = useGameplayStore.getState();
+    const cells = pickFreeSpawnCells(
+      qty,
+      mapConfig.gridCols,
+      mapConfig.gridRows,
+      existingTokens.filter((t) => t.onMap),
+    );
+
     for (let i = 0; i < qty; i++) {
+      const cell = cells[i] ?? cells[cells.length - 1] ?? { x: 0, y: 0 };
       const suffix = qty > 1 ? ` #${i + 1}` : "";
       const tokenId = `tok_lib_${Date.now()}_${Math.random().toString(36).slice(2, 5)}_${i}`;
       addToken({
@@ -45,8 +58,8 @@ export function AddTokenToMapPopover({
         ac: token.ac,
         speed: parseInt(token.speed) || 30,
         size: token.gridSize,
-        x: 5 + i,
-        y: 5,
+        x: cell.x,
+        y: cell.y,
         icon: token.icon || undefined,
       });
 

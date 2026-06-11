@@ -48,6 +48,22 @@ export function emitSessionSettingsUpdated(p: SessionSettingsUpdatedPayload): vo
   emitToSession(p.sessionId, "session:settings-updated", p);
 }
 
+export interface MissionContextUpdatedPayload {
+  sessionId: string;
+  content: string;
+  by: string;
+  at: string;
+}
+
+/** Broadcast pra TODOS na sala (GM, CO_GM, players, spectators) — o
+ *  contexto da missão é leitura pública dentro da sessão; só a escrita
+ *  é restrita a GM/CO_GM. */
+export function emitMissionContextUpdated(
+  p: MissionContextUpdatedPayload,
+): void {
+  emitToSession(p.sessionId, "session:mission-context-updated", p);
+}
+
 // ─── Combate ─────────────────────────────────────────────────
 
 export interface CombatHpChangedPayload {
@@ -116,6 +132,19 @@ export function emitPlayerConnected(p: PlayerPresencePayload): void {
 
 export function emitPlayerDisconnected(p: PlayerPresencePayload): void {
   emitToSession(p.sessionId, "player:disconnected", p);
+}
+
+export interface PlayerForceResyncPayload {
+  sessionId: string;
+  targetUserId: string;
+  by: string;
+  at: string;
+}
+
+/** GM forçou resync de um jogador específico. Emite pra sala inteira; o
+ *  client do alvo (targetUserId === me) reage recarregando o estado. */
+export function emitPlayerForceResync(p: PlayerForceResyncPayload): void {
+  emitToSession(p.sessionId, "player:force-resync", p);
 }
 
 // ─── Conversa com NPC (CLAUDE.md §6.3 / §8) ──────────────────

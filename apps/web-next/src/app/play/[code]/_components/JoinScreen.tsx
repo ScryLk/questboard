@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, Loader2, LogIn, Plus, Swords, Wand2 } from "lucide-react";
+import { Brain, Loader2, LogIn, Plus, Wand2 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { useUser } from "@clerk/nextjs";
 import {
   usePlayerViewStore,
@@ -16,6 +17,11 @@ import {
   getBackendCharacterId,
   syncCharacterToBackend,
 } from "@/lib/character-sync";
+import {
+  clearJoinResume,
+  loadJoinResume,
+  saveJoinResume,
+} from "@/lib/join-resume";
 
 // Lista vazia por default — player vê empty state com botão "Criar
 // personagem novo". Backend (apps/api/src/modules/sessions/players)
@@ -63,11 +69,25 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const createdId = searchParams.get("createdId");
   const { isSignedIn, isLoaded } = useUser();
 
-  const [name, setName] = useState("");
+  // Resume é carregado sync no mount pra evitar flicker do form em
+  // reloads onde o player já tinha entrado antes. `null` = sem
+  // resume, `undefined` = ainda não checado (SSR / primeiro render).
+  const initialResume = useMemo(
+    () => (sessionCode ? loadJoinResume(sessionCode) : null),
+    [sessionCode],
+  );
+
+  const [name, setName] = useState(initialResume?.playerName ?? "");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(
-    null,
+    initialResume?.characterId ?? null,
   );
   const [joining, setJoining] = useState(false);
+  // `autoRejoining` = tentativa silenciosa de reconectar com dados do
+  // localStorage; mostra UI dedicada em vez do form completo.
+  const [autoRejoining, setAutoRejoining] = useState(
+    Boolean(initialResume?.playerName && initialResume?.characterId),
+  );
+  const autoTriedRef = useRef(false);
 
   const setPlayerName = usePlayerViewStore((s) => s.setPlayerName);
   const setCharacterId = usePlayerViewStore((s) => s.setCharacterId);
@@ -108,6 +128,16 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
   const campaignSystem = usePlayerViewStore((s) => s.campaignSystem);
   const setCampaignSystem = usePlayerViewStore((s) => s.setCampaignSystem);
 
+  // Restaura o sistema da campanha a partir do resume (a store em si
+  // não tem persist, então toda recarga zera). Só seta uma vez no
+  // mount — depois disso o usuário pode trocar manualmente.
+  useEffect(() => {
+    if (initialResume?.campaignSystem && !campaignSystem) {
+      setCampaignSystem(initialResume.campaignSystem);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const campaignName =
     usePlayerViewStore((s) => s.campaignName) || "A Maldição de Strahd";
   const gmName = usePlayerViewStore((s) => s.gmName) || "Lucas";
@@ -134,6 +164,9 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     [myCharacters],
   );
 
+  const showMock = myLobbyEntries.length === 0;
+  const characterList = showMock ? MOCK_CHARACTERS : myLobbyEntries;
+
   // Auto-seleciona o personagem que acabou de ser criado pelo wizard.
   useEffect(() => {
     if (createdId && myCharacters.some((c) => c.id === createdId)) {
@@ -141,8 +174,38 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     }
   }, [createdId, myCharacters]);
 
-  const showMock = myLobbyEntries.length === 0;
-  const characterList = showMock ? MOCK_CHARACTERS : myLobbyEntries;
+  // Auto-rejoin a partir do localStorage. Só dispara uma vez por mount,
+  // quando: tem resume válido, clerk carregou, usuário logado, sistema
+  // hidratado, e o personagem salvo ainda existe na lista local. Se
+  // qualquer condição falhar, cai pro form manual (sem limpar resume —
+  // o usuário pode tentar de novo escolhendo um char diferente).
+  useEffect(() => {
+    if (!autoRejoining || autoTriedRef.current) return;
+    if (!initialResume) return;
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      setAutoRejoining(false);
+      return;
+    }
+    if (!campaignSystem) return;
+    const savedChar = myCharacters.find(
+      (c) => c.id === initialResume.characterId,
+    );
+    if (!savedChar) {
+      // Personagem do resume foi deletado (ou ainda não hidratou) —
+      // se o store já hidratou mas a lista está vazia/sem match,
+      // limpa pra próximo reload pedir um novo. Hidratação do
+      // characterStore (zustand persist) é sync após mount; um único
+      // tick é suficiente, então tratamos lista vazia como "deletado".
+      clearJoinResume(sessionCode);
+      setAutoRejoining(false);
+      setSelectedCharacterId(null);
+      return;
+    }
+    autoTriedRef.current = true;
+    void handleJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRejoining, isLoaded, isSignedIn, campaignSystem, myCharacters]);
 
   const handleJoin = async () => {
     if (!name.trim() || !selectedCharacterId || !campaignSystem) return;
@@ -180,12 +243,14 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
       console.warn("[join] char sync falhou:", err);
     }
 
+    let backendSessionIdResolved: string | null = null;
     try {
       // Backend cria SessionPlayer + Token (se characterId presente)
       // + emite sockets pra GM ver entrada e token no canvas.
       // 409 ("já é membro") é tratado como sucesso pelo helper —
       // cobre o caso GM testando o player view em outra aba.
       const result = await joinSessionByCode(sessionCode, backendCharId);
+      backendSessionIdResolved = result.sessionId;
       setBackendSessionId(result.sessionId);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
@@ -200,9 +265,16 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
         return;
       }
       if (status === 404) {
+        // Resume aponta pra sessão que não existe mais — limpa o
+        // cache pra não tentar de novo no próximo reload.
+        clearJoinResume(sessionCode);
+        setAutoRejoining(false);
         setSessionNotFound(true);
         setJoinError("Sessão não encontrada — verifique o código.");
       } else {
+        // Auto-rejoin falhou por outro motivo — volta pro form pra
+        // o usuário decidir o que fazer (não limpa o resume).
+        setAutoRejoining(false);
         setJoinError(
           (err as { message?: string }).message ??
             "Não foi possível entrar na sessão.",
@@ -239,6 +311,14 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     setConnected(true);
     setJoinStep("waiting-gm");
     setJoining(false);
+
+    // Próxima recarga não precisa pedir esses dados de novo.
+    saveJoinResume(sessionCode, {
+      playerName: name.trim(),
+      characterId: selectedCharacterId,
+      campaignSystem,
+      backendSessionId: backendSessionIdResolved,
+    });
   };
 
   const handleCreate = () => {
@@ -250,14 +330,51 @@ export function JoinScreen({ sessionCode }: JoinScreenProps) {
     name.trim() && selectedCharacterId && campaignSystem && !joining,
   );
 
+  // Auto-rejoin em curso — mostra UI mínima em vez do form, evita
+  // flicker e deixa claro pro usuário que algo está acontecendo.
+  if (autoRejoining) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10">
+        <div className="text-center">
+          <div className="mb-2 flex items-center justify-center">
+            <Logo variant="full" size="sm" priority />
+          </div>
+          <h1 className="text-2xl font-bold text-white">{campaignName}</h1>
+          <p className="mt-1 text-sm text-white/40">
+            Mestre: {gmName} · {playerCount} jogadores
+          </p>
+        </div>
+
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-brand-accent" />
+          <p className="text-sm text-white/60">
+            Reconectando como{" "}
+            <span className="font-medium text-white/90">
+              {initialResume?.playerName}
+            </span>
+            ...
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            clearJoinResume(sessionCode);
+            setAutoRejoining(false);
+          }}
+          className="mt-8 text-xs text-white/40 underline-offset-4 transition-colors hover:text-white/70 hover:underline"
+        >
+          Entrar como outra pessoa
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10">
       <div className="text-center">
-        <div className="mb-2 flex items-center justify-center gap-2">
-          <Swords className="h-5 w-5 text-brand-accent" />
-          <span className="text-sm font-medium uppercase tracking-widest text-brand-accent">
-            QuestBoard
-          </span>
+        <div className="mb-2 flex items-center justify-center">
+          <Logo variant="full" size="sm" priority />
         </div>
         <h1 className="text-2xl font-bold text-white">{campaignName}</h1>
         <p className="mt-1 text-sm text-white/40">

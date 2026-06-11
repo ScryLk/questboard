@@ -5,6 +5,7 @@ import { MOCK_MAP } from "./gameplay-mock-data";
 import { playOAAlertSound } from "./oa-alert-sound";
 import { useSettingsStore } from "./settings-store";
 import { makeWallKey } from "./wall-helpers";
+import { persistTokenMove } from "./session-tokens-api";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +65,7 @@ export async function executePath(
     // Move token (CSS transition handles visual animation at 200ms)
     store.getState().moveToken(tokenId, cell.x, cell.y);
     store.getState().addMovementFt(cell.ftCost);
+    persistTokenMove(tokenId, cell.x, cell.y);
 
     // Wait for visual animation
     await delay(180);

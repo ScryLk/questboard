@@ -9,13 +9,15 @@ import {
   Map,
   Radio,
   Pause,
+  ScrollText,
   Square,
   ChevronDown,
-  Swords,
 } from "lucide-react";
 import { usePlayerViewStore } from "@/lib/player-view-store";
 import { MOCK_SESSION, MOCK_PLAYERS, getElapsedTime } from "@/lib/gameplay-mock-data";
 import { LeaveSessionDialog } from "./actions-bar/LeaveSessionDialog";
+import { Logo } from "@/components/brand/logo";
+import { useMissionContextStore } from "@/lib/mission-context-store";
 
 export function PlayerHeader() {
   const playerId = usePlayerViewStore((s) => s.playerId);
@@ -30,6 +32,7 @@ export function PlayerHeader() {
   const sessionEnded = usePlayerViewStore((s) => s.sessionEnded);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
+  const openMissionContext = useMissionContextStore((s) => s.open);
 
   const [elapsed, setElapsed] = useState(() =>
     getElapsedTime(MOCK_SESSION.startedAt),
@@ -87,12 +90,9 @@ export function PlayerHeader() {
     <div className="flex h-12 shrink-0 items-center border-b border-brand-border bg-[#0D0D12] px-3">
       {/* Left — Logo + Session info */}
       <div className="flex min-w-0 shrink items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <Swords className="h-4 w-4 text-brand-accent" />
-          <span className="hidden text-sm font-bold text-brand-accent sm:inline">
-            QuestBoard
-          </span>
-        </div>
+        {/* Mobile: só símbolo. Desktop: símbolo + texto. */}
+        <Logo variant="full" size="xs" className="hidden sm:inline-flex" />
+        <Logo variant="mark" size="sm" className="sm:hidden" />
 
         <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
           <span className="truncate text-sm font-semibold text-brand-text">
@@ -144,6 +144,16 @@ export function PlayerHeader() {
 
       {/* Right — Volume, Character, Leave */}
       <div className="flex items-center gap-1.5">
+        {/* Contexto da missão (read-only pra player; conteúdo vem do GM
+            via Session.settings.missionContext + socket). */}
+        <button
+          onClick={openMissionContext}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-brand-muted transition-colors hover:bg-white/[0.06] hover:text-brand-accent"
+          title="Contexto da missão"
+        >
+          <ScrollText className="h-4 w-4" />
+        </button>
+
         {/* Volume toggle */}
         {soundtrack.playing && (
           <button

@@ -4,10 +4,20 @@
 // preview imediato + botão "Exibir pra todos". Quando há mídia
 // ativa, mostra controles pra ocultar.
 
-import { useMemo, useState } from "react";
-import { Loader2, Play, Tv, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileVideo, Loader2, Play, Tv, Upload, X } from "lucide-react";
 import { normalizeMediaUrl } from "@questboard/validators";
 import { useMediaBroadcastStore } from "@/lib/media-broadcast-store";
+
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/ogg"];
+const ACCEPTED_VIDEO_EXTENSIONS = ".mp4,.webm,.ogv,.ogg";
+const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface Props {
   /** Quando presente, opera em modo backend (REST + socket). Quando
@@ -30,12 +40,16 @@ export function MediaBroadcastModal({ sessionId }: Props) {
   const errorMessage = useMediaBroadcastStore((s) => s.errorMessage);
   const showLocal = useMediaBroadcastStore((s) => s.showLocal);
   const showBackend = useMediaBroadcastStore((s) => s.showBackend);
+  const uploadAndShow = useMediaBroadcastStore((s) => s.uploadAndShow);
   const hideLocal = useMediaBroadcastStore((s) => s.hideLocal);
   const hideBackend = useMediaBroadcastStore((s) => s.hideBackend);
   const clearError = useMediaBroadcastStore((s) => s.clearError);
 
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const preview = useMemo(() => {
     if (!url.trim()) return null;
@@ -44,11 +58,45 @@ export function MediaBroadcastModal({ sessionId }: Props) {
 
   if (!composerOpen) return null;
 
-  const canSubmit =
+  const canSubmitUrl =
     !pending && preview !== null && preview.provider !== "unknown";
+  const canSubmitFile = !pending && file !== null && !fileError;
+  const canSubmit = file ? canSubmitFile : canSubmitUrl;
+
+  function validateAndSetFile(f: File | null) {
+    if (!f) {
+      setFile(null);
+      setFileError(null);
+      return;
+    }
+    if (!ACCEPTED_VIDEO_TYPES.includes(f.type)) {
+      setFile(null);
+      setFileError("Formato não suportado. Use MP4, WebM ou OGG.");
+      return;
+    }
+    if (f.size > MAX_UPLOAD_BYTES) {
+      setFile(null);
+      setFileError(
+        `Arquivo grande demais (${formatFileSize(f.size)}). Limite: 200MB.`,
+      );
+      return;
+    }
+    setFile(f);
+    setFileError(null);
+    if (errorMessage) clearError();
+  }
 
   function handleShow() {
-    if (!canSubmit || !preview) return;
+    if (file) {
+      if (!canSubmitFile) return;
+      void uploadAndShow(sessionId, file, title.trim() || undefined);
+      setUrl("");
+      setTitle("");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (!canSubmitUrl || !preview) return;
     if (sessionId) {
       void showBackend(sessionId, {
         url: url.trim(),
@@ -91,9 +139,9 @@ export function MediaBroadcastModal({ sessionId }: Props) {
               Exibir vídeo pra todos
             </h2>
             <p className="mt-1 text-xs text-brand-muted">
-              Cola um link do YouTube, Vimeo ou MP4 direto. Quando você
-              ativa, o overlay aparece em fullscreen pra todos os jogadores
-              da sessão.
+              Cola um link do YouTube/Vimeo, MP4 direto, ou envie um
+              arquivo (MP4, WebM, máx. 200MB). O overlay aparece em
+              fullscreen pra todos os jogadores da sessão.
             </p>
           </div>
           <button
@@ -139,10 +187,61 @@ export function MediaBroadcastModal({ sessionId }: Props) {
                   if (errorMessage) clearError();
                 }}
                 placeholder="https://youtu.be/... ou https://vimeo.com/..."
-                className="w-full rounded-lg border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none placeholder:text-gray-500 focus:border-brand-accent"
+                disabled={file !== null}
+                className="w-full rounded-lg border border-white/10 bg-brand-primary px-3 py-2 text-sm text-white outline-none placeholder:text-gray-500 focus:border-brand-accent disabled:cursor-not-allowed disabled:opacity-50"
                 autoFocus
               />
             </label>
+
+            {/* File upload — alternativa ao URL. Mutuamente exclusivo:
+                quando há arquivo selecionado, o input de URL desabilita. */}
+            <div>
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-brand-muted">
+                Ou envie um arquivo
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_VIDEO_EXTENSIONS}
+                onChange={(e) => validateAndSetFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              {file ? (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+                  <FileVideo className="h-4 w-4 shrink-0 text-emerald-300" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-white">
+                      {file.name}
+                    </p>
+                    <p className="text-[10px] text-brand-muted">
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => validateAndSetFile(null)}
+                    disabled={pending}
+                    className="rounded p-1 text-brand-muted transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+                    aria-label="Remover arquivo"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={url.trim().length > 0}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 bg-white/[0.02] px-3 py-3 text-xs text-brand-muted transition-colors hover:border-brand-accent/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Escolher MP4/WebM (máx. 200MB)
+                </button>
+              )}
+              {fileError && (
+                <p className="mt-1 text-[10px] text-rose-300">{fileError}</p>
+              )}
+            </div>
 
             <label className="block">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-brand-muted">
@@ -157,7 +256,7 @@ export function MediaBroadcastModal({ sessionId }: Props) {
               />
             </label>
 
-            {preview && (
+            {!file && preview && (
               <div
                 className={`rounded-md border px-3 py-2 text-[11px] ${
                   preview.provider === "unknown"
@@ -190,12 +289,12 @@ export function MediaBroadcastModal({ sessionId }: Props) {
               {pending ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Exibindo...
+                  {file ? "Enviando..." : "Exibindo..."}
                 </>
               ) : (
                 <>
                   <Play className="h-3.5 w-3.5" />
-                  Exibir pra todos
+                  {file ? "Enviar e exibir" : "Exibir pra todos"}
                 </>
               )}
             </button>

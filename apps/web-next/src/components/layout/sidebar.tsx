@@ -27,6 +27,7 @@ import { useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useCampaignStore } from "@/lib/campaign-store";
 import { useCampaignModalsStore } from "@/lib/campaign-modals-store";
+import { Logo } from "@/components/brand/logo";
 
 const CAMPAIGN_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -63,8 +64,8 @@ function SidebarContent({
     <>
       {/* Logo + close (mobile) */}
       <div className="flex items-center gap-2 border-b border-brand-border px-5 py-4">
-        <Link href="/" className="flex-1 text-xl font-bold text-brand-accent">
-          QuestBoard
+        <Link href="/" className="flex-1">
+          <Logo variant="full" size="md" priority />
         </Link>
         {onCloseRequest && (
           <button

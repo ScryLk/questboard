@@ -8,6 +8,7 @@ import { useGameplayStore } from "@/lib/gameplay-store";
 import { useNPCStore } from "@/lib/npc-store";
 import { CREATURE_COMPENDIUM } from "@/lib/creature-data";
 import { useCustomCreaturesStore } from "@/lib/custom-creatures-store";
+import { pickFreeSpawnCells } from "@/lib/gameplay/token-spawn";
 
 interface AddToMapPopoverProps {
   npc: NPCData;
@@ -101,7 +102,18 @@ export function AddToMapPopover({ npc, onClose }: AddToMapPopoverProps) {
     const existingCount = npcTokenMap[npc.id]?.length ?? 0;
     const alignment = NPC_TYPE_TO_ALIGNMENT[npc.type] ?? "neutral";
 
+    // Spawn no centro do viewport + espiral pra evitar empilhar com
+    // tokens já no mapa (antes era chumbado em (8+i, 8)).
+    const { mapConfig, tokens: existingTokens } = useGameplayStore.getState();
+    const cells = pickFreeSpawnCells(
+      qty,
+      mapConfig.gridCols,
+      mapConfig.gridRows,
+      existingTokens.filter((t) => t.onMap),
+    );
+
     for (let i = 0; i < qty; i++) {
+      const cell = cells[i] ?? cells[cells.length - 1] ?? { x: 0, y: 0 };
       const instanceNum = existingCount + i + 1;
       const tokenName =
         qty > 1 || existingCount > 0
@@ -118,8 +130,8 @@ export function AddToMapPopover({ npc, onClose }: AddToMapPopoverProps) {
         ac: stats.ac,
         speed: stats.speed,
         size: stats.size,
-        x: 8 + i,
-        y: 8,
+        x: cell.x,
+        y: cell.y,
         icon: npc.portrait || undefined,
       });
 

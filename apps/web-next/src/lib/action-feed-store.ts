@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { useGameplayStore } from "./gameplay-store";
 import type { ConditionType } from "./gameplay-mock-data";
+import { persistTokenMove } from "./session-tokens-api";
 
 // ─── Tipos ──────────────────────────────────────────────────────────
 
@@ -182,6 +183,11 @@ export const useActionFeedStore = create<ActionFeedState>((set, get) => ({
       switch (entry.type) {
         case "TOKEN_MOVED":
           gm.moveToken(
+            entry.payload.tokenId,
+            entry.payload.fromX,
+            entry.payload.fromY,
+          );
+          persistTokenMove(
             entry.payload.tokenId,
             entry.payload.fromX,
             entry.payload.fromY,
